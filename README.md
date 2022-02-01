@@ -155,7 +155,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 	Share: func(c echo.Context) (map[string]interface{}, error) {
 		user := // get auth user...
 		return map[string]interface{}{
-			"AppName": "App Name",
+			"AppName":  "App Name",
 			"AuthUser": user,
 		}, nil
 	},
@@ -166,7 +166,7 @@ Set shared data manually.
 
 ```go
 Inertia(c).Share(map[string]interface{}{
-	"AppName": "App Name",
+	"AppName":  "App Name",
 	"AuthUser": user,
 })
 ```
@@ -205,7 +205,7 @@ Configure asset version via middleware.
 
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-	VersionFunc:    func() string { return version },
+	VersionFunc: func() string { return version },
 }))
 ```
 
