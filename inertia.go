@@ -36,6 +36,7 @@ type Inertia struct {
 	mu          sync.RWMutex
 }
 
+// New creates a new inertia instance.
 func New(c echo.Context, rootView string, sharedProps map[string]interface{}, versionFunc VersionFunc) *Inertia {
 	return &Inertia{
 		c:           c,
@@ -143,6 +144,8 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 	return c.Render(code, i.rootView, viewData)
 }
 
+// Lazy defines a lazy evaluated data.
+// see https://inertiajs.com/partial-reloads#lazy-data-evaluation
 func Lazy(callback func() interface{}) *LazyProp {
 	return &LazyProp{
 		callback: callback,

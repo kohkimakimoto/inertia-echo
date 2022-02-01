@@ -38,8 +38,9 @@ func defaultVersionFunc() VersionFunc {
 	var v string
 
 	// It is for Google App Engine.
+	// see https://cloud.google.com/appengine/docs/standard/go/runtime#environment_variables
 	if v = os.Getenv("GAE_VERSION"); v == "" {
-		// The fallback version value that imitates the GAE version.
+		// The fallback version value that imitates the default GAE version format.
 		// It assumes to be used for development.
 		v = time.Now().Format("20060102t150405")
 	}
@@ -53,6 +54,7 @@ func Middleware() echo.MiddlewareFunc {
 	return MiddlewareWithConfig(DefaultMiddlewareConfig)
 }
 
+// MiddlewareWithConfig returns an echo middleware that adds the Inertia instance to the context.
 func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	// Defaults
 	if config.Skipper == nil {
