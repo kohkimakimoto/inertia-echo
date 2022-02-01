@@ -66,7 +66,7 @@ func main() {
 
 	// handlers
 	e.GET("/", func(c echo.Context) error {
-		// Instead of using c.Render(), The following code can render inertia response.
+		// Instead of using c.Render(), the following code can render inertia response.
 		return Inertia(c).Render(http.StatusOK, "Index", map[string]interface{}{
 			"message": "Hello, World!",
 		})
@@ -77,7 +77,7 @@ func main() {
 }
 ```
 
-After that, you need to setup your client-side app. See [Client-side setup](https://inertiajs.com/client-side-setup) in official documentation.
+You need to setup your client-side app. See [Client-side setup](https://inertiajs.com/client-side-setup) in official document.
 
 ### Routing
 
@@ -87,7 +87,7 @@ Inertia-echo provides route helpers like [Official Laravel Adapter](https://iner
 e.GET("/about", inertia.Handler("About"))
 ```
 
-See also official document: https://inertiajs.com/routing
+See also official document: [Routing](https://inertiajs.com/routing)
 
 ### Responses
 
@@ -128,7 +128,7 @@ You can then access this variable like a regular template variable.
 <meta name="twitter:title" content="{{ .Meta }}">
 ```
 
-See also official document: https://inertiajs.com/responses
+See also official document: [Responses](https://inertiajs.com/responses)
 
 ### Redirects
 
@@ -138,13 +138,13 @@ You can use Echo's standard way to redirect.
 return c.Redirect(http.StatusFound, "/")
 ```
 
-The following is a way to redirect to an external website.
+The following is a way to redirect to an external website in Inertia apps.
 
 ```go
 return Inertia(c).Location("/path/to/external")
 ```
 
-See also official document: https://inertiajs.com/redirects
+See also official document: [Redirects](https://inertiajs.com/redirects)
 
 ### Shared data
 
@@ -171,7 +171,7 @@ Inertia(c).Share(map[string]interface{}{
 })
 ```
 
-See also official document: https://inertiajs.com/shared-data
+See also official document: [Shared data](https://inertiajs.com/shared-data)
 
 ### Partial reloads
 
@@ -197,7 +197,7 @@ Inertia(c).Render(http.StatusOK, "Index", map[string]interface{}{
 })
 ```
 
-See also official document: https://inertiajs.com/partial-reloads
+See also official document: [Partial reloads](https://inertiajs.com/partial-reloads)
 
 ### Asset versioning
 
@@ -215,7 +215,7 @@ Configure asset version manually.
 Inertia(c).SetVersion(func() string { return version })
 ```
 
-See also official document: https://inertiajs.com/asset-versioning
+See also official document: [Assset versioning](https://inertiajs.com/asset-versioning)
 
 ## Author
 
