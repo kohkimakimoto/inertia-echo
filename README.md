@@ -51,7 +51,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// I recommend to define the alias of `inertia.MustGet` for simplify the code.
+// I recommend to define the alias of `inertia.MustGet` to simplify the code.
 // The code examples in this document are written with this alias.
 var Inertia = inertia.MustGet
 
