@@ -1,0 +1,12 @@
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.tmp/
+node_modules/
+/coverage-report.html
+/.external-tools
+/examples/helloworld/gen/dist
+/examples/helloworld/main
+!.gitkeep
+
