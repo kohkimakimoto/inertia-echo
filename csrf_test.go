@@ -22,6 +22,6 @@ func TestCSRF(t *testing.T) {
 
 	cookie := rec.Header().Get(echo.HeaderSetCookie)
 	if !strings.Contains(cookie, "XSRF-TOKEN") {
-		t.Errorf("should cotain XSRF-TOKEN, but not '%v'", cookie)
+		t.Errorf("should contain XSRF-TOKEN, but not '%v'", cookie)
 	}
 }
