@@ -9,6 +9,22 @@ The [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://e
 I assume that you know [what Inertia.js is](https://inertiajs.com/who-is-it-for) and [how it works](https://inertiajs.com/how-it-works).
 You also need to know [Echo](https://echo.labstack.com/) that is a Go web framework. The inertia-echo helps you to develop web apps based on them.
 
+Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Minimum example](#minimum-example)
+  - [Routing](#routing)
+  - [Responses](#responses)
+  - [Redirects](#redirects)
+  - [Shared data](#shared-data)
+  - [Partial reloads](#partial-reloads)
+  - [Asset versioning](#asset-versioning)
+- [Unsupported features](#unsupported-features)
+  - [Validation](#validation)
+- [Author](#author)
+- [License](#license)
+
 ## Installation
 
 ```sh
@@ -217,6 +233,15 @@ Inertia(c).SetVersion(func() string { return version })
 ```
 
 See also official document: [Assset versioning](https://inertiajs.com/asset-versioning)
+
+## Unsupported features
+
+### Validation
+
+The inertia-echo does not support validation because echo does not have built-in validation.
+Validation implementation is up to you. If you want to handle validation errors with inertia-echo, You have to implement it yourself.
+
+See also official document: [Validation](https://inertiajs.com/validation)
 
 ## Author
 
