@@ -218,6 +218,15 @@ Inertia(c).SetVersion(func() string { return version })
 
 See also official document: [Assset versioning](https://inertiajs.com/asset-versioning)
 
+## Unsupported features
+
+### Validation
+
+The inertia-echo does not support validation because echo does not have built-in validation.
+Validation implementation is up to you. If you want to handle validation errors with inertia-echo, You have to implement it yourself.
+
+See also official document: [Validation](https://inertiajs.com/validation)
+
 ## Author
 
 Kohki Makimoto <kohki.makimoto@gmail.com>
