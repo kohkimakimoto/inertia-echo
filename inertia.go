@@ -102,6 +102,7 @@ func (i *Inertia) RenderWithViewData(code int, component string, props, viewData
 func (i *Inertia) render(code int, component string, props, viewData map[string]interface{}) error {
 	c := i.c
 	req := c.Request()
+	res := c.Response()
 
 	props = mergeProps(i.sharedProps, props)
 
@@ -133,9 +134,9 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 		Version:   i.Version(),
 	}
 
+	res.Header().Set("Vary", HeaderXInertia)
+
 	if req.Header.Get(HeaderXInertia) != "" {
-		res := c.Response()
-		res.Header().Set("Vary", "Accept")
 		res.Header().Set(HeaderXInertia, "true")
 		return c.JSON(http.StatusOK, page)
 	}
