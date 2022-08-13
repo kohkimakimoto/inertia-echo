@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/inertia-react';
+import {Head, Link} from '@inertiajs/inertia-react';
 
 export default function About() {
   return (
@@ -9,6 +9,9 @@ export default function About() {
       </Head>
       <div>
         About us
+        <div>
+          <Link href="/">Index</Link>
+        </div>
       </div>
     </>
   )
