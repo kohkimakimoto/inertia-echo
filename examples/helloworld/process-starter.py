@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from __future__ import division, print_function, absolute_import, unicode_literals
 import argparse, os, sys, re, fcntl, time, subprocess, textwrap, threading, signal
 

@@ -28,7 +28,20 @@ type Page struct {
 	Version   string                 `json:"version"`
 }
 
-type Inertia struct {
+type Inertia interface {
+	SetRootView(name string)
+	RootView() string
+	Share(props map[string]interface{})
+	Shared() map[string]interface{}
+	FlushShared()
+	SetVersion(version VersionFunc)
+	Version() string
+	Location(url string) error
+	Render(code int, component string, props map[string]interface{}) error
+	RenderWithViewData(code int, component string, props, viewData map[string]interface{}) error
+}
+
+type inertia struct {
 	c           echo.Context
 	rootView    string
 	sharedProps map[string]interface{}
@@ -37,8 +50,8 @@ type Inertia struct {
 }
 
 // New creates a new inertia instance.
-func New(c echo.Context, rootView string, sharedProps map[string]interface{}, versionFunc VersionFunc) *Inertia {
-	return &Inertia{
+func New(c echo.Context, rootView string, sharedProps map[string]interface{}, versionFunc VersionFunc) Inertia {
+	return &inertia{
 		c:           c,
 		rootView:    rootView,
 		sharedProps: sharedProps,
@@ -46,11 +59,15 @@ func New(c echo.Context, rootView string, sharedProps map[string]interface{}, ve
 	}
 }
 
-func (i *Inertia) SetRootView(name string) {
+func (i *inertia) SetRootView(name string) {
 	i.rootView = name
 }
 
-func (i *Inertia) Share(props map[string]interface{}) {
+func (i *inertia) RootView() string {
+	return i.rootView
+}
+
+func (i *inertia) Share(props map[string]interface{}) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -60,46 +77,46 @@ func (i *Inertia) Share(props map[string]interface{}) {
 	}
 }
 
-func (i *Inertia) Shared() map[string]interface{} {
+func (i *inertia) Shared() map[string]interface{} {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
 	return i.sharedProps
 }
 
-func (i *Inertia) FlushShared() {
+func (i *inertia) FlushShared() {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	i.sharedProps = map[string]interface{}{}
 }
 
-func (i *Inertia) SetVersion(version VersionFunc) {
+func (i *inertia) SetVersion(version VersionFunc) {
 	i.version = version
 }
 
-func (i *Inertia) Version() string {
+func (i *inertia) Version() string {
 	return i.version()
 }
 
 // Location generates 409 response for external redirects
 // see https://inertiajs.com/redirects#external-redirects
-func (i *Inertia) Location(url string) error {
+func (i *inertia) Location(url string) error {
 	res := i.c.Response()
 	res.Header().Set(HeaderXInertiaLocation, url)
 	res.WriteHeader(409)
 	return nil
 }
 
-func (i *Inertia) Render(code int, component string, props map[string]interface{}) error {
+func (i *inertia) Render(code int, component string, props map[string]interface{}) error {
 	return i.render(code, component, props, map[string]interface{}{})
 }
 
-func (i *Inertia) RenderWithViewData(code int, component string, props, viewData map[string]interface{}) error {
+func (i *inertia) RenderWithViewData(code int, component string, props, viewData map[string]interface{}) error {
 	return i.render(code, component, props, viewData)
 }
 
-func (i *Inertia) render(code int, component string, props, viewData map[string]interface{}) error {
+func (i *inertia) render(code int, component string, props, viewData map[string]interface{}) error {
 	c := i.c
 	req := c.Request()
 	res := c.Response()

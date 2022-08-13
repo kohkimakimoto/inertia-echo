@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/inertia-react';
+import { Head, Link } from '@inertiajs/inertia-react';
 
 type IndexProps = {
   message: string;
@@ -13,6 +13,9 @@ export default function Index({ message }: IndexProps) {
       </Head>
       <div>
         {message}
+        <div>
+          <Link href="/about">About us</Link>
+        </div>
       </div>
     </>
   )
