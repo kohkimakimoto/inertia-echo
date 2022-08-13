@@ -15,13 +15,13 @@ func TestInertia_Version(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	inertia := New(c, "app.html", map[string]interface{}{}, nil)
+	in := New(c, "app.html", map[string]interface{}{}, nil)
 
-	inertia.SetVersion(func() string {
+	in.SetVersion(func() string {
 		return "123456789"
 	})
 
-	v := inertia.Version()
+	v := in.Version()
 	if v != "123456789" {
 		t.Errorf("inertia.Version() = %v, want %v", v, "1")
 	}
@@ -32,9 +32,9 @@ func TestInertia_SetRootView(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	inertia := New(c, "app.html", map[string]interface{}{}, nil)
-	inertia.SetRootView("app2.html")
-	if inertia.rootView != "app2.html" {
+	in := New(c, "app.html", map[string]interface{}{}, nil)
+	in.SetRootView("app2.html")
+	if in.RootView() != "app2.html" {
 		t.Fatal("rootView should be app2.html")
 	}
 }
@@ -48,11 +48,11 @@ func TestInertia_Render(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		inertia := New(c, "app.html", map[string]interface{}{}, func() string {
+		in := New(c, "app.html", map[string]interface{}{}, func() string {
 			return "123456789"
 		})
 
-		err := inertia.Render(http.StatusOK, "Home", map[string]interface{}{
+		err := in.Render(http.StatusOK, "Home", map[string]interface{}{
 			"title": "Home Page title",
 		})
 		if err != nil {
@@ -75,11 +75,11 @@ func TestInertia_Render(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		inertia := New(c, "app.html", map[string]interface{}{}, func() string {
+		in := New(c, "app.html", map[string]interface{}{}, func() string {
 			return "123456789"
 		})
 
-		err := inertia.Render(http.StatusOK, "Home", map[string]interface{}{
+		err := in.Render(http.StatusOK, "Home", map[string]interface{}{
 			"title": "Home Page title",
 		})
 		if err != nil {
@@ -102,11 +102,11 @@ func TestInertia_RenderWithViewData(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	inertia := New(c, "app_with_view_data.html", map[string]interface{}{}, func() string {
+	in := New(c, "app_with_view_data.html", map[string]interface{}{}, func() string {
 		return "123456789"
 	})
 
-	err := inertia.RenderWithViewData(http.StatusOK, "Home", map[string]interface{}{
+	err := in.RenderWithViewData(http.StatusOK, "Home", map[string]interface{}{
 		"title": "Home Page title",
 	}, map[string]interface{}{
 		"viewData": "This is view data",

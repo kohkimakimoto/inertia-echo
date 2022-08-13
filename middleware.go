@@ -85,8 +85,8 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			}
 
 			// Create an inertia instance.
-			inertia := New(c, config.RootView, sharedProps, config.VersionFunc)
-			c.Set(key, inertia)
+			in := New(c, config.RootView, sharedProps, config.VersionFunc)
+			c.Set(key, in)
 
 			req := c.Request()
 			res := c.Response()
@@ -99,8 +99,8 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			// In the event that the assets change, initiate a
 			// client-side location visit to force an update.
 			// see https://inertiajs.com/the-protocol#asset-versioning
-			if checkVersion(req, inertia.Version()) {
-				return inertia.Location(req.URL.Path)
+			if checkVersion(req, in.Version()) {
+				return in.Location(req.URL.Path)
 			}
 
 			// Wrap the http response writer for modify the response headers after handler execution.
@@ -146,26 +146,26 @@ func changeRedirectCode(req *http.Request, res *echo.Response) {
 }
 
 var (
-	ErrNotFound = errors.New("context does not have '*Inertia'")
+	ErrNotFound = errors.New("context does not have 'Inertia'")
 )
 
-func Get(c echo.Context) (*Inertia, error) {
-	i, ok := c.Get(key).(*Inertia)
+func Get(c echo.Context) (Inertia, error) {
+	in, ok := c.Get(key).(Inertia)
 	if !ok {
 		return nil, ErrNotFound
 	}
-	return i, nil
+	return in, nil
 }
 
-func MustGet(c echo.Context) *Inertia {
-	i, err := Get(c)
+func MustGet(c echo.Context) Inertia {
+	in, err := Get(c)
 	if err != nil {
 		panic(err)
 	}
-	return i
+	return in
 }
 
 func Has(c echo.Context) bool {
-	_, ok := c.Get(key).(*Inertia)
+	_, ok := c.Get(key).(Inertia)
 	return ok
 }
