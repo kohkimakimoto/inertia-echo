@@ -84,7 +84,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				sharedProps = map[string]interface{}{}
 			}
 
-			// Create an inertia instance.
+			// Create an Inertia instance.
 			in := New(c, config.RootView, sharedProps, config.VersionFunc)
 			c.Set(key, in)
 
@@ -149,15 +149,15 @@ var (
 	ErrNotFound = errors.New("context does not have 'Inertia'")
 )
 
-func Get(c echo.Context) (Inertia, error) {
-	in, ok := c.Get(key).(Inertia)
+func Get(c echo.Context) (*Inertia, error) {
+	in, ok := c.Get(key).(*Inertia)
 	if !ok {
 		return nil, ErrNotFound
 	}
 	return in, nil
 }
 
-func MustGet(c echo.Context) Inertia {
+func MustGet(c echo.Context) *Inertia {
 	in, err := Get(c)
 	if err != nil {
 		panic(err)
@@ -166,6 +166,6 @@ func MustGet(c echo.Context) Inertia {
 }
 
 func Has(c echo.Context) bool {
-	_, ok := c.Get(key).(Inertia)
+	_, ok := c.Get(key).(*Inertia)
 	return ok
 }

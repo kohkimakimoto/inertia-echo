@@ -89,7 +89,7 @@ func TestMiddlewareAndRender(t *testing.T) {
 		err := m(func(c echo.Context) error {
 			i := MustGet(c)
 
-			// set shared data by inertia instance
+			// set shared data by Inertia instance
 			i.Share(map[string]interface{}{
 				"key2": "value2",
 			})
@@ -175,7 +175,7 @@ func TestMustGet(t *testing.T) {
 	err := m(func(c echo.Context) error {
 		i := MustGet(c)
 		if i == nil {
-			t.Error("expected inertia to be set")
+			t.Error("expected Inertia to be set")
 		}
 		return c.String(http.StatusOK, "test")
 	})(c)
@@ -193,7 +193,7 @@ func TestHas(t *testing.T) {
 
 	err := m(func(c echo.Context) error {
 		if !Has(c) {
-			t.Errorf("expected inertia exists")
+			t.Errorf("expected Inertia exists")
 		}
 		return c.String(http.StatusOK, "test")
 	})(c)

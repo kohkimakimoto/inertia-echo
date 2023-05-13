@@ -23,7 +23,7 @@ func TestInertia_Version(t *testing.T) {
 
 	v := in.Version()
 	if v != "123456789" {
-		t.Errorf("inertia.Version() = %v, want %v", v, "1")
+		t.Errorf("Inertia.Version() = %v, want %v", v, "1")
 	}
 }
 
