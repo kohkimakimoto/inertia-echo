@@ -15,19 +15,6 @@ const (
 	HeaderXInertiaPartialComponent = "X-Inertia-Partial-Component"
 )
 
-type LazyProp struct {
-	callback func() interface{}
-}
-
-type VersionFunc func() string
-
-type Page struct {
-	Component string                 `json:"component"`
-	Props     map[string]interface{} `json:"props"`
-	Url       string                 `json:"url"`
-	Version   string                 `json:"version"`
-}
-
 type Inertia struct {
 	c           echo.Context
 	rootView    string
@@ -78,6 +65,8 @@ func (i *Inertia) FlushShared() {
 	i.sharedProps = map[string]interface{}{}
 }
 
+type VersionFunc func() string
+
 func (i *Inertia) SetVersion(version VersionFunc) {
 	i.version = version
 }
@@ -101,6 +90,13 @@ func (i *Inertia) Render(code int, component string, props map[string]interface{
 
 func (i *Inertia) RenderWithViewData(code int, component string, props, viewData map[string]interface{}) error {
 	return i.render(code, component, props, viewData)
+}
+
+type Page struct {
+	Component string                 `json:"component"`
+	Props     map[string]interface{} `json:"props"`
+	Url       string                 `json:"url"`
+	Version   string                 `json:"version"`
 }
 
 func (i *Inertia) render(code int, component string, props, viewData map[string]interface{}) error {
@@ -147,6 +143,10 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 
 	viewData["page"] = page
 	return c.Render(code, i.rootView, viewData)
+}
+
+type LazyProp struct {
+	callback func() interface{}
 }
 
 // Lazy defines a lazy evaluated data.
