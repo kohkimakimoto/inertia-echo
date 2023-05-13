@@ -129,7 +129,7 @@ Sometimes you may even want to provide data that will not be sent to your JavaSc
 ```go
 func ShowEventsHandler(c echo.Context) error {
 	event := // retrieve a event...
-	return inertia..RenderWithViewData(c, http.StatusOK, "Event/Show", map[string]interface{}{
+	return inertia.RenderWithViewData(c, http.StatusOK, "Event/Show", map[string]interface{}{
 		"Event": event,
 	}, map[string]interface{}{
 		"Meta": "Meta data...",
