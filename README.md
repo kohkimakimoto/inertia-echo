@@ -92,11 +92,11 @@ func main() {
 }
 ```
 
-You need to setup your client-side app. See [Client-side setup](https://inertiajs.com/client-side-setup) in official document.
+You need to set up your client-side application. See [Client-side setup](https://inertiajs.com/client-side-setup) in official document.
 
-### Routing
+### Shorthand routes
 
-Inertia-echo provides route helpers like [Official Laravel Adapter](https://inertiajs.com/routing#route-helpers).
+Inertia-echo provides a helper function for shorthand routes like [Official Laravel Adapter](https://inertiajs.com/routing#shorthand-routes).
 
 ```go
 e.GET("/about", inertia.Handler("About"))
