@@ -10,23 +10,6 @@ The [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://e
 I assume that you are familiar with Inertia.js and [how it works](https://inertiajs.com/how-it-works).
 You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a Go web framework. The inertia-echo assists you in developing web applications that leverage both of these technologies.
 
-Table of Contents
-
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Minimum example](#minimum-example)
-  - [Routing](#routing)
-  - [Responses](#responses)
-  - [Redirects](#redirects)
-  - [Shared data](#shared-data)
-  - [Partial reloads](#partial-reloads)
-  - [Asset versioning](#asset-versioning)
-- [Unsupported features](#unsupported-features)
-  - [Validation](#validation)
-- [Demo application](#demo-application)
-- [Author](#author)
-- [License](#license)
-
 ## Installation
 
 ```sh
