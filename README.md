@@ -70,10 +70,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// I recommend to define the alias of `inertia.MustGet` to simplify the code.
-// The code examples in this document are written with this alias.
-var Inertia = inertia.MustGet
-
 func main() {
 	e := echo.New()
 	// setup renderer to load the root template.
@@ -86,7 +82,7 @@ func main() {
 	// handlers
 	e.GET("/", func(c echo.Context) error {
 		// Instead of using c.Render(), the following code can render inertia response.
-		return Inertia(c).Render(http.StatusOK, "Index", map[string]interface{}{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 			"message": "Hello, World!",
 		})
 	})
@@ -116,7 +112,7 @@ Creating responses.
 ```go
 func ShowEventsHandler(c echo.Context) error {
 	event := // retrieve a event...
-	return Inertia(c).Render(http.StatusOK, "Event/Show", map[string]interface{}{
+	return inertia.Render(c, http.StatusOK, "Event/Show", map[string]interface{}{
 		"Event": event,
 	})
 }
@@ -133,7 +129,7 @@ Sometimes you may even want to provide data that will not be sent to your JavaSc
 ```go
 func ShowEventsHandler(c echo.Context) error {
 	event := // retrieve a event...
-	return Inertia(c).RenderWithViewData(http.StatusOK, "Event/Show", map[string]interface{}{
+	return inertia..RenderWithViewData(c, http.StatusOK, "Event/Show", map[string]interface{}{
 		"Event": event,
 	}, map[string]interface{}{
 		"Meta": "Meta data...",
@@ -160,7 +156,7 @@ return c.Redirect(http.StatusFound, "/")
 The following is a way to redirect to an external website in Inertia apps.
 
 ```go
-return Inertia(c).Location("/path/to/external")
+return inertia.Location(c, "/path/to/external")
 ```
 
 See also official document: [Redirects](https://inertiajs.com/redirects)
@@ -184,7 +180,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 Set shared data manually.
 
 ```go
-Inertia(c).Share(map[string]interface{}{
+inertia.Share(c, map[string]interface{}{
 	"AppName":  "App Name",
 	"AuthUser": user,
 })
@@ -196,7 +192,7 @@ See also official document: [Shared data](https://inertiajs.com/shared-data)
 
 ```go
 
-Inertia(c).Render(http.StatusOK, "Index", map[string]interface{}{
+inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 	// ALWAYS included on first visit
 	// OPTIONALLY included on partial reloads
 	// ALWAYS evaluated
@@ -231,7 +227,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 Configure asset version manually.
 
 ```go
-Inertia(c).SetVersion(func() string { return version })
+inertia.SetVersion(c, func() string { return version })
 ```
 
 See also official document: [Assset versioning](https://inertiajs.com/asset-versioning)
