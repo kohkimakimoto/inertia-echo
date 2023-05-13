@@ -55,10 +55,8 @@ func jsonMarshal(v interface{}) template.JS {
 func mergeFuncMap(funcMaps ...template.FuncMap) template.FuncMap {
 	merged := template.FuncMap{}
 	for _, funcMap := range funcMaps {
-		if funcMap != nil {
-			for k, v := range funcMap {
-				merged[k] = v
-			}
+		for k, v := range funcMap {
+			merged[k] = v
 		}
 	}
 	return merged

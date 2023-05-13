@@ -34,10 +34,7 @@ func TestCSRFWithConfig(t *testing.T) {
 	csrf := CSRFWithConfig(CSRFConfig{
 		Skipper: func(c echo.Context) bool {
 			path := c.Request().URL.Path
-			if strings.HasPrefix(path, "/should_skip") {
-				return true
-			}
-			return false
+			return strings.HasPrefix(path, "/should_skip")
 		},
 	})
 	h := csrf(func(c echo.Context) error {
