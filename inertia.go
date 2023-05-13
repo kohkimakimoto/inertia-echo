@@ -156,3 +156,43 @@ func Lazy(callback func() interface{}) *LazyProp {
 		callback: callback,
 	}
 }
+
+func SetRootView(c echo.Context, name string) {
+	MustGet(c).SetRootView(name)
+}
+
+func RootView(c echo.Context) string {
+	return MustGet(c).RootView()
+}
+
+func Share(c echo.Context, props map[string]interface{}) {
+	MustGet(c).Share(props)
+}
+
+func Shared(c echo.Context) map[string]interface{} {
+	return MustGet(c).Shared()
+}
+
+func FlushShared(c echo.Context) {
+	MustGet(c).FlushShared()
+}
+
+func SetVersion(c echo.Context, version VersionFunc) {
+	MustGet(c).SetVersion(version)
+}
+
+func Version(c echo.Context) string {
+	return MustGet(c).Version()
+}
+
+func Location(c echo.Context, url string) error {
+	return MustGet(c).Location(url)
+}
+
+func Render(c echo.Context, code int, component string, props map[string]interface{}) error {
+	return MustGet(c).Render(code, component, props)
+}
+
+func RenderWithViewData(c echo.Context, code int, component string, props, viewData map[string]interface{}) error {
+	return MustGet(c).RenderWithViewData(code, component, props, viewData)
+}

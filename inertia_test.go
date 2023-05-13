@@ -10,6 +10,36 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+func TestInertia_SetRootView(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	in := New(c, "app.html", map[string]interface{}{}, nil)
+	in.SetRootView("app2.html")
+	if in.RootView() != "app2.html" {
+		t.Fatal("rootView should be app2.html")
+	}
+}
+
+func TestInertia_Share(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	in := New(c, "app.html", map[string]interface{}{}, nil)
+	in.Share(map[string]interface{}{
+		"foo": "bar",
+	})
+	if in.Shared()["foo"] != "bar" {
+		t.Fatal("shared data foo should be bar")
+	}
+	in.FlushShared()
+	if len(in.Shared()) != 0 {
+		t.Fatal("shared data should be empty")
+	}
+}
+
 func TestInertia_Version(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -27,15 +57,19 @@ func TestInertia_Version(t *testing.T) {
 	}
 }
 
-func TestInertia_SetRootView(t *testing.T) {
+func TestInertia_Location(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	in := New(c, "app.html", map[string]interface{}{}, nil)
-	in.SetRootView("app2.html")
-	if in.RootView() != "app2.html" {
-		t.Fatal("rootView should be app2.html")
+
+	err := in.Location("/bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Response().Header().Get(HeaderXInertiaLocation) != "/bar" {
+		t.Fatal("HeaderXInertiaLocation should be /bar")
 	}
 }
 
