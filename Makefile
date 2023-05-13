@@ -66,6 +66,12 @@ open-coverage-html: ## Open coverage report
 	@open .dev/coverage.html
 
 
+.PHONY: clean
+clean: ## Clean generated files
+	@rm -rf .dev/coverage.html
+	@rm -rf .dev/coverage.out
+
+
 
 #.PHONY: clean
 #clean: ## Clean the generated contents
