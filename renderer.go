@@ -12,8 +12,9 @@ import (
 // Renderer is a html/template renderer for Echo framework.
 // It provides `json_marshal` template function to render a JSON encoded page object.
 // see also:
-//   https://inertiajs.com/the-protocol#the-page-object
-//   https://echo.labstack.com/guide/templates/
+//
+//	https://inertiajs.com/the-protocol#the-page-object
+//	https://echo.labstack.com/guide/templates/
 //
 // Notice:
 // It is a built-in renderer included in the inertia-echo.
