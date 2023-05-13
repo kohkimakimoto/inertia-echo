@@ -12,20 +12,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go: ['1.16.x', '1.17.x']
     timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Setup go
-        uses: actions/setup-go@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go }}
-      - name: Install tools
-        run: make tools/install
-      - name: Install dependencies
-        run: make deps
-      - name: Test Go code
-        run: make test
+          go-version-file: go.mod
+          cache: true
+      - run: make dev/setup
+      - run: make test
+      - run: make lint
