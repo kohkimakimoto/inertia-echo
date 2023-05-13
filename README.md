@@ -102,7 +102,7 @@ Inertia-echo provides route helpers like [Official Laravel Adapter](https://iner
 e.GET("/about", inertia.Handler("About"))
 ```
 
-See also official document: [Routing](https://inertiajs.com/routing)
+See also the official document: [Routing](https://inertiajs.com/routing)
 
 ### Responses
 
@@ -143,7 +143,7 @@ You can then access this variable like a regular template variable.
 <meta name="twitter:title" content="{{ .Meta }}">
 ```
 
-See also official document: [Responses](https://inertiajs.com/responses)
+See also the official document: [Responses](https://inertiajs.com/responses)
 
 ### Redirects
 
@@ -159,7 +159,7 @@ The following is a way to redirect to an external website in Inertia apps.
 return inertia.Location(c, "/path/to/external")
 ```
 
-See also official document: [Redirects](https://inertiajs.com/redirects)
+See also the official document: [Redirects](https://inertiajs.com/redirects)
 
 ### Shared data
 
@@ -186,7 +186,7 @@ inertia.Share(c, map[string]interface{}{
 })
 ```
 
-See also official document: [Shared data](https://inertiajs.com/shared-data)
+See also the official document: [Shared data](https://inertiajs.com/shared-data)
 
 ### Partial reloads
 
@@ -212,7 +212,7 @@ inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 })
 ```
 
-See also official document: [Partial reloads](https://inertiajs.com/partial-reloads)
+See also the official document: [Partial reloads](https://inertiajs.com/partial-reloads)
 
 ### Asset versioning
 
@@ -230,16 +230,17 @@ Configure asset version manually.
 inertia.SetVersion(c, func() string { return version })
 ```
 
-See also official document: [Assset versioning](https://inertiajs.com/asset-versioning)
+See also the official document: [Assset versioning](https://inertiajs.com/asset-versioning)
 
 ## Unsupported features
 
 ### Validation
 
-The inertia-echo does not support validation because echo does not have built-in validation.
-Validation implementation is up to you. If you want to handle validation errors with inertia-echo, You have to implement it yourself.
+The Inertia-Echo does not support validation, as Echo lacks built-in validation.
+The implementation of validation is up to you.
+If you wish to handle validation errors with Inertia-Echo, you will need to implement it yourself.
 
-See also official document: [Validation](https://inertiajs.com/validation)
+See also the official document: [Validation](https://inertiajs.com/validation)
 
 ## Demo application
 
