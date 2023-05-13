@@ -1,13 +1,14 @@
 # inertia-echo
 
 [![test](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml/badge.svg)](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kohkimakimoto/inertia-echo/blob/main/LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kohkimakimoto/inertia-echo.svg)](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo)
 
 The [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://echo.labstack.com/) Go web framework.
 
 [Inertia.js](https://inertiajs.com) is a JavaScript library that allows you to build a fully JavaScript-based single-page app without complexity.
-I assume that you know [what Inertia.js is](https://inertiajs.com/who-is-it-for) and [how it works](https://inertiajs.com/how-it-works).
-You also need to know [Echo](https://echo.labstack.com/) that is a Go web framework. The inertia-echo helps you to develop web apps based on them.
+I assume that you are familiar with Inertia.js and [how it works](https://inertiajs.com/how-it-works).
+You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a Go web framework. The inertia-echo assists you in developing web applications that leverage both of these technologies.
 
 Table of Contents
 
@@ -48,9 +49,9 @@ Create the root template `views/app.html`.
 <body>
 <div id="app" data-page="{{ json_marshal .page }}"></div>
 <!--
-Echo does not have built-in frontend library.
-You have to set up frontend environment yourself such as Webpack, Vite, etc.
-Replace the following script tag with your environment.
+Echo does not come with a built-in frontend library.
+Therefore, you'll need to establish your own frontend environment using tools like Webpack, Vite, and so on.
+Replace the following script tag to fit your environment.
 -->
 <script src="/path/to/bundle.js"></script>
 </body>
