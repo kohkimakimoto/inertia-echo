@@ -56,7 +56,7 @@ import (
 func main() {
 	e := echo.New()
 	// setup renderer to load the root template.
-	e.Renderer = inertia.NewRenderer("views/*.html", nil)
+	e.Renderer = inertia.NewRenderer().ParseGlob("views/*.html")
 
 	// The middleware is needed to handle inertia protocol.
 	e.Use(inertia.Middleware())

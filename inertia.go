@@ -1,6 +1,7 @@
 package inertia
 
 import (
+	"bytes"
 	"net/http"
 	"sync"
 
@@ -20,17 +21,8 @@ type Inertia struct {
 	rootView    string
 	sharedProps map[string]interface{}
 	version     VersionFunc
+	renderer    echo.Renderer
 	mu          sync.RWMutex
-}
-
-// New creates a new Inertia instance.
-func New(c echo.Context, rootView string, sharedProps map[string]interface{}, versionFunc VersionFunc) *Inertia {
-	return &Inertia{
-		c:           c,
-		rootView:    rootView,
-		sharedProps: sharedProps,
-		version:     versionFunc,
-	}
 }
 
 func (i *Inertia) SetRootView(name string) {
@@ -142,7 +134,23 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 	}
 
 	viewData["page"] = page
-	return c.Render(code, i.rootView, viewData)
+
+	return i.renderHTML(code, i.rootView, viewData)
+}
+
+// renderHTML renders HTML template with given code, name and data.
+func (i *Inertia) renderHTML(code int, name string, data interface{}) (err error) {
+	// try to render with the renderer registered in Inertia instance
+	if i.renderer != nil {
+		buf := new(bytes.Buffer)
+		if err = i.renderer.Render(buf, name, data, i.c); err != nil {
+			return
+		}
+		return i.c.HTMLBlob(code, buf.Bytes())
+	}
+
+	// If the renderer is not registered, use the default echo renderer
+	return i.c.Render(code, name, data)
 }
 
 type LazyProp struct {

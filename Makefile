@@ -72,6 +72,12 @@ clean: ## Clean generated files
 	@rm -rf .dev/coverage.out
 
 
+.PHONY: run/helloworld
+run/helloworld: ## Run example helloworld app
+	@mkdir -p examples/helloworld/.generated
+	@cd examples/helloworld && ./scripts/process-starter.py \
+		'{"command": "air", "prefix": "[air] ", "prefixColor": "blue"}'
+
 
 #.PHONY: clean
 #clean: ## Clean the generated contents

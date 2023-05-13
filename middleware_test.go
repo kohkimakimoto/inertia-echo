@@ -68,7 +68,7 @@ func TestMiddleware(t *testing.T) {
 func TestMiddlewareAndRender(t *testing.T) {
 	t.Run("render with shared data", func(t *testing.T) {
 		e := echo.New()
-		e.Renderer = NewRenderer("./testdata/*.html", map[string]interface{}{})
+		e.Renderer = NewRenderer().MustParseGlob("./testdata/*.html")
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Add(HeaderXInertia, "true")
 		req.Header.Add(HeaderXInertiaVersion, "1")
@@ -119,7 +119,7 @@ func TestMiddlewareAndRender(t *testing.T) {
 
 	t.Run("render after flushing shared data", func(t *testing.T) {
 		e := echo.New()
-		e.Renderer = NewRenderer("./testdata/*.html", map[string]interface{}{})
+		e.Renderer = NewRenderer().MustParseGlob("./testdata/*.html")
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Add(HeaderXInertia, "true")
 		req.Header.Add(HeaderXInertiaVersion, "1")

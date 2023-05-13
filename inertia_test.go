@@ -15,7 +15,11 @@ func TestInertia_SetRootView(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	in := New(c, "app.html", map[string]interface{}{}, nil)
+	in := &Inertia{
+		c:           c,
+		rootView:    "app.html",
+		sharedProps: map[string]interface{}{},
+	}
 	in.SetRootView("app2.html")
 	if in.RootView() != "app2.html" {
 		t.Fatal("rootView should be app2.html")
@@ -27,7 +31,11 @@ func TestInertia_Share(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	in := New(c, "app.html", map[string]interface{}{}, nil)
+	in := &Inertia{
+		c:           c,
+		rootView:    "app.html",
+		sharedProps: map[string]interface{}{},
+	}
 	in.Share(map[string]interface{}{
 		"foo": "bar",
 	})
@@ -45,8 +53,11 @@ func TestInertia_Version(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	in := New(c, "app.html", map[string]interface{}{}, nil)
-
+	in := &Inertia{
+		c:           c,
+		rootView:    "app.html",
+		sharedProps: map[string]interface{}{},
+	}
 	in.SetVersion(func() string {
 		return "123456789"
 	})
@@ -62,7 +73,11 @@ func TestInertia_Location(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	in := New(c, "app.html", map[string]interface{}{}, nil)
+	in := &Inertia{
+		c:           c,
+		rootView:    "app.html",
+		sharedProps: map[string]interface{}{},
+	}
 
 	err := in.Location("/bar")
 	if err != nil {
@@ -76,15 +91,19 @@ func TestInertia_Location(t *testing.T) {
 func TestInertia_Render(t *testing.T) {
 	t.Run("render full html", func(t *testing.T) {
 		e := echo.New()
-		e.Renderer = NewRenderer(filepath.Join("testdata", "*.html"), nil)
+		e.Renderer = NewRenderer().MustParseGlob(filepath.Join("testdata", "*.html"))
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-
-		in := New(c, "app.html", map[string]interface{}{}, func() string {
-			return "123456789"
-		})
+		in := &Inertia{
+			c:           c,
+			rootView:    "app.html",
+			sharedProps: map[string]interface{}{},
+			version: func() string {
+				return "123456789"
+			},
+		}
 
 		err := in.Render(http.StatusOK, "Home", map[string]interface{}{
 			"title": "Home Page title",
@@ -102,16 +121,21 @@ func TestInertia_Render(t *testing.T) {
 
 	t.Run("render JSON", func(t *testing.T) {
 		e := echo.New()
-		e.Renderer = NewRenderer(filepath.Join("testdata", "*.html"), nil)
+		e.Renderer = NewRenderer().MustParseGlob(filepath.Join("testdata", "*.html"))
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Add(HeaderXInertia, "true")
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 
-		in := New(c, "app.html", map[string]interface{}{}, func() string {
-			return "123456789"
-		})
+		in := &Inertia{
+			c:           c,
+			rootView:    "app.html",
+			sharedProps: map[string]interface{}{},
+			version: func() string {
+				return "123456789"
+			},
+		}
 
 		err := in.Render(http.StatusOK, "Home", map[string]interface{}{
 			"title": "Home Page title",
@@ -130,15 +154,20 @@ func TestInertia_Render(t *testing.T) {
 
 func TestInertia_RenderWithViewData(t *testing.T) {
 	e := echo.New()
-	e.Renderer = NewRenderer(filepath.Join("testdata", "*.html"), nil)
+	e.Renderer = NewRenderer().MustParseGlob(filepath.Join("testdata", "*.html"))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	in := New(c, "app_with_view_data.html", map[string]interface{}{}, func() string {
-		return "123456789"
-	})
+	in := &Inertia{
+		c:           c,
+		rootView:    "view_data.html",
+		sharedProps: map[string]interface{}{},
+		version: func() string {
+			return "123456789"
+		},
+	}
 
 	err := in.RenderWithViewData(http.StatusOK, "Home", map[string]interface{}{
 		"title": "Home Page title",

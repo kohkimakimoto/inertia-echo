@@ -14,7 +14,7 @@ func TestHandler(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	e := echo.New()
-	e.Renderer = NewRenderer("testdata/*.html", nil)
+	e.Renderer = NewRenderer().MustParseGlob("testdata/*.html")
 	e.GET("/about", Handler("About"))
 	e.Use(Middleware())
 	e.ServeHTTP(rec, req)
