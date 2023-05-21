@@ -227,7 +227,9 @@ See also the official document: [Validation](https://inertiajs.com/validation)
 
 ## Demo application
 
-I've created a demo application with the inertia-echo. See [pingcrm-echo](https://github.com/kohkimakimoto/pingcrm-echo).
+- [Hello World](https://github.com/kohkimakimoto/inertia-echo/tree/master/examples/helloworld)
+- [pingcrm-echo](https://github.com/kohkimakimoto/pingcrm-echo).
+
 ## Author
 
 Kohki Makimoto <kohki.makimoto@gmail.com>
