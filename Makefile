@@ -23,8 +23,7 @@ dev/setup: ## Setup development environment
 	@export GOPATH=$(CURDIR)/.dev/gopath && \
 		go install honnef.co/go/tools/cmd/staticcheck@latest && \
 		go install github.com/axw/gocov/gocov@latest && \
-		go install github.com/matm/gocov-html/cmd/gocov-html@latest && \
-		go install github.com/cosmtrek/air@latest
+		go install github.com/matm/gocov-html/cmd/gocov-html@latest
 
 
 .PHONY: dev/clean
