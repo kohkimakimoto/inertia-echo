@@ -38,12 +38,12 @@ func main() {
 		v.MustParseManifestFile(filepath.Join(optDir, "public/dist/manifest.json"))
 	}
 
+	e.Renderer = v.NewRenderer().MustParseGlob(filepath.Join(optDir, "views/*.html"))
+
 	e.Use(middleware.Recover())
 	e.Use(middleware.Logger())
 	// setup inertia
-	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-		Renderer: v.NewRenderer().MustParseGlob(filepath.Join(optDir, "views/*.html")),
-	}))
+	e.Use(inertia.Middleware())
 	e.Use(inertia.CSRF())
 
 	e.Static("/", filepath.Join(optDir, "public"))

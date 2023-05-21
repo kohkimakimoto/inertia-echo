@@ -228,7 +228,7 @@ See also the official document: [Validation](https://inertiajs.com/validation)
 ## Demo application
 
 - [Hello World](https://github.com/kohkimakimoto/inertia-echo/tree/master/examples/helloworld)
-- [pingcrm-echo](https://github.com/kohkimakimoto/pingcrm-echo).
+- [pingcrm-echo](https://github.com/kohkimakimoto/pingcrm-echo)
 
 ## Author
 
