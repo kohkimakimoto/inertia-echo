@@ -1,30 +1,14 @@
 # inertia-echo
 
 [![test](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml/badge.svg)](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kohkimakimoto/inertia-echo/blob/main/LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kohkimakimoto/inertia-echo.svg)](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo)
 
 The [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://echo.labstack.com/) Go web framework.
 
 [Inertia.js](https://inertiajs.com) is a JavaScript library that allows you to build a fully JavaScript-based single-page app without complexity.
-I assume that you know [what Inertia.js is](https://inertiajs.com/who-is-it-for) and [how it works](https://inertiajs.com/how-it-works).
-You also need to know [Echo](https://echo.labstack.com/) that is a Go web framework. The inertia-echo helps you to develop web apps based on them.
-
-Table of Contents
-
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Minimum example](#minimum-example)
-  - [Routing](#routing)
-  - [Responses](#responses)
-  - [Redirects](#redirects)
-  - [Shared data](#shared-data)
-  - [Partial reloads](#partial-reloads)
-  - [Asset versioning](#asset-versioning)
-- [Unsupported features](#unsupported-features)
-  - [Validation](#validation)
-- [Demo application](#demo-application)
-- [Author](#author)
-- [License](#license)
+I assume that you are familiar with Inertia.js and [how it works](https://inertiajs.com/how-it-works).
+You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a Go web framework. The inertia-echo assists you in developing web applications that leverage both of these technologies.
 
 ## Installation
 
@@ -48,9 +32,9 @@ Create the root template `views/app.html`.
 <body>
 <div id="app" data-page="{{ json_marshal .page }}"></div>
 <!--
-Echo does not have built-in frontend library.
-You have to set up frontend environment yourself such as Webpack, Vite, etc.
-Replace the following script tag with your environment.
+Echo does not come with a built-in frontend library.
+Therefore, you'll need to establish your own frontend environment using tools like Webpack, Vite, and so on.
+Replace the following script tag to fit your environment.
 -->
 <script src="/path/to/bundle.js"></script>
 </body>
@@ -69,14 +53,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// I recommend to define the alias of `inertia.MustGet` to simplify the code.
-// The code examples in this document are written with this alias.
-var Inertia = inertia.MustGet
-
 func main() {
 	e := echo.New()
 	// setup renderer to load the root template.
-	e.Renderer = inertia.NewRenderer("views/*.html", nil)
+	e.Renderer = inertia.NewRenderer().ParseGlob("views/*.html")
 
 	// The middleware is needed to handle inertia protocol.
 	e.Use(inertia.Middleware())
@@ -85,7 +65,7 @@ func main() {
 	// handlers
 	e.GET("/", func(c echo.Context) error {
 		// Instead of using c.Render(), the following code can render inertia response.
-		return Inertia(c).Render(http.StatusOK, "Index", map[string]interface{}{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 			"message": "Hello, World!",
 		})
 	})
@@ -95,17 +75,17 @@ func main() {
 }
 ```
 
-You need to setup your client-side app. See [Client-side setup](https://inertiajs.com/client-side-setup) in official document.
+You need to set up your client-side application. See [Client-side setup](https://inertiajs.com/client-side-setup) in official document.
 
-### Routing
+### Shorthand routes
 
-Inertia-echo provides route helpers like [Official Laravel Adapter](https://inertiajs.com/routing#route-helpers).
+Inertia-echo provides a helper function for shorthand routes like [Official Laravel Adapter](https://inertiajs.com/routing#shorthand-routes).
 
 ```go
 e.GET("/about", inertia.Handler("About"))
 ```
 
-See also official document: [Routing](https://inertiajs.com/routing)
+See also the official document: [Routing](https://inertiajs.com/routing)
 
 ### Responses
 
@@ -115,7 +95,7 @@ Creating responses.
 ```go
 func ShowEventsHandler(c echo.Context) error {
 	event := // retrieve a event...
-	return Inertia(c).Render(http.StatusOK, "Event/Show", map[string]interface{}{
+	return inertia.Render(c, http.StatusOK, "Event/Show", map[string]interface{}{
 		"Event": event,
 	})
 }
@@ -132,7 +112,7 @@ Sometimes you may even want to provide data that will not be sent to your JavaSc
 ```go
 func ShowEventsHandler(c echo.Context) error {
 	event := // retrieve a event...
-	return Inertia(c).RenderWithViewData(http.StatusOK, "Event/Show", map[string]interface{}{
+	return inertia.RenderWithViewData(c, http.StatusOK, "Event/Show", map[string]interface{}{
 		"Event": event,
 	}, map[string]interface{}{
 		"Meta": "Meta data...",
@@ -146,7 +126,7 @@ You can then access this variable like a regular template variable.
 <meta name="twitter:title" content="{{ .Meta }}">
 ```
 
-See also official document: [Responses](https://inertiajs.com/responses)
+See also the official document: [Responses](https://inertiajs.com/responses)
 
 ### Redirects
 
@@ -159,10 +139,10 @@ return c.Redirect(http.StatusFound, "/")
 The following is a way to redirect to an external website in Inertia apps.
 
 ```go
-return Inertia(c).Location("/path/to/external")
+return inertia.Location(c, "/path/to/external")
 ```
 
-See also official document: [Redirects](https://inertiajs.com/redirects)
+See also the official document: [Redirects](https://inertiajs.com/redirects)
 
 ### Shared data
 
@@ -183,19 +163,19 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 Set shared data manually.
 
 ```go
-Inertia(c).Share(map[string]interface{}{
+inertia.Share(c, map[string]interface{}{
 	"AppName":  "App Name",
 	"AuthUser": user,
 })
 ```
 
-See also official document: [Shared data](https://inertiajs.com/shared-data)
+See also the official document: [Shared data](https://inertiajs.com/shared-data)
 
 ### Partial reloads
 
 ```go
 
-Inertia(c).Render(http.StatusOK, "Index", map[string]interface{}{
+inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 	// ALWAYS included on first visit
 	// OPTIONALLY included on partial reloads
 	// ALWAYS evaluated
@@ -215,7 +195,7 @@ Inertia(c).Render(http.StatusOK, "Index", map[string]interface{}{
 })
 ```
 
-See also official document: [Partial reloads](https://inertiajs.com/partial-reloads)
+See also the official document: [Partial reloads](https://inertiajs.com/partial-reloads)
 
 ### Asset versioning
 
@@ -230,23 +210,26 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 Configure asset version manually.
 
 ```go
-Inertia(c).SetVersion(func() string { return version })
+inertia.SetVersion(c, func() string { return version })
 ```
 
-See also official document: [Assset versioning](https://inertiajs.com/asset-versioning)
+See also the official document: [Assset versioning](https://inertiajs.com/asset-versioning)
 
 ## Unsupported features
 
 ### Validation
 
-The inertia-echo does not support validation because echo does not have built-in validation.
-Validation implementation is up to you. If you want to handle validation errors with inertia-echo, You have to implement it yourself.
+The Inertia-Echo does not support validation, as Echo lacks built-in validation.
+The implementation of validation is up to you.
+If you wish to handle validation errors with Inertia-Echo, you will need to implement it yourself.
 
-See also official document: [Validation](https://inertiajs.com/validation)
+See also the official document: [Validation](https://inertiajs.com/validation)
 
 ## Demo application
 
-I've created a demo application with the inertia-echo. See [pingcrm-echo](https://github.com/kohkimakimoto/pingcrm-echo).
+- [Hello World](https://github.com/kohkimakimoto/inertia-echo/tree/master/examples/helloworld)
+- [pingcrm-echo](https://github.com/kohkimakimoto/pingcrm-echo)
+
 ## Author
 
 Kohki Makimoto <kohki.makimoto@gmail.com>

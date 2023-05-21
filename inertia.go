@@ -1,6 +1,7 @@
 package inertia
 
 import (
+	"bytes"
 	"net/http"
 	"sync"
 
@@ -15,59 +16,24 @@ const (
 	HeaderXInertiaPartialComponent = "X-Inertia-Partial-Component"
 )
 
-type LazyProp struct {
-	callback func() interface{}
-}
-
-type VersionFunc func() string
-
-type Page struct {
-	Component string                 `json:"component"`
-	Props     map[string]interface{} `json:"props"`
-	Url       string                 `json:"url"`
-	Version   string                 `json:"version"`
-}
-
-type Inertia interface {
-	SetRootView(name string)
-	RootView() string
-	Share(props map[string]interface{})
-	Shared() map[string]interface{}
-	FlushShared()
-	SetVersion(version VersionFunc)
-	Version() string
-	Location(url string) error
-	Render(code int, component string, props map[string]interface{}) error
-	RenderWithViewData(code int, component string, props, viewData map[string]interface{}) error
-}
-
-type inertia struct {
+type Inertia struct {
 	c           echo.Context
 	rootView    string
 	sharedProps map[string]interface{}
 	version     VersionFunc
+	renderer    echo.Renderer
 	mu          sync.RWMutex
 }
 
-// New creates a new inertia instance.
-func New(c echo.Context, rootView string, sharedProps map[string]interface{}, versionFunc VersionFunc) Inertia {
-	return &inertia{
-		c:           c,
-		rootView:    rootView,
-		sharedProps: sharedProps,
-		version:     versionFunc,
-	}
-}
-
-func (i *inertia) SetRootView(name string) {
+func (i *Inertia) SetRootView(name string) {
 	i.rootView = name
 }
 
-func (i *inertia) RootView() string {
+func (i *Inertia) RootView() string {
 	return i.rootView
 }
 
-func (i *inertia) Share(props map[string]interface{}) {
+func (i *Inertia) Share(props map[string]interface{}) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -77,46 +43,55 @@ func (i *inertia) Share(props map[string]interface{}) {
 	}
 }
 
-func (i *inertia) Shared() map[string]interface{} {
+func (i *Inertia) Shared() map[string]interface{} {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
 	return i.sharedProps
 }
 
-func (i *inertia) FlushShared() {
+func (i *Inertia) FlushShared() {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	i.sharedProps = map[string]interface{}{}
 }
 
-func (i *inertia) SetVersion(version VersionFunc) {
+type VersionFunc func() string
+
+func (i *Inertia) SetVersion(version VersionFunc) {
 	i.version = version
 }
 
-func (i *inertia) Version() string {
+func (i *Inertia) Version() string {
 	return i.version()
 }
 
 // Location generates 409 response for external redirects
 // see https://inertiajs.com/redirects#external-redirects
-func (i *inertia) Location(url string) error {
+func (i *Inertia) Location(url string) error {
 	res := i.c.Response()
 	res.Header().Set(HeaderXInertiaLocation, url)
 	res.WriteHeader(409)
 	return nil
 }
 
-func (i *inertia) Render(code int, component string, props map[string]interface{}) error {
+func (i *Inertia) Render(code int, component string, props map[string]interface{}) error {
 	return i.render(code, component, props, map[string]interface{}{})
 }
 
-func (i *inertia) RenderWithViewData(code int, component string, props, viewData map[string]interface{}) error {
+func (i *Inertia) RenderWithViewData(code int, component string, props, viewData map[string]interface{}) error {
 	return i.render(code, component, props, viewData)
 }
 
-func (i *inertia) render(code int, component string, props, viewData map[string]interface{}) error {
+type Page struct {
+	Component string                 `json:"component"`
+	Props     map[string]interface{} `json:"props"`
+	Url       string                 `json:"url"`
+	Version   string                 `json:"version"`
+}
+
+func (i *Inertia) render(code int, component string, props, viewData map[string]interface{}) error {
 	c := i.c
 	req := c.Request()
 	res := c.Response()
@@ -159,7 +134,27 @@ func (i *inertia) render(code int, component string, props, viewData map[string]
 	}
 
 	viewData["page"] = page
-	return c.Render(code, i.rootView, viewData)
+
+	return i.renderHTML(code, i.rootView, viewData)
+}
+
+// renderHTML renders HTML template with given code, name and data.
+func (i *Inertia) renderHTML(code int, name string, data interface{}) (err error) {
+	// try to render with the renderer registered in Inertia instance
+	if i.renderer != nil {
+		buf := new(bytes.Buffer)
+		if err = i.renderer.Render(buf, name, data, i.c); err != nil {
+			return
+		}
+		return i.c.HTMLBlob(code, buf.Bytes())
+	}
+
+	// If the renderer is not registered, use the default echo renderer
+	return i.c.Render(code, name, data)
+}
+
+type LazyProp struct {
+	callback func() interface{}
 }
 
 // Lazy defines a lazy evaluated data.
@@ -168,4 +163,44 @@ func Lazy(callback func() interface{}) *LazyProp {
 	return &LazyProp{
 		callback: callback,
 	}
+}
+
+func SetRootView(c echo.Context, name string) {
+	MustGet(c).SetRootView(name)
+}
+
+func RootView(c echo.Context) string {
+	return MustGet(c).RootView()
+}
+
+func Share(c echo.Context, props map[string]interface{}) {
+	MustGet(c).Share(props)
+}
+
+func Shared(c echo.Context) map[string]interface{} {
+	return MustGet(c).Shared()
+}
+
+func FlushShared(c echo.Context) {
+	MustGet(c).FlushShared()
+}
+
+func SetVersion(c echo.Context, version VersionFunc) {
+	MustGet(c).SetVersion(version)
+}
+
+func Version(c echo.Context) string {
+	return MustGet(c).Version()
+}
+
+func Location(c echo.Context, url string) error {
+	return MustGet(c).Location(url)
+}
+
+func Render(c echo.Context, code int, component string, props map[string]interface{}) error {
+	return MustGet(c).Render(code, component, props)
+}
+
+func RenderWithViewData(c echo.Context, code int, component string, props, viewData map[string]interface{}) error {
+	return MustGet(c).RenderWithViewData(code, component, props, viewData)
 }

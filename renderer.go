@@ -12,8 +12,9 @@ import (
 // Renderer is a html/template renderer for Echo framework.
 // It provides `json_marshal` template function to render a JSON encoded page object.
 // see also:
-//   https://inertiajs.com/the-protocol#the-page-object
-//   https://echo.labstack.com/guide/templates/
+//
+//	https://inertiajs.com/the-protocol#the-page-object
+//	https://echo.labstack.com/guide/templates/
 //
 // Notice:
 // It is a built-in renderer included in the inertia-echo.
@@ -23,42 +24,78 @@ type Renderer struct {
 	templates *template.Template
 }
 
-// NewRenderer returns a new Renderer instance.
-func NewRenderer(pattern string, funcMap template.FuncMap) *Renderer {
+func NewRenderer() *Renderer {
 	return &Renderer{
-		templates: template.Must(template.New("template").Funcs(mergeFuncMap(builtinFuncMap, funcMap)).ParseGlob(pattern)),
+		templates: template.New("T").Funcs(builtinFuncMap),
 	}
 }
 
-// NewRendererWithFS returns a new Renderer instance with FS interface.
-func NewRendererWithFS(f fs.FS, pattern string, funcMap template.FuncMap) *Renderer {
-	return &Renderer{
-		templates: template.Must(template.New("template").Funcs(mergeFuncMap(builtinFuncMap, funcMap)).ParseFS(f, pattern)),
+func (r *Renderer) Funcs(funcMap template.FuncMap) *Renderer {
+	r.templates = r.templates.Funcs(funcMap)
+	return r
+}
+
+func (r *Renderer) Parse(text string) (*Renderer, error) {
+	t, err := r.templates.Parse(text)
+	if err != nil {
+		return nil, err
 	}
+	r.templates = t
+	return r, nil
+}
+
+func (r *Renderer) MustParse(text string) *Renderer {
+	t, err := r.Parse(text)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+func (r *Renderer) ParseGlob(pattern string) (*Renderer, error) {
+	t, err := r.templates.ParseGlob(pattern)
+	if err != nil {
+		return nil, err
+	}
+	r.templates = t
+	return r, nil
+}
+
+func (r *Renderer) MustParseGlob(pattern string) *Renderer {
+	t, err := r.ParseGlob(pattern)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+func (r *Renderer) ParseFS(f fs.FS, pattern string) (*Renderer, error) {
+	t, err := r.templates.ParseFS(f, pattern)
+	if err != nil {
+		return nil, err
+	}
+	r.templates = t
+	return r, nil
+}
+
+func (r *Renderer) MustParseFS(f fs.FS, pattern string) *Renderer {
+	t, err := r.ParseFS(f, pattern)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
 
 // Render renders HTML by using templates.
-func (t *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
+func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	return r.templates.ExecuteTemplate(w, name, data)
 }
 
 var builtinFuncMap = template.FuncMap{
-	"json_marshal": jsonMarshal,
+	"json_marshal": fnJsonMarshal,
 }
 
-func jsonMarshal(v interface{}) template.JS {
+func fnJsonMarshal(v interface{}) template.JS {
 	ret, _ := json.Marshal(v)
 	return template.JS(ret)
-}
-
-func mergeFuncMap(funcMaps ...template.FuncMap) template.FuncMap {
-	merged := template.FuncMap{}
-	for _, funcMap := range funcMaps {
-		if funcMap != nil {
-			for k, v := range funcMap {
-				merged[k] = v
-			}
-		}
-	}
-	return merged
 }

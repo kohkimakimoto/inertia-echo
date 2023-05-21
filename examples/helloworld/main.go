@@ -1,74 +1,58 @@
 package main
 
 import (
-	"embed"
 	"flag"
-	"io/fs"
-	"net/http"
-
+	"github.com/kohkimakimoto/inertia-echo"
+	"github.com/kohkimakimoto/inertia-echo/vite"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-
-	"github.com/kohkimakimoto/inertia-echo"
+	"net/http"
+	"os"
+	"path/filepath"
 )
 
-var Inertia = inertia.MustGet
+var BuildMode = "debug"
+
+func IsDebug() bool {
+	return BuildMode == "debug"
+}
 
 func main() {
-	var optDev bool
-	flag.BoolVar(&optDev, "development", false, "Run dev mode")
+	var optDir string
+	flag.StringVar(&optDir, "dir", "", "project directory")
 	flag.Parse()
 
-	e := echo.New()
-	e.HTTPErrorHandler = func(err error, c echo.Context) {
-		c.Logger().Error(err)
-		e.DefaultHTTPErrorHandler(err, c)
+	if optDir == "" {
+		optDir, _ = os.Getwd()
 	}
-	e.Renderer = inertia.NewRendererWithFS(viewsFs, "views/*.html", map[string]interface{}{
-		"vite_entry": inertia.ViteEntry(getViteManifest()),
-		"is_dev": func() bool {
-			return optDev
-		},
-	})
+
+	e := echo.New()
+	e.Debug = IsDebug()
+
+	// initialize vite integration for inertia
+	v := vite.New()
+	v.Debug = e.Debug
+	v.BasePath = "/dist"
+	v.AddEntryPoint("js/app.tsx")
+	if !v.Debug {
+		v.MustParseManifestFile(filepath.Join(optDir, "public/dist/manifest.json"))
+	}
+
+	e.Renderer = v.NewRenderer().MustParseGlob(filepath.Join(optDir, "views/*.html"))
 
 	e.Use(middleware.Recover())
 	e.Use(middleware.Logger())
+	// setup inertia
 	e.Use(inertia.Middleware())
 	e.Use(inertia.CSRF())
 
-	e.GET("/assets/*", echo.WrapHandler(http.StripPrefix("/assets/", http.FileServer(getAssetsFileSystem()))))
+	e.Static("/", filepath.Join(optDir, "public"))
+
 	e.GET("/", func(c echo.Context) error {
-		return inertia.MustGet(c).Render(http.StatusOK, "Index", map[string]interface{}{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 			"message": "Hello, World!",
 		})
 	})
-	e.GET("/about", inertia.Handler("About"))
 
 	e.Logger.Fatal(e.Start(":8080"))
-}
-
-//go:embed views
-var viewsFs embed.FS
-
-//go:embed gen
-var genFs embed.FS
-
-func getViteManifest() inertia.ViteManifest {
-	b, err := genFs.ReadFile("gen/dist/manifest.json")
-	if err != nil {
-		panic(err)
-	}
-	manifest, err := inertia.ParseViteManifest(b)
-	if err != nil {
-		panic(err)
-	}
-	return manifest
-}
-
-func getAssetsFileSystem() http.FileSystem {
-	fsys, err := fs.Sub(genFs, "gen/dist/assets")
-	if err != nil {
-		panic(err)
-	}
-	return http.FS(fsys)
 }

@@ -17,11 +17,11 @@ var testdataFs embed.FS
 func TestRenderer_Render(t *testing.T) {
 	expected := `<div id="app" data-page="{&#34;component&#34;:&#34;Page&#34;,&#34;props&#34;:{&#34;title&#34;:&#34;Hello, World!&#34;}}"></div>`
 
-	t.Run("NewRenderer", func(t *testing.T) {
+	t.Run("NewRendererWithGlob", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		e := echo.New()
-		e.Renderer = NewRenderer(filepath.Join("testdata", "*.html"), nil)
+		e.Renderer = NewRenderer().MustParseGlob(filepath.Join("testdata", "*.html"))
 		c := e.NewContext(req, rec)
 		err := c.Render(http.StatusOK, "app.html", map[string]interface{}{
 			"page": map[string]interface{}{
@@ -38,11 +38,11 @@ func TestRenderer_Render(t *testing.T) {
 		}
 	})
 
-	t.Run("NewRendererWithFS", func(t *testing.T) {
+	t.Run("MustParseFS", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		e := echo.New()
-		e.Renderer = NewRendererWithFS(testdataFs, filepath.Join("testdata", "*.html"), nil)
+		e.Renderer = NewRenderer().MustParseFS(testdataFs, filepath.Join("testdata", "*.html"))
 		c := e.NewContext(req, rec)
 		err := c.Render(http.StatusOK, "app.html", map[string]interface{}{
 			"page": map[string]interface{}{

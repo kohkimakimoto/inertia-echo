@@ -16,10 +16,8 @@ func inArray(needle string, heyStack []string) bool {
 func mergeProps(props ...map[string]interface{}) map[string]interface{} {
 	merged := map[string]interface{}{}
 	for _, a := range props {
-		if a != nil {
-			for k, v := range a {
-				merged[k] = v
-			}
+		for k, v := range a {
+			merged[k] = v
 		}
 	}
 	return merged

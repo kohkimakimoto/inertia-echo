@@ -6,18 +6,7 @@
 </head>
 <body>
 <div id="app" data-page="{{ json_marshal .page }}"></div>
-{{ if is_dev }}
-<script type="module">
-  import RefreshRuntime from 'http://localhost:3000/@react-refresh'
-  RefreshRuntime.injectIntoGlobalHook(window)
-  window.$RefreshReg$ = () => {}
-  window.$RefreshSig$ = () => (type) => type
-  window.__vite_plugin_react_preamble_installed__ = true
-</script>
-<script type="module" src="http://localhost:3000/@vite/client"></script>
-<script type="module" src="http://localhost:3000/src/main.tsx"></script>
-{{ else }}
-<script type="module" src="/{{ $main := vite_entry "src/main.tsx" }}{{ $main.file }}"></script>
-{{ end }}
+{{ vite_react_refresh }}
+{{ vite }}
 </body>
 </html>

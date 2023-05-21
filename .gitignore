@@ -2,11 +2,18 @@
 Thumbs.db
 .idea/
 .vscode/
-.tmp/
 node_modules/
-/coverage-report.html
-/.external-tools
-/examples/helloworld/gen/dist
-/examples/helloworld/main
+
+# dev
+/.dev
+
+# .gptx home for development
+/.gptx
+
+# doenv, direnv
+.env
+.envrc
+
 !.gitkeep
+
 

@@ -25,13 +25,16 @@ type MiddlewareConfig struct {
 	// Defines the props that are shared by default.
 	// see https://inertiajs.com/shared-data
 	Share SharedDataFunc
+	// Renderer is a renderer that is used for rendering the root view.
+	Renderer echo.Renderer
 }
 
 type SharedDataFunc func(c echo.Context) (map[string]interface{}, error)
 
 var DefaultMiddlewareConfig = MiddlewareConfig{
-	Skipper:  middleware.DefaultSkipper,
-	RootView: "app.html",
+	Skipper:     middleware.DefaultSkipper,
+	RootView:    "app.html",
+	VersionFunc: defaultVersionFunc(),
 }
 
 func defaultVersionFunc() VersionFunc {
@@ -64,7 +67,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 		config.RootView = DefaultMiddlewareConfig.RootView
 	}
 	if config.VersionFunc == nil {
-		config.VersionFunc = defaultVersionFunc()
+		config.VersionFunc = DefaultMiddlewareConfig.VersionFunc
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -84,8 +87,15 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				sharedProps = map[string]interface{}{}
 			}
 
-			// Create an inertia instance.
-			in := New(c, config.RootView, sharedProps, config.VersionFunc)
+			// Create an Inertia instance.
+			in := &Inertia{
+				c:           c,
+				rootView:    config.RootView,
+				sharedProps: sharedProps,
+				version:     config.VersionFunc,
+				renderer:    config.Renderer,
+			}
+
 			c.Set(key, in)
 
 			req := c.Request()
@@ -149,15 +159,15 @@ var (
 	ErrNotFound = errors.New("context does not have 'Inertia'")
 )
 
-func Get(c echo.Context) (Inertia, error) {
-	in, ok := c.Get(key).(Inertia)
+func Get(c echo.Context) (*Inertia, error) {
+	in, ok := c.Get(key).(*Inertia)
 	if !ok {
 		return nil, ErrNotFound
 	}
 	return in, nil
 }
 
-func MustGet(c echo.Context) Inertia {
+func MustGet(c echo.Context) *Inertia {
 	in, err := Get(c)
 	if err != nil {
 		panic(err)
@@ -166,6 +176,6 @@ func MustGet(c echo.Context) Inertia {
 }
 
 func Has(c echo.Context) bool {
-	_, ok := c.Get(key).(Inertia)
+	_, ok := c.Get(key).(*Inertia)
 	return ok
 }

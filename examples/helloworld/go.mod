@@ -1,8 +1,11 @@
-module github.com/kohkimakimoto/inertia-echo
+module github.com/kohkimakimoto/inertia-echo/examples/blog
 
 go 1.19
 
-require github.com/labstack/echo/v4 v4.10.2
+require (
+	github.com/kohkimakimoto/inertia-echo v0.0.0-00010101000000-000000000000
+	github.com/labstack/echo/v4 v4.10.2
+)
 
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
@@ -17,3 +20,5 @@ require (
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 )
+
+replace github.com/kohkimakimoto/inertia-echo => ../..

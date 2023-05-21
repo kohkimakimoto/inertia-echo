@@ -1,25 +1,26 @@
 {
-  "name": "example",
+  "name": "helloworld",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "clean": "rm -rf dist",
+    "dev": "vite --clearScreen=false",
     "build": "tsc && vite build",
-    "dev": "vite --clearScreen=false"
+    "clean": "rm -rf public/dist"
   },
   "author": "",
   "license": "ISC",
-  "devDependencies": {
-    "@inertiajs/inertia": "^0.11.0",
-    "@inertiajs/inertia-react": "^0.8.0",
-    "@inertiajs/progress": "^0.2.7",
-    "@types/react": "^17.0.38",
-    "@types/react-dom": "^17.0.11",
-    "@vitejs/plugin-react": "^1.1.4",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2",
-    "typescript": "^4.5.5",
-    "vite": "^2.7.13"
+  "dependencies": {
+    "@inertiajs/react": "^1.0.6",
+    "@types/react": "^18.2.6",
+    "@types/react-dom": "^18.2.4",
+    "@vitejs/plugin-react": "^4.0.0",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.23",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.3.2",
+    "typescript": "^5.0.4",
+    "vite": "^4.3.5"
   }
 }
