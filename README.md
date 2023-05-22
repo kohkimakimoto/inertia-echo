@@ -79,7 +79,7 @@ You need to set up your client-side application. See [Client-side setup](https:/
 
 ### Shorthand routes
 
-Inertia-echo provides a helper function for shorthand routes like [Official Laravel Adapter](https://inertiajs.com/routing#shorthand-routes).
+The inertia-echo provides a helper function for shorthand routes like [Official Laravel Adapter](https://inertiajs.com/routing#shorthand-routes).
 
 ```go
 e.GET("/about", inertia.Handler("About"))
@@ -219,11 +219,15 @@ See also the official document: [Assset versioning](https://inertiajs.com/asset-
 
 ### Validation
 
-The Inertia-Echo does not support validation, as Echo lacks built-in validation.
+The inertia-echo does not support validation, as Echo lacks built-in validation.
 The implementation of validation is up to you.
-If you wish to handle validation errors with Inertia-Echo, you will need to implement it yourself.
+If you wish to handle validation errors with inertia-echo, you will need to implement it yourself.
 
 See also the official document: [Validation](https://inertiajs.com/validation)
+
+### Server-side Rendering (SSR)
+
+The inertia-echo does not support server-side Rendering.
 
 ## Demo application
 
