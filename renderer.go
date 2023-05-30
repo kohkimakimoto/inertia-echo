@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 )
@@ -93,9 +94,21 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 
 var builtinFuncMap = template.FuncMap{
 	"json_marshal": fnJsonMarshal,
+	"inertia":      fnInertia,
 }
 
 func fnJsonMarshal(v interface{}) template.JS {
 	ret, _ := json.Marshal(v)
 	return template.JS(ret)
+}
+
+func fnInertia(page *Page) template.HTML {
+	pageJson, _ := json.Marshal(page)
+
+	builder := new(strings.Builder)
+	builder.WriteString(`<div id="app" data-page="`)
+	template.HTMLEscape(builder, pageJson)
+	builder.WriteString(`"></div>`)
+
+	return template.HTML(builder.String())
 }
