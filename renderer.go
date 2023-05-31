@@ -123,15 +123,6 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 	return r.templates.ExecuteTemplate(w, name, data)
 }
 
-var builtinFuncMap = template.FuncMap{
-	"json_marshal": fnJsonMarshal,
-}
-
-func fnJsonMarshal(v interface{}) template.JS {
-	ret, _ := json.Marshal(v)
-	return template.JS(ret)
-}
-
 func (r *Renderer) renderInertia(page *Page) template.HTML {
 	pageJson, _ := json.Marshal(page)
 
@@ -141,4 +132,15 @@ func (r *Renderer) renderInertia(page *Page) template.HTML {
 	builder.WriteString(`"></div>`)
 
 	return template.HTML(builder.String())
+}
+
+var builtinFuncMap = template.FuncMap{
+	// This function is a primitive way to render a container element for Inertia.
+	// Generally, you don't have to use this function. You can use {{ .inertia }} instead.
+	"json_marshal": fnJsonMarshal,
+}
+
+func fnJsonMarshal(v interface{}) template.JS {
+	ret, _ := json.Marshal(v)
+	return template.JS(ret)
 }
