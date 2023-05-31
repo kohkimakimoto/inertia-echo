@@ -11,17 +11,9 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// Renderer is a html/template renderer for Echo framework.
-// It provides `json_marshal` template function to render a JSON encoded page object.
-// see also:
-//
-//	https://inertiajs.com/the-protocol#the-page-object
-//	https://echo.labstack.com/guide/templates/
-//
-// Notice:
+// Renderer is a html/template renderer for Echo framework with inertia.js.
 // It is a built-in renderer included in the inertia-echo.
 // But you don't have to use it. You can use any renderers you want with inertia-echo.
-// The inertia-echo is renderer agnostic.
 type Renderer struct {
 	templates   *template.Template
 	containerId string
