@@ -32,6 +32,10 @@ func New() *Vite {
 	}
 }
 
+func (v *Vite) NewRendererWithConfig(config inertia.RendererConfig) *inertia.Renderer {
+	return v.NewRendererWithConfig(config).Funcs(v.FuncMap())
+}
+
 func (v *Vite) NewRenderer() *inertia.Renderer {
 	return inertia.NewRenderer().Funcs(v.FuncMap())
 }
