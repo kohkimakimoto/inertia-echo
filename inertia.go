@@ -25,6 +25,14 @@ type Inertia struct {
 	mu          sync.RWMutex
 }
 
+func (i *Inertia) SetRenderer(r echo.Renderer) {
+	i.renderer = r
+}
+
+func (i *Inertia) Renderer() echo.Renderer {
+	return i.renderer
+}
+
 func (i *Inertia) SetRootView(name string) {
 	i.rootView = name
 }
