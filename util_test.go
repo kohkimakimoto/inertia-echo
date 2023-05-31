@@ -92,7 +92,7 @@ func TestEvaluatePropsRecursive(t *testing.T) {
 		},
 	}
 
-	evaluatePropsRecursive(a)
+	evaluateProps(a)
 	if a["c"] != "ccc" {
 		t.Errorf("expected 'ccc' but %v", a["c"])
 	}

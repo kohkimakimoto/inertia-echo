@@ -117,7 +117,7 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 		props = filteredProps
 	}
 
-	evaluatePropsRecursive(props)
+	evaluateProps(props)
 
 	page := &Page{
 		Component: component,
@@ -139,7 +139,7 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 }
 
 // renderHTML renders HTML template with given code, name and data.
-func (i *Inertia) renderHTML(code int, name string, data interface{}) (err error) {
+func (i *Inertia) renderHTML(code int, name string, data map[string]interface{}) (err error) {
 	// try to render with the renderer registered in Inertia instance
 	if i.renderer != nil {
 		buf := new(bytes.Buffer)
