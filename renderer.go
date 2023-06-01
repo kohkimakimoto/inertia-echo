@@ -132,7 +132,7 @@ func (r *Renderer) renderInertia(page *Page) (template.HTML, error) {
 }
 
 var builtinFuncMap = template.FuncMap{
-	// This function is a primitive way to render a container element for Inertia.
+	// This function is a primitive way to render a data-page value for Inertia.
 	// Generally, you don't have to use this function. You can use {{ .inertia }} instead.
 	"json_marshal": fnJsonMarshal,
 }
