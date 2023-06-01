@@ -106,8 +106,11 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 		if !ok {
 			return errors.New("page object is not found in the data")
 		}
-		m["inertia"] = r.renderInertia(page)
-
+		_inertia, err := r.renderInertia(page)
+		if err != nil {
+			return err
+		}
+		m["inertia"] = _inertia
 		return r.templates.ExecuteTemplate(w, name, m)
 	}
 
@@ -115,15 +118,17 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 	return r.templates.ExecuteTemplate(w, name, data)
 }
 
-func (r *Renderer) renderInertia(page *Page) template.HTML {
-	pageJson, _ := json.Marshal(page)
-
+func (r *Renderer) renderInertia(page *Page) (template.HTML, error) {
+	pageJson, err := json.Marshal(page)
+	if err != nil {
+		return "", err
+	}
 	builder := new(strings.Builder)
 	builder.WriteString(`<div id="` + r.containerId + `" data-page="`)
 	template.HTMLEscape(builder, pageJson)
 	builder.WriteString(`"></div>`)
 
-	return template.HTML(builder.String())
+	return template.HTML(builder.String()), nil
 }
 
 var builtinFuncMap = template.FuncMap{
@@ -132,7 +137,10 @@ var builtinFuncMap = template.FuncMap{
 	"json_marshal": fnJsonMarshal,
 }
 
-func fnJsonMarshal(v interface{}) template.JS {
-	ret, _ := json.Marshal(v)
-	return template.JS(ret)
+func fnJsonMarshal(v interface{}) (template.JS, error) {
+	j, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return template.JS(j), nil
 }
