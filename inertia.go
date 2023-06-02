@@ -95,7 +95,7 @@ func (i *Inertia) RenderWithViewData(code int, component string, props, viewData
 type Page struct {
 	Component string                 `json:"component"`
 	Props     map[string]interface{} `json:"props"`
-	Url       string                 `json:"url"`
+	URL       string                 `json:"url"`
 	Version   string                 `json:"version"`
 }
 
@@ -130,7 +130,7 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 	page := &Page{
 		Component: component,
 		Props:     props,
-		Url:       req.URL.String(),
+		URL:       req.URL.String(),
 		Version:   i.Version(),
 	}
 
