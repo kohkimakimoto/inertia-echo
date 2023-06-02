@@ -28,19 +28,20 @@ func main() {
 	e := echo.New()
 	e.Debug = IsDebug()
 
-	// setup renderer for inertia with Vite
+	e.Use(middleware.Recover())
+	e.Use(middleware.Logger())
+
+	// setup inertia
 	r := inertia.NewRenderer()
 	r.Debug = e.Debug
 	r.MustParseGlob(filepath.Join(optDir, "views/*.html"))
 	r.ViteBasePath = "/dist/"
 	r.AddViteEntryPoint("js/app.tsx")
 	r.MustParseViteManifestFile(filepath.Join(optDir, "public/dist/manifest.json"))
-	e.Renderer = r
 
-	e.Use(middleware.Recover())
-	e.Use(middleware.Logger())
-	// setup inertia
-	e.Use(inertia.Middleware())
+	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+		Renderer: r,
+	}))
 	e.Use(inertia.CSRF())
 
 	e.Static("/", filepath.Join(optDir, "public"))
