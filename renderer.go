@@ -28,6 +28,10 @@ type Renderer struct {
 	ViteDisableReact bool
 	ViteEntryPoints  []string
 	viteManifest     ViteManifest
+
+	// SSR
+
+	SsrEngine SsrEngine
 }
 
 func NewRenderer() *Renderer {
@@ -40,6 +44,7 @@ func NewRenderer() *Renderer {
 		ViteDisableReact: false,
 		ViteEntryPoints:  []string{},
 		viteManifest:     nil,
+		SsrEngine:        nil,
 	}
 	r.templates = template.New("T").Funcs(r.funcMap())
 	return r
