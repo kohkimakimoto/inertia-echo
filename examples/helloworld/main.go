@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"github.com/kohkimakimoto/inertia-echo"
-	"github.com/kohkimakimoto/inertia-echo/vite"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"net/http"
@@ -29,16 +28,14 @@ func main() {
 	e := echo.New()
 	e.Debug = IsDebug()
 
-	// initialize vite integration for inertia
-	v := vite.New()
-	v.Debug = e.Debug
-	v.BasePath = "/dist"
-	v.AddEntryPoint("js/app.tsx")
-	if !v.Debug {
-		v.MustParseManifestFile(filepath.Join(optDir, "public/dist/manifest.json"))
-	}
-
-	e.Renderer = v.NewRenderer().MustParseGlob(filepath.Join(optDir, "views/*.html"))
+	// setup renderer for inertia with Vite
+	r := inertia.NewRenderer()
+	r.Debug = e.Debug
+	r.MustParseGlob(filepath.Join(optDir, "views/*.html"))
+	r.ViteBasePath = "/dist/"
+	r.AddViteEntryPoint("js/app.tsx")
+	r.MustParseViteManifestFile(filepath.Join(optDir, "public/dist/manifest.json"))
+	e.Renderer = r
 
 	e.Use(middleware.Recover())
 	e.Use(middleware.Logger())

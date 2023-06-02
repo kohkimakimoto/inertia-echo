@@ -42,12 +42,12 @@ func splitOrNil(s string, sep string) []string {
 	return ret
 }
 
-// evaluatePropsRecursive evaluates the given props and update it.
-func evaluatePropsRecursive(values map[string]interface{}) {
+// evaluateProps evaluates the given props and update it.
+func evaluateProps(values map[string]interface{}) {
 	for k, v := range values {
 		switch converted := v.(type) {
 		case map[string]interface{}:
-			evaluatePropsRecursive(converted)
+			evaluateProps(converted)
 		case *LazyProp:
 			values[k] = converted.callback()
 		case func() interface{}:
