@@ -27,14 +27,19 @@ type MiddlewareConfig struct {
 	Share SharedDataFunc
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer echo.Renderer
+	// IsSsrDisabled is a flag that determines whether server-side rendering is disabled.
+	IsSsrDisabled bool
 }
 
 type SharedDataFunc func(c echo.Context) (map[string]interface{}, error)
 
 var DefaultMiddlewareConfig = MiddlewareConfig{
-	Skipper:     middleware.DefaultSkipper,
-	RootView:    "app.html",
-	VersionFunc: defaultVersionFunc(),
+	Skipper:       middleware.DefaultSkipper,
+	RootView:      "app.html",
+	VersionFunc:   defaultVersionFunc(),
+	Share:         nil,
+	Renderer:      nil,
+	IsSsrDisabled: false,
 }
 
 func defaultVersionFunc() VersionFunc {
@@ -89,11 +94,12 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 
 			// Create an Inertia instance.
 			in := &Inertia{
-				c:           c,
-				rootView:    config.RootView,
-				sharedProps: sharedProps,
-				version:     config.VersionFunc,
-				renderer:    config.Renderer,
+				c:             c,
+				rootView:      config.RootView,
+				sharedProps:   sharedProps,
+				version:       config.VersionFunc,
+				renderer:      config.Renderer,
+				isSsrDisabled: config.IsSsrDisabled,
 			}
 
 			c.Set(key, in)

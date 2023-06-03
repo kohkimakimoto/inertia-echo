@@ -17,12 +17,13 @@ const (
 )
 
 type Inertia struct {
-	c           echo.Context
-	rootView    string
-	sharedProps map[string]interface{}
-	version     VersionFunc
-	renderer    echo.Renderer
-	mu          sync.RWMutex
+	c             echo.Context
+	rootView      string
+	sharedProps   map[string]interface{}
+	version       VersionFunc
+	renderer      echo.Renderer
+	isSsrDisabled bool
+	mu            sync.RWMutex
 }
 
 func (i *Inertia) SetRenderer(r echo.Renderer) {
@@ -31,6 +32,22 @@ func (i *Inertia) SetRenderer(r echo.Renderer) {
 
 func (i *Inertia) Renderer() echo.Renderer {
 	return i.renderer
+}
+
+func (i *Inertia) IsSsrDisabled() bool {
+	return i.isSsrDisabled
+}
+
+func (i *Inertia) IsSsrEnabled() bool {
+	return !i.isSsrDisabled
+}
+
+func (i *Inertia) EnableSsr() {
+	i.isSsrDisabled = false
+}
+
+func (i *Inertia) DisableSsr() {
+	i.isSsrDisabled = true
 }
 
 func (i *Inertia) SetRootView(name string) {

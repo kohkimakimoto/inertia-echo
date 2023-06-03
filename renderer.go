@@ -112,24 +112,39 @@ func (r *Renderer) MustParseFS(f fs.FS, pattern string) *Renderer {
 
 // Render renders HTML by using templates.
 func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	if m, ok := data.(map[string]interface{}); ok {
-		// The data is always a map[string]interface{}, if the renderer is used by Inertia.
-		page, ok := m["page"].(*Page)
+	// The data is always a map[string]interface{}, if the renderer is used by Inertia.
+	if mData, ok := data.(map[string]interface{}); ok {
+		page, ok := mData["page"].(*Page)
 		if !ok {
 			return errors.New("page object is not found in the data")
 		}
 
-		debug := c.Echo().Debug
-		m["debug"] = debug
-
-		// Configure inertia variable that is used in the template as {{ .inertia }}
-		_inertia, err := r.renderInertia(page)
+		in, err := Get(c)
 		if err != nil {
 			return err
 		}
-		m["inertia"] = _inertia
 
-		return r.templates.ExecuteTemplate(w, name, m)
+		if in.IsSsrEnabled() && r.SsrEngine != nil {
+			// server-side rendering
+			ssr, err := r.SsrEngine.Render(page)
+			if err != nil {
+				return err
+			}
+			mData["inertia"] = ssr.BodyHTML()
+			mData["inertiaHead"] = ssr.HeadHTML()
+		} else {
+			// client-side rendering
+			// Configure inertia variable that is used in the template as {{ .inertia }}
+			_inertia, err := r.renderInertia(page)
+			if err != nil {
+				return err
+			}
+			mData["inertia"] = _inertia
+			mData["inertiaHead"] = ""
+		}
+
+		return r.templates.ExecuteTemplate(w, name, mData)
+
 	}
 
 	// The following is a fallback for the case that the renderer is used without Inertia.
