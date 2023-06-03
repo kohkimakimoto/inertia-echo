@@ -143,7 +143,6 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 		}
 
 		return r.templates.ExecuteTemplate(w, name, mData)
-
 	}
 
 	// The following is a fallback for the case that the renderer is used without Inertia.
