@@ -1,3 +1,5 @@
+// package ssr is currently under development...
+
 package ssr
 
 import (
