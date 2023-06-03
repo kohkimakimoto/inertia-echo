@@ -10,12 +10,15 @@ import (
 	"os"
 	"regexp"
 	"strings"
-
-	"github.com/labstack/echo/v4"
 )
 
-// Renderer is a html/template renderer for Echo framework with inertia.js.
-type Renderer struct {
+type Renderer interface {
+	// Render renders a HTML for inertia.
+	Render(io.Writer, string, interface{}, *Inertia) error
+}
+
+// HTMLRenderer is a html/template renderer for Echo framework with inertia.js.
+type HTMLRenderer struct {
 	templates   *template.Template
 	Debug       bool
 	ContainerId string
@@ -28,10 +31,14 @@ type Renderer struct {
 	ViteDisableReact bool
 	ViteEntryPoints  []string
 	viteManifest     ViteManifest
+
+	// SSR
+
+	SsrEngine SsrEngine
 }
 
-func NewRenderer() *Renderer {
-	r := &Renderer{
+func NewRenderer() *HTMLRenderer {
+	r := &HTMLRenderer{
 		Debug:            false,
 		ContainerId:      "app",
 		Vite:             true,
@@ -40,21 +47,22 @@ func NewRenderer() *Renderer {
 		ViteDisableReact: false,
 		ViteEntryPoints:  []string{},
 		viteManifest:     nil,
+		SsrEngine:        nil,
 	}
 	r.templates = template.New("T").Funcs(r.funcMap())
 	return r
 }
 
-func (r *Renderer) AddViteEntryPoint(entryPoint ...string) {
+func (r *HTMLRenderer) AddViteEntryPoint(entryPoint ...string) {
 	r.ViteEntryPoints = append(r.ViteEntryPoints, entryPoint...)
 }
 
-func (r *Renderer) Funcs(funcMap template.FuncMap) *Renderer {
+func (r *HTMLRenderer) Funcs(funcMap template.FuncMap) *HTMLRenderer {
 	r.templates = r.templates.Funcs(funcMap)
 	return r
 }
 
-func (r *Renderer) Parse(text string) (*Renderer, error) {
+func (r *HTMLRenderer) Parse(text string) (*HTMLRenderer, error) {
 	t, err := r.templates.Parse(text)
 	if err != nil {
 		return nil, err
@@ -63,7 +71,7 @@ func (r *Renderer) Parse(text string) (*Renderer, error) {
 	return r, nil
 }
 
-func (r *Renderer) MustParse(text string) *Renderer {
+func (r *HTMLRenderer) MustParse(text string) *HTMLRenderer {
 	t, err := r.Parse(text)
 	if err != nil {
 		panic(err)
@@ -71,7 +79,7 @@ func (r *Renderer) MustParse(text string) *Renderer {
 	return t
 }
 
-func (r *Renderer) ParseGlob(pattern string) (*Renderer, error) {
+func (r *HTMLRenderer) ParseGlob(pattern string) (*HTMLRenderer, error) {
 	t, err := r.templates.ParseGlob(pattern)
 	if err != nil {
 		return nil, err
@@ -80,7 +88,7 @@ func (r *Renderer) ParseGlob(pattern string) (*Renderer, error) {
 	return r, nil
 }
 
-func (r *Renderer) MustParseGlob(pattern string) *Renderer {
+func (r *HTMLRenderer) MustParseGlob(pattern string) *HTMLRenderer {
 	t, err := r.ParseGlob(pattern)
 	if err != nil {
 		panic(err)
@@ -88,7 +96,7 @@ func (r *Renderer) MustParseGlob(pattern string) *Renderer {
 	return t
 }
 
-func (r *Renderer) ParseFS(f fs.FS, pattern string) (*Renderer, error) {
+func (r *HTMLRenderer) ParseFS(f fs.FS, pattern string) (*HTMLRenderer, error) {
 	t, err := r.templates.ParseFS(f, pattern)
 	if err != nil {
 		return nil, err
@@ -97,7 +105,7 @@ func (r *Renderer) ParseFS(f fs.FS, pattern string) (*Renderer, error) {
 	return r, nil
 }
 
-func (r *Renderer) MustParseFS(f fs.FS, pattern string) *Renderer {
+func (r *HTMLRenderer) MustParseFS(f fs.FS, pattern string) *HTMLRenderer {
 	t, err := r.ParseFS(f, pattern)
 	if err != nil {
 		panic(err)
@@ -106,32 +114,40 @@ func (r *Renderer) MustParseFS(f fs.FS, pattern string) *Renderer {
 }
 
 // Render renders HTML by using templates.
-func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	if m, ok := data.(map[string]interface{}); ok {
-		// The data is always a map[string]interface{}, if the renderer is used by Inertia.
-		page, ok := m["page"].(*Page)
+func (r *HTMLRenderer) Render(w io.Writer, name string, data interface{}, in *Inertia) error {
+	// The data is always a map[string]interface{}, if the renderer is used by Inertia.
+	if mData, ok := data.(map[string]interface{}); ok {
+		page, ok := mData["page"].(*Page)
 		if !ok {
 			return errors.New("page object is not found in the data")
 		}
 
-		debug := c.Echo().Debug
-		m["debug"] = debug
-
-		// Configure inertia variable that is used in the template as {{ .inertia }}
-		_inertia, err := r.renderInertia(page)
-		if err != nil {
-			return err
+		if in.IsSsrEnabled() && r.SsrEngine != nil {
+			// server-side rendering
+			ssr, err := r.SsrEngine.Render(page)
+			if err != nil {
+				return err
+			}
+			mData["inertia"] = ssr.BodyHTML()
+			mData["inertiaHead"] = ssr.HeadHTML()
+		} else {
+			// client-side rendering
+			_inertia, err := r.renderInertia(page)
+			if err != nil {
+				return err
+			}
+			mData["inertia"] = _inertia
+			mData["inertiaHead"] = ""
 		}
-		m["inertia"] = _inertia
 
-		return r.templates.ExecuteTemplate(w, name, m)
+		return r.templates.ExecuteTemplate(w, name, mData)
 	}
 
 	// The following is a fallback for the case that the renderer is used without Inertia.
 	return r.templates.ExecuteTemplate(w, name, data)
 }
 
-func (r *Renderer) renderInertia(page *Page) (template.HTML, error) {
+func (r *HTMLRenderer) renderInertia(page *Page) (template.HTML, error) {
 	pageJson, err := json.Marshal(page)
 	if err != nil {
 		return "", err
@@ -144,7 +160,7 @@ func (r *Renderer) renderInertia(page *Page) (template.HTML, error) {
 	return template.HTML(builder.String()), nil
 }
 
-func (r *Renderer) funcMap() template.FuncMap {
+func (r *HTMLRenderer) funcMap() template.FuncMap {
 	return template.FuncMap{
 		// This function is a primitive way to render a data-page value for Inertia.
 		// Generally, you don't have to use this function. You can use {{ .inertia }} instead.
@@ -155,7 +171,7 @@ func (r *Renderer) funcMap() template.FuncMap {
 	}
 }
 
-func (r *Renderer) fnJsonMarshal(v interface{}) (template.JS, error) {
+func (r *HTMLRenderer) fnJsonMarshal(v interface{}) (template.JS, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -163,7 +179,7 @@ func (r *Renderer) fnJsonMarshal(v interface{}) (template.JS, error) {
 	return template.JS(j), nil
 }
 
-func (r *Renderer) fnReactRefresh() template.HTML {
+func (r *HTMLRenderer) fnReactRefresh() template.HTML {
 	if !r.Debug {
 		return ""
 	}
@@ -177,7 +193,7 @@ func (r *Renderer) fnReactRefresh() template.HTML {
 </script>`, r.ViteDevServerURL))
 }
 
-func (r *Renderer) fnVite(entryPoints ...string) (template.HTML, error) {
+func (r *HTMLRenderer) fnVite(entryPoints ...string) (template.HTML, error) {
 	if len(entryPoints) == 0 {
 		entryPoints = r.ViteEntryPoints
 	}
@@ -217,7 +233,7 @@ func (r *Renderer) fnVite(entryPoints ...string) (template.HTML, error) {
 	return template.HTML(strings.Join(tags, "")), nil
 }
 
-func (r *Renderer) genTag(path string) string {
+func (r *HTMLRenderer) genTag(path string) string {
 	if isCssPath(path) {
 		return fmt.Sprintf(`<link rel="stylesheet" href="%s" />`, path)
 	} else {
@@ -231,7 +247,7 @@ func isCssPath(name string) bool {
 	return cssRe.MatchString(name)
 }
 
-func (r *Renderer) ParseViteManifest(data []byte) error {
+func (r *HTMLRenderer) ParseViteManifest(data []byte) error {
 	if r.Debug {
 		return nil
 	}
@@ -244,13 +260,13 @@ func (r *Renderer) ParseViteManifest(data []byte) error {
 	return nil
 }
 
-func (r *Renderer) MustParseViteManifest(data []byte) {
+func (r *HTMLRenderer) MustParseViteManifest(data []byte) {
 	if err := r.ParseViteManifest(data); err != nil {
 		panic(err)
 	}
 }
 
-func (r *Renderer) ParseViteManifestFile(name string) error {
+func (r *HTMLRenderer) ParseViteManifestFile(name string) error {
 	if r.Debug {
 		return nil
 	}
@@ -263,13 +279,13 @@ func (r *Renderer) ParseViteManifestFile(name string) error {
 	return nil
 }
 
-func (r *Renderer) MustParseViteManifestFile(name string) {
+func (r *HTMLRenderer) MustParseViteManifestFile(name string) {
 	if err := r.ParseViteManifestFile(name); err != nil {
 		panic(err)
 	}
 }
 
-func (r *Renderer) ParseViteManifestFS(f fs.FS, name string) error {
+func (r *HTMLRenderer) ParseViteManifestFS(f fs.FS, name string) error {
 	if r.Debug {
 		return nil
 	}
@@ -282,7 +298,7 @@ func (r *Renderer) ParseViteManifestFS(f fs.FS, name string) error {
 	return nil
 }
 
-func (r *Renderer) MustParseViteManifestFS(f fs.FS, name string) {
+func (r *HTMLRenderer) MustParseViteManifestFS(f fs.FS, name string) {
 	if err := r.ParseViteManifestFS(f, name); err != nil {
 		panic(err)
 	}

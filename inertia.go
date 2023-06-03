@@ -17,20 +17,37 @@ const (
 )
 
 type Inertia struct {
-	c           echo.Context
-	rootView    string
-	sharedProps map[string]interface{}
-	version     VersionFunc
-	renderer    echo.Renderer
-	mu          sync.RWMutex
+	c             echo.Context
+	rootView      string
+	sharedProps   map[string]interface{}
+	version       VersionFunc
+	renderer      Renderer
+	isSsrDisabled bool
+	mu            sync.RWMutex
 }
 
-func (i *Inertia) SetRenderer(r echo.Renderer) {
+func (i *Inertia) SetRenderer(r Renderer) {
 	i.renderer = r
 }
 
-func (i *Inertia) Renderer() echo.Renderer {
+func (i *Inertia) Renderer() Renderer {
 	return i.renderer
+}
+
+func (i *Inertia) IsSsrDisabled() bool {
+	return i.isSsrDisabled
+}
+
+func (i *Inertia) IsSsrEnabled() bool {
+	return !i.isSsrDisabled
+}
+
+func (i *Inertia) EnableSsr() {
+	i.isSsrDisabled = false
+}
+
+func (i *Inertia) DisableSsr() {
+	i.isSsrDisabled = true
 }
 
 func (i *Inertia) SetRootView(name string) {
@@ -147,18 +164,15 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 }
 
 // renderHTML renders HTML template with given code, name and data.
-func (i *Inertia) renderHTML(code int, name string, data map[string]interface{}) (err error) {
-	// try to render with the renderer registered in Inertia instance
-	if i.renderer != nil {
-		buf := new(bytes.Buffer)
-		if err = i.renderer.Render(buf, name, data, i.c); err != nil {
-			return
-		}
-		return i.c.HTMLBlob(code, buf.Bytes())
+func (i *Inertia) renderHTML(code int, name string, data map[string]interface{}) error {
+	if i.renderer == nil {
+		return ErrRendererNotRegistered
 	}
-
-	// If the renderer is not registered, use the default echo renderer
-	return i.c.Render(code, name, data)
+	buf := new(bytes.Buffer)
+	if err := i.renderer.Render(buf, name, data, i); err != nil {
+		return err
+	}
+	return i.c.HTMLBlob(code, buf.Bytes())
 }
 
 type LazyProp struct {
