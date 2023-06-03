@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite --clearScreen=false",
-    "build": "tsc --noEmit && vite build",
-    "clean": "rm -rf public/dist"
+    "build": "tsc --noEmit && vite build && vite build --ssr",
+    "clean": "rm -rf public/dist && rm -rf .generated/ssr",
+    "start-ssr": "node .generated/ssr/ssr.mjs"
   },
   "author": "",
   "license": "ISC",

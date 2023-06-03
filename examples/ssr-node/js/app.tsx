@@ -1,5 +1,5 @@
 import "../css/app.css";
-import { createRoot } from 'react-dom/client';
+import { hydrateRoot } from 'react-dom/client'
 import { createInertiaApp } from '@inertiajs/react';
 
 createInertiaApp({
@@ -8,6 +8,6 @@ createInertiaApp({
     return pages[`./pages/${name}.tsx`]
   },
   setup({ el, App, props }) {
-    createRoot(el).render(<App {...props} />)
+    hydrateRoot(el, <App {...props} />)
   },
 })
