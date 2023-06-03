@@ -134,7 +134,6 @@ func (r *Renderer) Render(w io.Writer, name string, data interface{}, c echo.Con
 			mData["inertiaHead"] = ssr.HeadHTML()
 		} else {
 			// client-side rendering
-			// Configure inertia variable that is used in the template as {{ .inertia }}
 			_inertia, err := r.renderInertia(page)
 			if err != nil {
 				return err
