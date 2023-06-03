@@ -57,8 +57,10 @@ func defaultVersionFunc() VersionFunc {
 	}
 }
 
-func Middleware() echo.MiddlewareFunc {
-	return MiddlewareWithConfig(DefaultMiddlewareConfig)
+func Middleware(r Renderer) echo.MiddlewareFunc {
+	return MiddlewareWithConfig(MiddlewareConfig{
+		Renderer: r,
+	})
 }
 
 // MiddlewareWithConfig returns an echo middleware that adds the Inertia instance to the context.

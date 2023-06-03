@@ -39,9 +39,7 @@ func main() {
 	r.AddViteEntryPoint("js/app.tsx")
 	r.MustParseViteManifestFile(filepath.Join(optDir, "public/dist/manifest.json"))
 
-	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-		Renderer: r,
-	}))
+	e.Use(inertia.Middleware(r))
 	e.Use(inertia.CSRF())
 
 	e.Static("/", filepath.Join(optDir, "public"))
