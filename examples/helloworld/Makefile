@@ -19,7 +19,7 @@ help: ## Show help
 
 .PHONY: run
 run: ## Run the application in development mode
-	@./process-starter.py \
+	@../../_tools/process-starter.py \
 		'{"command": "go run main.go -dir=$(DIR)", "prefix": "[go]", "prefixColor": "blue"}' \
 		'{"command": "npm run dev", "prefix": "[vite]", "prefixColor": "green"}'
 

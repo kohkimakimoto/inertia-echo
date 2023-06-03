@@ -46,6 +46,7 @@ func main() {
 
 	e.GET("/", func(c echo.Context) error {
 		return inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
+			"title":   "Hello, World! powered by inertia-echo",
 			"message": "Hello, World!",
 		})
 	})
