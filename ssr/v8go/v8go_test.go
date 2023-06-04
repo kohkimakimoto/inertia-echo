@@ -8,7 +8,11 @@ import (
 func TestSsrEngine_Render(t *testing.T) {
 	f := testTempJavaScriptFile(t, []byte(`
 const a = "aaaa";
-print("aaaaaaaaaaaaaaaaaaaaa");
+const isServer = typeof window === 'undefined';
+
+print("isServer");
+print(isServer);
+
 `))
 	e := NewSsrEngine()
 	if err := e.LoadFile(f.Name()); err != nil {
