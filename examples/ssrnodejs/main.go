@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/kohkimakimoto/inertia-echo"
-	"github.com/kohkimakimoto/inertia-echo/ssr"
+	"github.com/kohkimakimoto/inertia-echo/ssr/nodejs"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"net/http"
@@ -39,7 +39,7 @@ func main() {
 	r.ViteBasePath = "/dist/"
 	r.AddViteEntryPoint("js/app.tsx")
 	r.MustParseViteManifestFile(filepath.Join(optDir, "public/dist/manifest.json"))
-	r.SsrEngine = ssr.NewNodeSsrEngine()
+	r.SsrEngine = nodejs.NewSsrEngine()
 
 	e.Use(inertia.Middleware(r))
 	e.Use(inertia.CSRF())

@@ -1,6 +1,4 @@
-// package ssr is currently under development...
-
-package ssr
+package nodejs
 
 import (
 	"bytes"
@@ -11,19 +9,19 @@ import (
 	"strings"
 )
 
-type NodeSsrEngine struct {
+type SsrEngine struct {
 	SsrURL     string
 	HttpClient *http.Client
 }
 
-func NewNodeSsrEngine() *NodeSsrEngine {
-	return &NodeSsrEngine{
+func NewSsrEngine() *SsrEngine {
+	return &SsrEngine{
 		SsrURL:     "http://127.0.0.1:13714",
 		HttpClient: &http.Client{},
 	}
 }
 
-func (e *NodeSsrEngine) Render(p *inertia.Page) (*inertia.SsrResponse, error) {
+func (e *SsrEngine) Render(p *inertia.Page) (*inertia.SsrResponse, error) {
 	pJson, err := json.Marshal(p)
 	if err != nil {
 		return nil, err
