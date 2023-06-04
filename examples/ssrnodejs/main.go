@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/kohkimakimoto/inertia-echo"
+	"github.com/kohkimakimoto/inertia-echo/ssr/nodejs"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"net/http"
@@ -38,6 +39,7 @@ func main() {
 	r.ViteBasePath = "/dist/"
 	r.AddViteEntryPoint("js/app.tsx")
 	r.MustParseViteManifestFile(filepath.Join(optDir, "public/dist/manifest.json"))
+	r.SsrEngine = nodejs.NewSsrEngine()
 
 	e.Use(inertia.Middleware(r))
 	e.Use(inertia.CSRF())
@@ -46,8 +48,8 @@ func main() {
 
 	e.GET("/", func(c echo.Context) error {
 		return inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
-			"title":   "Hello, World! powered by inertia-echo",
-			"message": "Hello, World!",
+			"title":   "SSR Node powered by inertia-echo",
+			"message": "SSR Node",
 		})
 	})
 

@@ -1,4 +1,4 @@
-module github.com/kohkimakimoto/inertia-echo/examples/helloworld
+module github.com/kohkimakimoto/inertia-echo/examples/ssr-node
 
 go 1.19
 

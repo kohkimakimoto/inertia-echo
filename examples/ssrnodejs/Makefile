@@ -21,12 +21,15 @@ help: ## Show help
 run: ## Run the application in development mode
 	@../../_tools/process-starter.py \
 		'{"command": "go run main.go -dir=$(DIR)", "prefix": "[go]", "prefixColor": "blue"}' \
+		'{"command": "npm run start-ssr", "prefix": "[ssr]", "prefixColor": "magenta"}' \
 		'{"command": "npm run dev", "prefix": "[vite]", "prefixColor": "green"}'
 
 
 .PHONY: run/production
 run/production: build ## Run the application in production mode
-	@.generated/blog -dir=$(DIR)
+	@../../_tools/process-starter.py \
+		'{"command": ".generated/blog -dir=$(DIR)", "prefix": "[go]", "prefixColor": "blue"}' \
+		'{"command": "npm run start-ssr", "prefix": "[ssr]", "prefixColor": "magenta"}'
 
 
 .PHONY: build
