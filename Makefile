@@ -69,31 +69,3 @@ open-coverage-html: ## Open coverage report
 clean: ## Clean generated files
 	@rm -rf .dev/coverage.html
 	@rm -rf .dev/coverage.out
-
-
-.PHONY: run/helloworld
-run/helloworld: ## Run example helloworld app
-	@mkdir -p examples/helloworld/.generated
-	@cd examples/helloworld && ./scripts/process-starter.py \
-		'{"command": "air", "prefix": "[air] ", "prefixColor": "blue"}'
-
-
-#.PHONY: clean
-#clean: ## Clean the generated contents
-#	@rm -rf coverage-report.html
-#	@rm -rf examples/helloworld/gen/dist
-#	@rm -rf examples/helloworld/main
-#	@rm -rf examples/helloworld/.tmp
-
-#.PHONY: examples/helloworld/start
-#examples/helloworld/start: examples/helloworld/yarn-install ## start example helloworld app
-#	@if [[ ! -e examples/helloworld/gen/dist ]]; then cd examples/helloworld && yarn build; fi
-#	@cd examples/helloworld && ./process-starter.py --run "yarn dev" "air"
-#
-#.PHONY: examples/helloworld/build
-#examples/helloworld/build: examples/helloworld/yarn-install ## build example helloworld app
-#	@cd examples/helloworld && yarn build && go build -o main main.go
-#
-#.PHONY: examples/helloworld/yarn-install
-#examples/helloworld/yarn-install:
-#	@if [[ ! -e examples/helloworld/node_modules ]]; then cd examples/helloworld && yarn install; fi
