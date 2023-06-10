@@ -16,11 +16,11 @@ You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a
 go get github.com/kohkimakimoto/inertia-echo
 ```
 
-## Usage
-
-### Minimum example
+## Minimum example
 
 Please see [Hello World](https://github.com/kohkimakimoto/inertia-echo/tree/master/examples/helloworld) example.
+
+## Usage
 
 ### Shorthand routes
 
