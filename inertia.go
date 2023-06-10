@@ -123,8 +123,8 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 
 	props = mergeProps(i.sharedProps, props)
 
-	only := splitOrNil(req.Header.Get(HeaderXInertiaPartialData), ",")
-	if only != nil && req.Header.Get(HeaderXInertiaPartialComponent) == component {
+	only := splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
+	if len(only) > 0 && req.Header.Get(HeaderXInertiaPartialComponent) == component {
 		filteredProps := map[string]interface{}{}
 		for _, key := range only {
 			filteredProps[key] = props[key]
