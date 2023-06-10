@@ -330,3 +330,44 @@ func TestInertia_Render(t *testing.T) {
 		}
 	})
 }
+
+func TestInertia_RenderWithViewData(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	res := httptest.NewRecorder()
+	c := e.NewContext(req, res)
+
+	i := &Inertia{
+		c:           c,
+		rootView:    "app.html",
+		sharedProps: map[string]interface{}{},
+		version: func() string {
+			return "1.0.0"
+		},
+		renderer: testNewMockRenderer(t, func(w io.Writer, name string, data map[string]interface{}, in *Inertia) error {
+			if name != "app.html" {
+				t.Errorf("name should be app.html")
+			}
+			page := data["page"].(*Page)
+			if page.Component != "Index" {
+				t.Errorf("page component should be Index")
+			}
+			if page.Props["message"] != "Hello World" {
+				t.Errorf("page props message should be Hello World")
+			}
+			if data["key1"] != "value1" {
+				t.Errorf("data key1 should be value1")
+			}
+			return nil
+		}),
+	}
+
+	err := i.RenderWithViewData(http.StatusOK, "Index", map[string]interface{}{
+		"message": "Hello World",
+	}, map[string]interface{}{
+		"key1": "value1",
+	})
+	if err != nil {
+		t.Errorf("should not return error")
+	}
+}
