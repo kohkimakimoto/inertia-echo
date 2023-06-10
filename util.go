@@ -23,20 +23,16 @@ func mergeProps(props ...map[string]interface{}) map[string]interface{} {
 	return merged
 }
 
-func splitOrNil(s string, sep string) []string {
+func splitAndRemoveEmpty(s string, sep string) []string {
+	var ret []string
 	if s == "" {
-		return nil
+		return ret
 	}
 
-	var ret []string
 	for _, str := range strings.Split(s, sep) {
 		if str != "" {
 			ret = append(ret, str)
 		}
-	}
-
-	if len(ret) == 0 {
-		return nil
 	}
 
 	return ret

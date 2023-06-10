@@ -14,7 +14,7 @@ import (
 
 type Renderer interface {
 	// Render renders a HTML for inertia.
-	Render(io.Writer, string, interface{}, *Inertia) error
+	Render(io.Writer, string, map[string]interface{}, *Inertia) error
 }
 
 // HTMLRenderer is a html/template renderer for Echo framework with inertia.js.
@@ -114,36 +114,30 @@ func (r *HTMLRenderer) MustParseFS(f fs.FS, pattern string) *HTMLRenderer {
 }
 
 // Render renders HTML by using templates.
-func (r *HTMLRenderer) Render(w io.Writer, name string, data interface{}, in *Inertia) error {
-	// The data is always a map[string]interface{}, if the renderer is used by Inertia.
-	if mData, ok := data.(map[string]interface{}); ok {
-		page, ok := mData["page"].(*Page)
-		if !ok {
-			return errors.New("page object is not found in the data")
-		}
-
-		if in.IsSsrEnabled() && r.SsrEngine != nil {
-			// server-side rendering
-			ssr, err := r.SsrEngine.Render(page)
-			if err != nil {
-				return err
-			}
-			mData["inertia"] = ssr.BodyHTML()
-			mData["inertiaHead"] = ssr.HeadHTML()
-		} else {
-			// client-side rendering
-			_inertia, err := r.renderInertia(page)
-			if err != nil {
-				return err
-			}
-			mData["inertia"] = _inertia
-			mData["inertiaHead"] = ""
-		}
-
-		return r.templates.ExecuteTemplate(w, name, mData)
+func (r *HTMLRenderer) Render(w io.Writer, name string, data map[string]interface{}, in *Inertia) error {
+	page, ok := data["page"].(*Page)
+	if !ok {
+		return errors.New("page object is not found in the data")
 	}
 
-	// The following is a fallback for the case that the renderer is used without Inertia.
+	if in.IsSsrEnabled() && r.SsrEngine != nil {
+		// server-side rendering
+		ssr, err := r.SsrEngine.Render(page)
+		if err != nil {
+			return err
+		}
+		data["inertia"] = ssr.BodyHTML()
+		data["inertiaHead"] = ssr.HeadHTML()
+	} else {
+		// client-side rendering
+		_inertia, err := r.renderInertia(page)
+		if err != nil {
+			return err
+		}
+		data["inertia"] = _inertia
+		data["inertiaHead"] = ""
+	}
+
 	return r.templates.ExecuteTemplate(w, name, data)
 }
 
