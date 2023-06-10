@@ -14,7 +14,7 @@ func TestHandler(t *testing.T) {
 		res := httptest.NewRecorder()
 		e := echo.New()
 		c := e.NewContext(req, res)
-		m := Middleware(testMockRenderer(t, func(w io.Writer, name string, data map[string]interface{}, in *Inertia) error {
+		m := Middleware(testNewMockRenderer(t, func(w io.Writer, name string, data map[string]interface{}, in *Inertia) error {
 			page := data["page"].(*Page)
 			if page.Component != "About" {
 				t.Errorf("expected component: %s, got: %s", "About", page.Component)
@@ -33,7 +33,7 @@ func TestHandler(t *testing.T) {
 		res := httptest.NewRecorder()
 		e := echo.New()
 		c := e.NewContext(req, res)
-		m := Middleware(testMockRenderer(t, func(w io.Writer, name string, data map[string]interface{}, in *Inertia) error {
+		m := Middleware(testNewMockRenderer(t, func(w io.Writer, name string, data map[string]interface{}, in *Inertia) error {
 			page := data["page"].(*Page)
 			if page.Component != "About" {
 				t.Errorf("expected component: %s, got: %s", "About", page.Component)
