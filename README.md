@@ -16,67 +16,11 @@ You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a
 go get github.com/kohkimakimoto/inertia-echo
 ```
 
+## Minimum example
+
+Please see [Hello World](https://github.com/kohkimakimoto/inertia-echo/tree/master/examples/helloworld) example.
+
 ## Usage
-
-### Minimum example
-
-Create the root template `views/app.html`.
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-<div id="app" data-page="{{ json_marshal .page }}"></div>
-<!--
-Echo does not come with a built-in frontend library.
-Therefore, you'll need to establish your own frontend environment using tools like Webpack, Vite, and so on.
-Replace the following script tag to fit your environment.
--->
-<script src="/path/to/bundle.js"></script>
-</body>
-</html>
-```
-
-Next, write server-side app with [Echo](https://echo.labstack.com/)
-
-```go
-package main
-
-import (
-	"net/http"
-
-	"github.com/kohkimakimoto/inertia-echo"
-	"github.com/labstack/echo/v4"
-)
-
-func main() {
-	e := echo.New()
-	// setup renderer to load the root template.
-	r := inertia.NewRenderer()
-	r.MustParseGlob("views/*.html")
-
-	// The middleware is needed to handle inertia protocol.
-	e.Use(inertia.Middleware(r))
-	e.Use(inertia.CSRF())
-
-	// handlers
-	e.GET("/", func(c echo.Context) error {
-		// Instead of using c.Render(), the following code can render inertia response.
-		return inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
-			"message": "Hello, World!",
-		})
-	})
-
-	// start server
-	e.Logger.Fatal(e.Start(":8080"))
-}
-```
-
-You need to set up your client-side application. See [Client-side setup](https://inertiajs.com/client-side-setup) in official document.
 
 ### Shorthand routes
 
@@ -91,7 +35,6 @@ See also the official document: [Routing](https://inertiajs.com/routing)
 ### Responses
 
 Creating responses.
-
 
 ```go
 func ShowEventsHandler(c echo.Context) error {
@@ -175,12 +118,15 @@ See also the official document: [Shared data](https://inertiajs.com/shared-data)
 ### Partial reloads
 
 ```go
-
 inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 	// ALWAYS included on first visit
 	// OPTIONALLY included on partial reloads
 	// ALWAYS evaluated
 	"users": users,
+
+  // ALWAYS included on first visit...
+  // OPTIONALLY included on partial reloads...
+  // ONLY evaluated when needed...
 	"users": func() interface{} {
 		users := // get users...
 		return users
@@ -216,6 +162,12 @@ inertia.SetVersion(c, func() string { return version })
 
 See also the official document: [Assset versioning](https://inertiajs.com/asset-versioning)
 
+### Server-side Rendering (SSR)
+
+The inertia-echo supports SSR. Please see [SSR Node.js](https://github.com/kohkimakimoto/inertia-echo/tree/master/examples/ssrnodejs) example.
+
+See also the official document: [Server-side Rendering (SSR)](https://inertiajs.com/server-side-rendering)
+
 ## Unsupported features
 
 ### Validation
@@ -226,14 +178,11 @@ If you wish to handle validation errors with inertia-echo, you will need to impl
 
 See also the official document: [Validation](https://inertiajs.com/validation)
 
-### Server-side Rendering (SSR)
-
-The inertia-echo does not support server-side Rendering.
-
 ## Demo application
 
 - [Hello World](https://github.com/kohkimakimoto/inertia-echo/tree/master/examples/helloworld)
-- [pingcrm-echo](https://github.com/kohkimakimoto/pingcrm-echo)
+- [SSR Node.js](https://github.com/kohkimakimoto/inertia-echo/tree/master/examples/ssrnodejs)
+- [pingcrm-echo](https://github.com/kohkimakimoto/pingcrm-echo) (but it was implemented with the old version of inertia-echo)
 
 ## Author
 
