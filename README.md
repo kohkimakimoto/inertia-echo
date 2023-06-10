@@ -175,7 +175,6 @@ See also the official document: [Shared data](https://inertiajs.com/shared-data)
 ### Partial reloads
 
 ```go
-
 inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 	// ALWAYS included on first visit
 	// OPTIONALLY included on partial reloads
