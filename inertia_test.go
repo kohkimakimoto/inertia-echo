@@ -105,6 +105,7 @@ func TestInertia_Version(t *testing.T) {
 func TestInertia_Location(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set(HeaderXInertia, "true")
 	res := httptest.NewRecorder()
 	c := e.NewContext(req, res)
 
