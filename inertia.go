@@ -2,7 +2,6 @@ package inertia
 
 import (
 	"bytes"
-	"net/http"
 	"sync"
 
 	"github.com/labstack/echo/v4"
@@ -155,7 +154,7 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 
 	if req.Header.Get(HeaderXInertia) != "" {
 		res.Header().Set(HeaderXInertia, "true")
-		return c.JSON(http.StatusOK, page)
+		return c.JSON(code, page)
 	}
 
 	viewData["page"] = page
