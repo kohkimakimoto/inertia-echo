@@ -2,6 +2,7 @@ package inertia
 
 import (
 	"bytes"
+	"net/http"
 	"sync"
 
 	"github.com/labstack/echo/v4"
@@ -94,10 +95,14 @@ func (i *Inertia) Version() string {
 // Location generates 409 response for external redirects
 // see https://inertiajs.com/redirects#external-redirects
 func (i *Inertia) Location(url string) error {
-	res := i.c.Response()
-	res.Header().Set(HeaderXInertiaLocation, url)
-	res.WriteHeader(409)
-	return nil
+	if i.c.Request().Header.Get(HeaderXInertia) != "" {
+		res := i.c.Response()
+		res.Header().Set(HeaderXInertiaLocation, url)
+		res.WriteHeader(409)
+		return nil
+	} else {
+		return i.c.Redirect(http.StatusFound, url)
+	}
 }
 
 func (i *Inertia) Render(code int, component string, props map[string]interface{}) error {
