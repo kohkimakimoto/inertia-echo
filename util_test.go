@@ -1,6 +1,8 @@
 package inertia
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -111,27 +113,71 @@ func TestSplitAndRemoveEmpty(t *testing.T) {
 }
 
 func TestEvaluateProps(t *testing.T) {
-	a := map[string]interface{}{
-		"a": "aaa",
-		"b": map[string]interface{}{
-			"b-a": "b-aaa",
-			"b-b": map[string]interface{}{
-				"b-b-a": "b-b-aaa",
+	tests := []struct {
+		values   map[string]interface{}
+		expected map[string]interface{}
+		error    bool
+	}{
+		{
+			values: map[string]interface{}{
+				"a": "aaa",
+				"b": map[string]interface{}{
+					"b-a": "b-aaa",
+					"b-b": map[string]interface{}{
+						"b-b-a": "b-b-aaa",
+					},
+				},
+				"c": Lazy(func() (interface{}, error) {
+					return "ccc", nil
+				}),
+				"d": func() interface{} {
+					return "ddd"
+				},
 			},
+			expected: map[string]interface{}{
+				"a": "aaa",
+				"b": map[string]interface{}{
+					"b-a": "b-aaa",
+					"b-b": map[string]interface{}{
+						"b-b-a": "b-b-aaa",
+					},
+				},
+				"c": "ccc",
+				"d": "ddd",
+			},
+			error: false,
 		},
-		"c": Lazy(func() (interface{}, error) {
-			return "ccc", nil
-		}),
-		"d": func() interface{} {
-			return "ddd"
+		{
+			values: map[string]interface{}{
+				"a": func() (interface{}, error) {
+					return nil, errors.New("error")
+				},
+			},
+			error: true,
+		},
+		{
+			values: map[string]interface{}{
+				"a": Lazy(func() (interface{}, error) {
+					return nil, errors.New("error")
+				},
+				),
+			},
+			error: true,
 		},
 	}
 
-	evaluateProps(a)
-	if a["c"] != "ccc" {
-		t.Errorf("expected 'ccc' but %v", a["c"])
-	}
-	if a["d"] != "ddd" {
-		t.Errorf("expected 'ddd' but %v", a["d"])
+	for _, tt := range tests {
+		err := evaluateProps(tt.values)
+		if tt.error && err == nil {
+			t.Errorf("expected error but nil")
+		}
+		if !tt.error {
+			if err != nil {
+				t.Errorf("expected nil but %v", err)
+			}
+			if !reflect.DeepEqual(tt.expected, tt.values) {
+				t.Errorf("expected %v but %v", tt.expected, tt.values)
+			}
+		}
 	}
 }
