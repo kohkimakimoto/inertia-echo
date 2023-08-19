@@ -39,15 +39,28 @@ func splitAndRemoveEmpty(s string, sep string) []string {
 }
 
 // evaluateProps evaluates the given props and update it.
-func evaluateProps(values map[string]interface{}) {
+func evaluateProps(values map[string]interface{}) error {
 	for k, v := range values {
 		switch converted := v.(type) {
 		case map[string]interface{}:
-			evaluateProps(converted)
+			if err := evaluateProps(converted); err != nil {
+				return err
+			}
 		case *LazyProp:
-			values[k] = converted.callback()
+			vv, err := converted.callback()
+			if err != nil {
+				return err
+			}
+			values[k] = vv
+		case func() (interface{}, error):
+			vv, err := converted()
+			if err != nil {
+				return err
+			}
+			values[k] = vv
 		case func() interface{}:
 			values[k] = converted()
 		}
 	}
+	return nil
 }

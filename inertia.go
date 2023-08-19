@@ -146,7 +146,9 @@ func (i *Inertia) render(code int, component string, props, viewData map[string]
 		props = filteredProps
 	}
 
-	evaluateProps(props)
+	if err := evaluateProps(props); err != nil {
+		return err
+	}
 
 	page := &Page{
 		Component: component,
@@ -179,13 +181,15 @@ func (i *Inertia) renderHTML(code int, name string, data map[string]interface{})
 	return i.c.HTMLBlob(code, buf.Bytes())
 }
 
+type LazyPropFunc func() (interface{}, error)
+
 type LazyProp struct {
-	callback func() interface{}
+	callback LazyPropFunc
 }
 
 // Lazy defines a lazy evaluated data.
 // see https://inertiajs.com/partial-reloads#lazy-data-evaluation
-func Lazy(callback func() interface{}) *LazyProp {
+func Lazy(callback LazyPropFunc) *LazyProp {
 	return &LazyProp{
 		callback: callback,
 	}
