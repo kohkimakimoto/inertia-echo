@@ -239,8 +239,8 @@ func TestInertia_Render(t *testing.T) {
 			"key2": func() interface{} {
 				return "value2"
 			},
-			"key3": Lazy(func() interface{} {
-				return "value3"
+			"key3": Lazy(func() (interface{}, error) {
+				return "value3", nil
 			}),
 		})
 		if err != nil {
@@ -288,8 +288,8 @@ func TestInertia_Render(t *testing.T) {
 			"key2": func() interface{} {
 				return "value2"
 			},
-			"key3": Lazy(func() interface{} {
-				return "value3"
+			"key3": Lazy(func() (interface{}, error) {
+				return "value3", nil
 			}),
 		})
 		if err != nil {

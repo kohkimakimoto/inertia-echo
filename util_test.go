@@ -119,8 +119,8 @@ func TestEvaluateProps(t *testing.T) {
 				"b-b-a": "b-b-aaa",
 			},
 		},
-		"c": Lazy(func() interface{} {
-			return "ccc"
+		"c": Lazy(func() (interface{}, error) {
+			return "ccc", nil
 		}),
 		"d": func() interface{} {
 			return "ddd"
