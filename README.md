@@ -128,10 +128,10 @@ inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 	// OPTIONALLY included on partial reloads...
 	// ONLY evaluated when needed...
 	"users": func() (interface{}, error) {
-    users, err := // get users...
-    if err != nil {
-        return nil, err
-    }
+		users, err := // get users...
+		if err != nil {
+			return nil, err
+		}
 		return users
 	},
 
@@ -141,8 +141,8 @@ inertia.Render(c, http.StatusOK, "Index", map[string]interface{}{
 	"users": inertia.Lazy(func() (interface{}, error) {
 		users, err := // get users...
 		if err != nil {
-      return nil, err
-    }
+			return nil, err
+		}
 		return users, nil
 	}),
 })
