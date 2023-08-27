@@ -26,14 +26,14 @@ run: ## Run the application in development mode
 
 .PHONY: run/production
 run/production: build ## Run the application in production mode
-	@.generated/blog -dir=$(DIR)
+	@.generated/helloworld -dir=$(DIR)
 
 
 .PHONY: build
 build: ## Build the application
 	@mkdir -p .generated
 	@npm run build
-	@go build -ldflags=$(BUILD_LDFLAGS) -o .generated/blog
+	@go build -ldflags=$(BUILD_LDFLAGS) -o .generated/helloworld
 
 
 .PHONY: clean
