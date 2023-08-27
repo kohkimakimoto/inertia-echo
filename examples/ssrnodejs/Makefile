@@ -28,7 +28,7 @@ run: ## Run the application in development mode
 .PHONY: run/production
 run/production: build ## Run the application in production mode
 	@../../_tools/process-starter.py \
-		'{"command": ".generated/blog -dir=$(DIR)", "prefix": "[go]", "prefixColor": "blue"}' \
+		'{"command": ".generated/ssrnodejs -dir=$(DIR)", "prefix": "[go]", "prefixColor": "blue"}' \
 		'{"command": "npm run start-ssr", "prefix": "[ssr]", "prefixColor": "magenta"}'
 
 
@@ -36,7 +36,7 @@ run/production: build ## Run the application in production mode
 build: ## Build the application
 	@mkdir -p .generated
 	@npm run build
-	@go build -ldflags=$(BUILD_LDFLAGS) -o .generated/blog
+	@go build -ldflags=$(BUILD_LDFLAGS) -o .generated/ssrnodejs
 
 
 .PHONY: clean
