@@ -326,7 +326,7 @@ func TestInertia_Render(t *testing.T) {
 		if res.Code != http.StatusOK {
 			t.Errorf("should respond with status code 200")
 		}
-		if res.Header().Get("Content-Type") != "application/json; charset=UTF-8" {
+		if res.Header().Get("Content-Type") != "application/json" {
 			t.Errorf("should respond with Content-Type application/json")
 		}
 	})
