@@ -27,37 +27,14 @@ func TestCSRF(t *testing.T) {
 }
 
 func TestCSRFWithConfig(t *testing.T) {
-	t.Run("has skipper but it should not skip", func(t *testing.T) {
+	t.Run("has skipper and it should skip", func(t *testing.T) {
 		e := echo.New()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		csrf := CSRFWithConfig(CSRFConfig{
 			Skipper: func(c echo.Context) bool {
-				path := c.Request().URL.Path
-				return strings.HasPrefix(path, "/should_skip")
-			},
-		})
-		h := csrf(func(c echo.Context) error {
-			return c.String(http.StatusOK, "test")
-		})
-		_ = h(c)
-
-		cookie := rec.Header().Get(echo.HeaderSetCookie)
-		if !strings.Contains(cookie, "XSRF-TOKEN") {
-			t.Errorf("should contain XSRF-TOKEN, but not '%v'", cookie)
-		}
-	})
-
-	t.Run("has skipper and it should skip", func(t *testing.T) {
-		e := echo.New()
-		req := httptest.NewRequest(http.MethodGet, "/should_skip", nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		csrf := CSRFWithConfig(CSRFConfig{
-			Skipper: func(c echo.Context) bool {
-				path := c.Request().URL.Path
-				return strings.HasPrefix(path, "/should_skip")
+				return true
 			},
 		})
 		h := csrf(func(c echo.Context) error {

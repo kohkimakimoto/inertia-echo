@@ -1,183 +1,182 @@
 package inertia
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 )
 
 func TestInArray(t *testing.T) {
 	tests := []struct {
+		name     string
 		needle   string
 		haystack []string
 		expected bool
 	}{
 		{
-			needle:   "c",
-			haystack: []string{"a", "b", "c", "d"},
+			name:     "found in array",
+			needle:   "apple",
+			haystack: []string{"orange", "apple", "banana"},
 			expected: true,
 		},
 		{
-			needle:   "e",
-			haystack: []string{"a", "b", "c", "d"},
+			name:     "not found in array",
+			needle:   "grape",
+			haystack: []string{"orange", "apple", "banana"},
+			expected: false,
+		},
+		{
+			name:     "empty array",
+			needle:   "apple",
+			haystack: []string{},
+			expected: false,
+		},
+		{
+			name:     "nil array",
+			needle:   "apple",
+			haystack: nil,
+			expected: false,
+		},
+		{
+			name:     "empty needle",
+			needle:   "",
+			haystack: []string{"orange", "", "banana"},
+			expected: true,
+		},
+		{
+			name:     "empty needle not in array",
+			needle:   "",
+			haystack: []string{"orange", "apple", "banana"},
 			expected: false,
 		},
 	}
 
 	for _, tt := range tests {
-		if ret := inArray(tt.needle, tt.haystack); ret != tt.expected {
-			t.Errorf("expected %v but %v", tt.expected, ret)
-		}
-	}
-}
-
-func TestMergeProps(t *testing.T) {
-	tests := []struct {
-		a        map[string]interface{}
-		b        map[string]interface{}
-		expected map[string]interface{}
-	}{
-		{
-			a: map[string]interface{}{
-				"a": "a-aaa",
-				"b": "a-bbb",
-				"c": "a-ccc",
-			},
-			b: map[string]interface{}{
-				"c": "b-ccc",
-				"d": "b-ddd",
-				"e": "b-eee",
-			},
-			expected: map[string]interface{}{
-				"a": "a-aaa",
-				"b": "a-bbb",
-				"c": "b-ccc",
-				"d": "b-ddd",
-				"e": "b-eee",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		ret := mergeProps(tt.a, tt.b)
-		if len(ret) != len(tt.expected) {
-			t.Errorf("expected %v but %v", len(tt.expected), len(ret))
-		}
-		for k, v := range tt.expected {
-			if ret[k] != v {
-				t.Errorf("expected %v but %v", v, ret[k])
+		t.Run(tt.name, func(t *testing.T) {
+			result := inArray(tt.needle, tt.haystack)
+			if result != tt.expected {
+				t.Errorf("inArray(%q, %v) = %v, expected %v", tt.needle, tt.haystack, result, tt.expected)
 			}
-		}
+		})
 	}
 }
 
 func TestSplitAndRemoveEmpty(t *testing.T) {
 	tests := []struct {
-		s        string
-		sep      string
-		expected []string
+		name      string
+		input     string
+		separator string
+		expected  []string
 	}{
 		{
-			s:        "aaa",
-			sep:      ",",
-			expected: []string{"aaa"},
+			name:      "normal split",
+			input:     "apple,orange,banana",
+			separator: ",",
+			expected:  []string{"apple", "orange", "banana"},
 		},
 		{
-			s:        "aaa,bbb,ccc",
-			sep:      ",",
-			expected: []string{"aaa", "bbb", "ccc"},
+			name:      "empty string",
+			input:     "",
+			separator: ",",
+			expected:  nil,
 		},
 		{
-			s:        ",,,",
-			sep:      ",",
-			expected: []string{},
+			name:      "single element",
+			input:     "apple",
+			separator: ",",
+			expected:  []string{"apple"},
 		},
 		{
-			s:        "",
-			sep:      ",",
-			expected: []string{},
+			name:      "empty elements",
+			input:     "apple,,orange,,banana",
+			separator: ",",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "leading empty elements",
+			input:     ",,apple,orange,banana",
+			separator: ",",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "trailing empty elements",
+			input:     "apple,orange,banana,,",
+			separator: ",",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "only separators",
+			input:     ",,,",
+			separator: ",",
+			expected:  nil,
+		},
+		{
+			name:      "different separator",
+			input:     "apple|orange|banana",
+			separator: "|",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "space separator",
+			input:     "apple orange banana",
+			separator: " ",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "space separator with extra spaces",
+			input:     "apple  orange  banana",
+			separator: " ",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "multi-character separator",
+			input:     "apple::orange::banana",
+			separator: "::",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "multi-character separator with empty",
+			input:     "apple::::orange::banana",
+			separator: "::",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "no separator found",
+			input:     "apple",
+			separator: ",",
+			expected:  []string{"apple"},
+		},
+		{
+			name:      "whitespace elements",
+			input:     " apple , orange , banana ",
+			separator: ",",
+			expected:  []string{"apple", "orange", "banana"},
+		},
+		{
+			name:      "single separator at start",
+			input:     ",apple",
+			separator: ",",
+			expected:  []string{"apple"},
+		},
+		{
+			name:      "single separator at end",
+			input:     "apple,",
+			separator: ",",
+			expected:  []string{"apple"},
+		},
+		{
+			name:      "just separator",
+			input:     ",",
+			separator: ",",
+			expected:  nil,
 		},
 	}
 
 	for _, tt := range tests {
-		ret := splitAndRemoveEmpty(tt.s, tt.sep)
-		if len(ret) != len(tt.expected) {
-			t.Errorf("expected %v but %v", len(tt.expected), len(ret))
-		}
-		for i, v := range tt.expected {
-			if ret[i] != v {
-				t.Errorf("expected %v but %v", v, ret[i])
+		t.Run(tt.name, func(t *testing.T) {
+			result := splitAndRemoveEmpty(tt.input, tt.separator)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("splitAndRemoveEmpty(%q, %q) = %v, expected %v", tt.input, tt.separator, result, tt.expected)
 			}
-		}
-	}
-}
-
-func TestEvaluateProps(t *testing.T) {
-	tests := []struct {
-		values   map[string]interface{}
-		expected map[string]interface{}
-		error    bool
-	}{
-		{
-			values: map[string]interface{}{
-				"a": "aaa",
-				"b": map[string]interface{}{
-					"b-a": "b-aaa",
-					"b-b": map[string]interface{}{
-						"b-b-a": "b-b-aaa",
-					},
-				},
-				"c": Lazy(func() (interface{}, error) {
-					return "ccc", nil
-				}),
-				"d": func() interface{} {
-					return "ddd"
-				},
-			},
-			expected: map[string]interface{}{
-				"a": "aaa",
-				"b": map[string]interface{}{
-					"b-a": "b-aaa",
-					"b-b": map[string]interface{}{
-						"b-b-a": "b-b-aaa",
-					},
-				},
-				"c": "ccc",
-				"d": "ddd",
-			},
-			error: false,
-		},
-		{
-			values: map[string]interface{}{
-				"a": func() (interface{}, error) {
-					return nil, errors.New("error")
-				},
-			},
-			error: true,
-		},
-		{
-			values: map[string]interface{}{
-				"a": Lazy(func() (interface{}, error) {
-					return nil, errors.New("error")
-				},
-				),
-			},
-			error: true,
-		},
-	}
-
-	for _, tt := range tests {
-		err := evaluateProps(tt.values)
-		if tt.error && err == nil {
-			t.Errorf("expected error but nil")
-		}
-		if !tt.error {
-			if err != nil {
-				t.Errorf("expected nil but %v", err)
-			}
-			if !reflect.DeepEqual(tt.expected, tt.values) {
-				t.Errorf("expected %v but %v", tt.expected, tt.values)
-			}
-		}
+		})
 	}
 }

@@ -1,0 +1,24 @@
+{
+  "name": "viewkit",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite --clearScreen=false",
+    "build": "tsc --noEmit && vite build",
+    "clean": "rm -rf public/build && rm -rf .build",
+    "start-ssr": "vite build --ssr && node .build/ssr/ssr.mjs"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@inertiajs/react": "^2.0.17",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.35.1",
+    "vite": "^7.0.6"
+  }
+}

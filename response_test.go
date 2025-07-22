@@ -4,64 +4,52 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/labstack/echo/v4"
 )
 
-func TestNewResponseWriterWrapper(t *testing.T) {
-	t.Run("should buffer status code", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		rec := httptest.NewRecorder()
-		e := echo.New()
-		c := e.NewContext(req, rec)
-		var w *ResponseWriterWrapper
-		err := func(c echo.Context) error {
-			res := c.Response()
-			w = NewResponseWriterWrapper(res.Writer)
-			res.Writer = w
-			return c.Redirect(http.StatusFound, "/example")
-		}(c)
-		if err != nil {
-			t.Fatal(err)
-		}
+func TestResponseWriterWrapper_FlushHeader_WhenBuffered(t *testing.T) {
+	rec := httptest.NewRecorder()
+	wrapper := NewResponseWriterWrapper(rec)
 
-		if rec.Code != http.StatusOK {
-			// status code 200, because the actual status code is buffered and not sent.
-			t.Errorf("expected status code to be 200, got %d", rec.Code)
-		}
+	// Set a buffered status code
+	wrapper.WriteHeader(302)
 
-		w.FlushHeader()
-		if rec.Code != http.StatusFound {
-			// you will get buffered status code after FlushHeader.
-			t.Errorf("expected status code to be 302, got %d", rec.Code)
-		}
-	})
+	// Verify it's buffered
+	if !wrapper.buffered {
+		t.Fatal("expected status to be buffered")
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected underlying recorder to still have default status %d, got %d", http.StatusOK, rec.Code)
+	}
 
-	t.Run("should NOT buffer status code", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		rec := httptest.NewRecorder()
-		e := echo.New()
-		c := e.NewContext(req, rec)
-		var w *ResponseWriterWrapper
-		err := func(c echo.Context) error {
-			res := c.Response()
-			w = NewResponseWriterWrapper(res.Writer)
-			res.Writer = w
-			return c.String(http.StatusNotFound, "/example")
-		}(c)
-		if err != nil {
-			t.Fatal(err)
-		}
+	// Flush the header
+	wrapper.FlushHeader()
 
-		if rec.Code != http.StatusNotFound {
-			// status code 404, 404 is not buffered.
-			t.Errorf("expected status code to be 404, got %d", rec.Code)
-		}
+	// Now the underlying response writer should have the status code
+	if rec.Code != 302 {
+		t.Errorf("expected underlying recorder code to be 302 after flush, got %d", rec.Code)
+	}
+}
 
-		w.FlushHeader()
-		if rec.Code != http.StatusNotFound {
-			// no effect by FlushHeader
-			t.Errorf("expected status code to be 404, got %d", rec.Code)
-		}
-	})
+func TestResponseWriterWrapper_FlushHeader_WhenNotBuffered(t *testing.T) {
+	rec := httptest.NewRecorder()
+	wrapper := NewResponseWriterWrapper(rec)
+
+	// Set a non-buffered status code
+	wrapper.WriteHeader(404)
+
+	// Verify it's not buffered and was written immediately
+	if wrapper.buffered {
+		t.Error("expected status to not be buffered")
+	}
+	if rec.Code != 404 {
+		t.Errorf("expected underlying recorder code to be 404, got %d", rec.Code)
+	}
+
+	// Flush should be a no-op
+	wrapper.FlushHeader()
+
+	// Status should remain the same
+	if rec.Code != 404 {
+		t.Errorf("expected underlying recorder code to remain 404 after flush, got %d", rec.Code)
+	}
 }

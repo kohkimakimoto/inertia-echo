@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io"
 	"io/fs"
 	"os"
 	"regexp"
@@ -13,13 +12,14 @@ import (
 )
 
 type Renderer interface {
-	// Render renders a HTML for inertia.
-	Render(io.Writer, string, map[string]interface{}, *Inertia) error
+	// Render renders an HTML page for inertia.
+	Render(ctx *RenderContext) error
 }
 
 // HTMLRenderer is a html/template renderer for Echo framework with inertia.js.
 type HTMLRenderer struct {
-	templates   *template.Template
+	templates *template.Template
+
 	Debug       bool
 	ContainerId string
 
@@ -37,7 +37,7 @@ type HTMLRenderer struct {
 	SsrEngine SsrEngine
 }
 
-func NewRenderer() *HTMLRenderer {
+func NewHTMLRenderer() *HTMLRenderer {
 	r := &HTMLRenderer{
 		Debug:            false,
 		ContainerId:      "app",
@@ -114,15 +114,21 @@ func (r *HTMLRenderer) MustParseFS(f fs.FS, pattern string) *HTMLRenderer {
 }
 
 // Render renders HTML by using templates.
-func (r *HTMLRenderer) Render(w io.Writer, name string, data map[string]interface{}, in *Inertia) error {
-	page, ok := data["page"].(*Page)
-	if !ok {
-		return errors.New("page object is not found in the data")
+func (r *HTMLRenderer) Render(ctx *RenderContext) error {
+	var data map[string]any
+	if ctx.ViewData != nil {
+		_data, ok := ctx.ViewData.(map[string]any)
+		if !ok {
+			return errors.New("HTMLRenderer requires ViewData to be a map[string]any")
+		}
+		data = _data
+	} else {
+		data = map[string]any{}
 	}
 
-	if in.IsSsrEnabled() && r.SsrEngine != nil {
+	if ctx.Inertia.IsSsrEnabled() && r.SsrEngine != nil {
 		// server-side rendering
-		ssr, err := r.SsrEngine.Render(page)
+		ssr, err := r.SsrEngine.Render(ctx)
 		if err != nil {
 			return err
 		}
@@ -130,7 +136,7 @@ func (r *HTMLRenderer) Render(w io.Writer, name string, data map[string]interfac
 		data["inertiaHead"] = ssr.HeadHTML()
 	} else {
 		// client-side rendering
-		_inertia, err := r.renderInertia(page)
+		_inertia, err := r.renderInertia(ctx.Page)
 		if err != nil {
 			return err
 		}
@@ -138,7 +144,7 @@ func (r *HTMLRenderer) Render(w io.Writer, name string, data map[string]interfac
 		data["inertiaHead"] = ""
 	}
 
-	return r.templates.ExecuteTemplate(w, name, data)
+	return r.templates.ExecuteTemplate(ctx.Writer, ctx.ViewName, data)
 }
 
 func (r *HTMLRenderer) renderInertia(page *Page) (template.HTML, error) {
@@ -298,7 +304,7 @@ func (r *HTMLRenderer) MustParseViteManifestFS(f fs.FS, name string) {
 	}
 }
 
-type ViteManifest map[string]interface{}
+type ViteManifest map[string]any
 
 func parseViteManifest(data []byte) (ViteManifest, error) {
 	var manifest ViteManifest
