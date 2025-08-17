@@ -19,5 +19,4 @@ jobs:
         with:
           go-version: stable
           cache: true
-      - run: make setup
       - run: make test
