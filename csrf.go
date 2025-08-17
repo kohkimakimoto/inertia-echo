@@ -24,8 +24,7 @@ var DefaultCSRFConfig = CSRFConfig{
 }
 
 func CSRF() echo.MiddlewareFunc {
-	c := DefaultCSRFConfig
-	return CSRFWithConfig(c)
+	return CSRFWithConfig(DefaultCSRFConfig)
 }
 
 func CSRFWithConfig(config CSRFConfig) echo.MiddlewareFunc {

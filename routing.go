@@ -7,9 +7,14 @@ import (
 )
 
 // Handler is a helper function that makes an inertia route without implementing handler function.
-func Handler(component string, props ...map[string]interface{}) echo.HandlerFunc {
-	mergedProps := mergeProps(props...)
+func Handler(component string) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return Render(c, http.StatusOK, component, mergedProps)
+		return Render(c, http.StatusOK, component, nil)
+	}
+}
+
+func HandlerWithProps(component string, props any) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		return Render(c, http.StatusOK, component, props)
 	}
 }

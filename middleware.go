@@ -1,12 +1,12 @@
 package inertia
 
 import (
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"net/http"
 	"os"
 	"time"
-
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
 
 const (
@@ -26,41 +26,55 @@ type MiddlewareConfig struct {
 	Share SharedDataFunc
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer Renderer
+	// ClearHistoryCookieKey is a key for the cookie that is used to clear the history state.
+	ClearHistoryCookieKey string
+	// Session is a session store used for Inertia's features. Currently, it is used for handling validation error messages.
+	// Session is an optional config. But it is used for built-in error message handling.
+	Session sessions.Store
+	// SessionName is a name of the session that is used for Inertia's features.
+	SessionName string
+	// SessionOptions is a session options that is used for Inertia's features.
+	SessionOptions *sessions.Options
 	// IsSsrDisabled is a flag that determines whether server-side rendering is disabled.
+	// If this is true, server-side rendering is disabled even if the renderer supports and is configured for it.
 	IsSsrDisabled bool
 }
 
-type SharedDataFunc func(c echo.Context) (map[string]interface{}, error)
+type SharedDataFunc func(c echo.Context) (map[string]any, error)
 
 var DefaultMiddlewareConfig = MiddlewareConfig{
-	Skipper:       middleware.DefaultSkipper,
-	RootView:      "app.html",
-	VersionFunc:   defaultVersionFunc(),
-	Share:         nil,
-	Renderer:      nil,
+	Skipper:               middleware.DefaultSkipper,
+	RootView:              "app.html",
+	VersionFunc:           defaultVersionFunc(),
+	Share:                 nil,
+	Renderer:              nil,
+	ClearHistoryCookieKey: "inertia.clear_history",
+	Session:               nil,
+	SessionName:           "inertia.session",
+	SessionOptions: &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 7 days
+		HttpOnly: true,
+	},
 	IsSsrDisabled: false,
 }
 
 func defaultVersionFunc() VersionFunc {
 	var v string
 
-	// It is for Google App Engine.
-	// see https://cloud.google.com/appengine/docs/standard/go/runtime#environment_variables
-	if v = os.Getenv("GAE_VERSION"); v == "" {
-		// The fallback version value that imitates the default GAE version format.
-		// It assumes to be used for development.
-		v = time.Now().Format("20060102t150405")
+	if v = os.Getenv("INERTIA_VERSION"); v == "" {
+		// `GAE_VERSION` is for Google App Engine.
+		// see https://cloud.google.com/appengine/docs/standard/go/runtime#environment_variables
+		if v = os.Getenv("GAE_VERSION"); v == "" {
+			// The fallback version value that imitates the default GAE version format.
+			// It assumes to be used for development.
+			v = time.Now().Format("20060102t150405")
+		}
 	}
 
 	return func() string {
 		return v
 	}
-}
-
-func Middleware(r Renderer) echo.MiddlewareFunc {
-	return MiddlewareWithConfig(MiddlewareConfig{
-		Renderer: r,
-	})
 }
 
 // MiddlewareWithConfig returns an echo middleware that adds the Inertia instance to the context.
@@ -75,6 +89,15 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	if config.VersionFunc == nil {
 		config.VersionFunc = DefaultMiddlewareConfig.VersionFunc
 	}
+	if config.ClearHistoryCookieKey == "" {
+		config.ClearHistoryCookieKey = DefaultMiddlewareConfig.ClearHistoryCookieKey
+	}
+	if config.SessionName == "" {
+		config.SessionName = DefaultMiddlewareConfig.SessionName
+	}
+	if config.SessionOptions == nil {
+		config.SessionOptions = DefaultMiddlewareConfig.SessionOptions
+	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) (err error) {
@@ -82,7 +105,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				return next(c)
 			}
 
-			var sharedProps map[string]interface{}
+			var sharedProps map[string]any
 			if config.Share != nil {
 				ret, err := config.Share(c)
 				if err != nil {
@@ -90,37 +113,54 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				}
 				sharedProps = ret
 			} else {
-				sharedProps = map[string]interface{}{}
+				sharedProps = map[string]any{}
 			}
 
 			// Create an Inertia instance.
-			in := &Inertia{
-				c:             c,
-				rootView:      config.RootView,
-				sharedProps:   sharedProps,
-				version:       config.VersionFunc,
-				renderer:      config.Renderer,
-				isSsrDisabled: config.IsSsrDisabled,
+			i := &Inertia{
+				echoContext:           c,
+				rootView:              config.RootView,
+				sharedProps:           sharedProps,
+				version:               config.VersionFunc,
+				renderer:              config.Renderer,
+				clearHistoryCookieKey: config.ClearHistoryCookieKey,
+				sessionStore:          config.Session,
+				sessionName:           config.SessionName,
+				sessionOptions:        config.SessionOptions,
+				errorMessageMap:       NewErrorMessageMap(),
+				isSsrDisabled:         config.IsSsrDisabled,
 			}
-
-			c.Set(key, in)
+			c.Set(key, i)
 
 			req := c.Request()
 			res := c.Response()
 
+			i.partialComponent = req.Header.Get(HeaderXInertiaPartialComponent)
+			i.onlyProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
+			i.exceptProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ",")
+			i.resetProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ",")
+			i.errorBagKey = req.Header.Get(HeaderXInertiaErrorBag)
+
 			if req.Header.Get(HeaderXInertia) == "" {
 				// Not inertial request
-				return next(c)
+				if err = next(c); err != nil {
+					return
+				}
+				i.sendClearHistoryCookieIfNeeded()
+
+				return
 			}
 
 			// In the event that the assets change, initiate a
 			// client-side location visit to force an update.
 			// see https://inertiajs.com/the-protocol#asset-versioning
-			if checkVersion(req, in.Version()) {
-				return in.Location(req.URL.Path)
+			if checkVersion(req, i.Version()) {
+				err = i.Location(req.URL.Path)
+				return
 			}
 
-			// Wrap the http response writer for modify the response headers after handler execution.
+			// Wrap the http response writer.
+			// The response status code might change after the handler executes.
 			w := NewResponseWriterWrapper(res.Writer)
 			res.Writer = w
 			defer func(w *ResponseWriterWrapper) {
@@ -130,12 +170,12 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			}(w)
 
 			if err = next(c); err != nil {
-				return err
+				return
 			}
+			i.sendClearHistoryCookieIfNeeded()
 
 			changeRedirectCode(req, res)
-
-			return nil
+			return
 		}
 	}
 }
@@ -165,7 +205,7 @@ func changeRedirectCode(req *http.Request, res *echo.Response) {
 func Get(c echo.Context) (*Inertia, error) {
 	in, ok := c.Get(key).(*Inertia)
 	if !ok {
-		return nil, ErrNotFound
+		return nil, ErrNoInertiaContext
 	}
 	return in, nil
 }
@@ -181,4 +221,35 @@ func MustGet(c echo.Context) *Inertia {
 func Has(c echo.Context) bool {
 	_, ok := c.Get(key).(*Inertia)
 	return ok
+}
+
+type EncryptHistoryMiddlewareConfig struct {
+	Skipper middleware.Skipper
+}
+
+func EncryptHistoryMiddleware() echo.MiddlewareFunc {
+	return EncryptHistoryMiddlewareWithConfig(EncryptHistoryMiddlewareConfig{})
+}
+
+func EncryptHistoryMiddlewareWithConfig(config EncryptHistoryMiddlewareConfig) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		if config.Skipper == nil {
+			config.Skipper = middleware.DefaultSkipper
+		}
+
+		return func(c echo.Context) (err error) {
+			if config.Skipper(c) {
+				return next(c)
+			}
+
+			i, err := Get(c)
+			if err != nil {
+				return err
+			}
+
+			i.EncryptHistory(true)
+
+			return next(c)
+		}
+	}
 }
