@@ -1,7 +1,7 @@
 # inertia-echo
 
 [![test](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml/badge.svg)](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kohkimakimoto/inertia-echo/blob/main/LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kohkimakimoto/inertia-echo/blob/master/LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kohkimakimoto/inertia-echo.svg)](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v2)
 
 The [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://echo.labstack.com/) Go web framework.
