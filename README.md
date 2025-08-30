@@ -14,7 +14,7 @@ The inertia-echo assists you in developing web applications that leverage both o
 > [!WARNING]
 > Version 2 of inertia-echo is still under development, and much of the documentation is lacking.
 
-## Getting Started
+## Getting started
 
 The following sections provides step-by-step instructions on how to get started with inertia-echo.
 
@@ -25,6 +25,32 @@ The inertia-echo is a Go module that can be installed using the following comman
 ```sh
 go get github.com/kohkimakimoto/inertia-echo/v2
 ```
+
+### Root template
+
+Next, setup the root template that will be loaded on the first page visit to your application. This template should include your site's CSS and JavaScript assets, along with the `.inertia` and `.inertiaHead` variables.
+
+In this tutorial, we will create the `views/app.html` file as the root template.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{- .inertiaHead -}}
+  </head>
+  <body>
+    {{ .inertia }}
+    {{ vite_react_refresh }}
+    {{ vite "assets/app.js" }}
+  </body>
+</html>
+```
+
+### Create Echo application
+
+TODO:...
 
 ## Author
 
