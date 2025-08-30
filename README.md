@@ -48,9 +48,11 @@ In this tutorial, we will create the `views/app.html` file as the root template.
 </html>
 ```
 
-### Create application
+### Write Go code
 
-Next,
+Next, you need to implement Go application code with Echo framework.
+
+
 
 TODO:...
 
