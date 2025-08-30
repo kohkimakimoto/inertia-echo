@@ -48,6 +48,9 @@ In this tutorial, we will create the `views/app.html` file as the root template.
 </html>
 ```
 
+> [!NOTE]
+> The inertia-echo can be used with arbitrary template engines.
+
 ### Write Go code
 
 Next, you need to implement Go application code with Echo framework.
