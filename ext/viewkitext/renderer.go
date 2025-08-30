@@ -30,6 +30,8 @@ func (r *ViewKitRenderer) Render(ctx *inertia.RenderContext) error {
 		return fmt.Errorf("unsupported ViewData type: %w", err)
 	}
 
+	data["page"] = ctx.Page
+
 	if ctx.Inertia.IsSsrEnabled() && r.SsrEngine != nil {
 		// server-side rendering
 		ssr, err := r.SsrEngine.Render(ctx)
