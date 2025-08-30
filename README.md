@@ -14,7 +14,13 @@ The inertia-echo assists you in developing web applications that leverage both o
 > [!WARNING]
 > Version 2 of inertia-echo is still under development, and much of the documentation is lacking.
 
-## Installation
+## Getting Started
+
+The following sections provides step-by-step instructions on how to get started with inertia-echo.
+
+### Installation
+
+The inertia-echo is a Go module that can be installed using the following command:
 
 ```sh
 go get github.com/kohkimakimoto/inertia-echo/v2
