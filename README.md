@@ -16,7 +16,7 @@ The inertia-echo assists you in developing web applications that leverage both o
 
 ## Getting started
 
-In this section I provide step-by-step instructions on how to get started with inertia-echo.
+In this section, We provide step-by-step instructions on how to get started with inertia-echo.
 
 ### Installation
 
@@ -48,7 +48,9 @@ In this tutorial, we will create the `views/app.html` file as the root template.
 </html>
 ```
 
-### Create Echo application
+### Create application
+
+Next,
 
 TODO:...
 
