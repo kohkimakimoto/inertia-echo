@@ -16,7 +16,7 @@ The inertia-echo assists you in developing web applications that leverage both o
 
 ## Getting started
 
-The following sections provides step-by-step instructions on how to get started with inertia-echo.
+In this section I provide step-by-step instructions on how to get started with inertia-echo.
 
 ### Installation
 
