@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io/fs"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -171,7 +172,7 @@ func (r *HTMLRenderer) funcMap() template.FuncMap {
 	}
 }
 
-func (r *HTMLRenderer) fnJsonMarshal(v interface{}) (template.JS, error) {
+func (r *HTMLRenderer) fnJsonMarshal(v any) (template.JS, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -219,13 +220,17 @@ func (r *HTMLRenderer) fnVite(entryPoints ...string) (template.HTML, error) {
 			panic(fmt.Sprintf("unable to locate file in Vite manifest: %s", entryPoint))
 		}
 
-		if chunk, ok := chunk.(map[string]interface{}); ok {
+		if chunk, ok := chunk.(map[string]any); ok {
 			file := chunk["file"].(string)
-			tags = append(tags, r.genTag(fmt.Sprintf("%s%s", r.ViteBasePath, file)))
+			tags = append(tags, r.genTag(path.Join(r.ViteBasePath, file)))
 
-			if css, ok := chunk["css"].([]interface{}); ok {
-				for _, cssFile := range css {
-					tags = append(tags, r.genTag(fmt.Sprintf("%s%s", r.ViteBasePath, cssFile)))
+			if cssList, ok := chunk["css"].([]any); ok {
+				for _, cssV := range cssList {
+					cssFile, ok := cssV.(string)
+					if !ok {
+						return "", fmt.Errorf("the Vite manifest has an invalid css file: %v", cssV)
+					}
+					tags = append(tags, r.genTag(path.Join(r.ViteBasePath, cssFile)))
 				}
 			}
 		}

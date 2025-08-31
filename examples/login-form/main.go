@@ -37,7 +37,7 @@ func main() {
 	r := inertia.NewHTMLRenderer()
 	r.Debug = e.Debug
 	r.MustParseGlob(filepath.Join(optDir, "views/*.html"))
-	r.ViteBasePath = "/build/"
+	r.ViteBasePath = "/build"
 	r.AddViteEntryPoint("assets/app.tsx")
 	r.MustParseViteManifestFile(filepath.Join(optDir, "public/build/manifest.json"))
 
