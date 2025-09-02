@@ -127,6 +127,8 @@ func (r *HTMLRenderer) Render(ctx *RenderContext) error {
 		data = map[string]any{}
 	}
 
+	data["page"] = ctx.Page
+
 	if ctx.Inertia.IsSsrEnabled() && r.SsrEngine != nil {
 		// server-side rendering
 		ssr, err := r.SsrEngine.Render(ctx)
