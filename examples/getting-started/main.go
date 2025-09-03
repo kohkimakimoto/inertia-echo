@@ -1,8 +1,6 @@
 package main
 
 import (
-	"net/http"
-
 	inertia "github.com/kohkimakimoto/inertia-echo/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -27,7 +25,7 @@ func main() {
 	e.Static("/", "public")
 
 	e.GET("/", func(c echo.Context) error {
-		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
+		return inertia.Render(c, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})

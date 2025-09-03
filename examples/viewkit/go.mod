@@ -11,7 +11,7 @@ require (
 	github.com/kohkimakimoto/echo-viewkit v0.5.0
 	github.com/kohkimakimoto/go-subprocess v0.2.0
 	github.com/kohkimakimoto/inertia-echo/ext/viewkitext/v2 v2.0.0
-	github.com/kohkimakimoto/inertia-echo/v2 v2.0.0
+	github.com/kohkimakimoto/inertia-echo/v2 v2.0.3
 	github.com/labstack/echo/v4 v4.13.4
 )
 
@@ -29,5 +29,5 @@ require (
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
-	golang.org/x/time v0.11.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
 )
