@@ -11,9 +11,6 @@ I assume that you are familiar with Inertia.js and [how it works](https://inerti
 You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a Go web framework.
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
-> [!WARNING]
-> Version 2 of Inertia Echo is still under development, and much of the documentation is lacking.
-
 Table of Contents
 
 - [Getting started](#getting-started)
