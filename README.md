@@ -11,9 +11,6 @@ I assume that you are familiar with Inertia.js and [how it works](https://inerti
 You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a Go web framework.
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
-> [!WARNING]
-> Version 2 of Inertia Echo is still under development, and much of the documentation is lacking.
-
 Table of Contents
 
 - [Getting started](#getting-started)
@@ -266,7 +263,7 @@ For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/koh
 #### Creating responses
 
 The following code shows how to create an Inertia response.
-The `inertia.Render` function accepts a `map[string]any` as its final argument, which contains the properties to pass to the view.
+The `Render` function accepts a `map[string]any` as its final argument, which contains the properties to pass to the view.
 
 ```go
 func ShowEventHandler(c echo.Context) error {
@@ -303,7 +300,7 @@ You can access your properties in the root template.
 ```
 
 Sometimes you may even want to provide data that will not be sent to your JavaScript component.
-In this case, you can use the `inertia.RenderWithViewData` function.
+In this case, you can use the `RenderWithViewData` function.
 
 ```go
 func ShowEventsHandler(c echo.Context) error {
@@ -374,7 +371,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 
 #### Sharing data manually
 
-Alternatively, you can manually share data using the `inertia.Share` function.
+Alternatively, you can manually share data using the `Share` function.
 
 ```go
 inertia.Share(c, map[string]any{
@@ -482,31 +479,98 @@ inertia.Render(c, "Users/Index", map[string]any{
 
 :book: The related official document: [Merging props](https://inertiajs.com/merging-props)
 
-TODO:...
+#### Shallow merge
+
+```go
+inertia.Render(c, "Tags/Index", map[string]any{
+	"tags": inertia.Merge(tags),
+})
+```
+
+#### Deep merge
+
+```go
+inertia.Render(c, "Users/Index", map[string]any{
+	"tags": inertia.DeepMerge(users),
+})
+```
+
+You may chain the matchOn method to determine how existing items should be matched and updated.
+
+```go
+inertia.Render(c, "Users/Index", map[string]any{
+	"tags": inertia.DeepMerge(users).MatchesOn("data.id"),
+})
+```
 
 ### CSRF protection
 
 :book: The related official document: [CSRF protection](https://inertiajs.com/csrf-protection)
 
-TODO:...
+Inertia Echo has CSRF middleware that is configured for Inertia.js.
+This middleware provides `XSRF-TOKEN` cookie and verifies the `X-XSRF-TOKEN` header in the request.
+
+The following code shows how to set up the CSRF middleware in your Echo application.
+
+```go
+e.Use(inertia.CSRF())
+```
 
 ### History encryption
 
 :book: The related official document: [History encryption](https://inertiajs.com/history-encryption)
 
-TODO:...
+#### Encrypt middleware
+
+To encrypt a group of routes, you may use `EncryptHistoryMiddleware`
+
+```go
+e.Use(inertia.EncryptHistoryMiddleware())
+```
+
+You are able to opt out of encryption on specific pages by calling the `EncryptHistory` function before returning the response.
+
+```go
+inertia.EncryptHistory(c, false)
+```
+
+#### Per-request encryption
+
+To encrypt the history of an individual request, you can call the `EncryptHistory` function with `true` as the second argument.
+
+```go
+inertia.EncryptHistory(c, true)
+```
+
+#### Clearing history
+
+```go
+inertia.ClearHistory(c)
+```
 
 ### Asset versioning
 
 :book: The related official document: [Asset versioning](https://inertiajs.com/asset-versioning)
 
-TODO:...
+Configure asset version via middleware.
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	VersionFunc: func() string { return version },
+}))
+```
+
+Configure asset version manually.
+
+```go
+inertia.SetVersion(c, func() string { return version })
+```
 
 ### Server-side Rendering (SSR)
 
 :book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/server-side-rendering)
 
-TODO:...
+Inertia Echo supports SSR. See [SSR example](./examples/ssr).
 
 ## Author
 
