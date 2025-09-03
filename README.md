@@ -523,7 +523,33 @@ e.Use(inertia.CSRF())
 
 :book: The related official document: [History encryption](https://inertiajs.com/history-encryption)
 
-TODO:...
+#### Global encryption
+
+If you'd like to enable history encryption globally, use `EncryptHistoryMiddleware` like this:
+
+```go
+e.Use(inertia.EncryptHistoryMiddleware())
+```
+
+You are able to opt out of encryption on specific pages by calling the `inertia.EncryptHistory` function before returning the response.
+
+```go
+inertia.EncryptHistory(c, false)
+```
+
+#### Per-request encryption
+
+To encrypt the history of an individual request, you can call the `inertia.EncryptHistory` function with `true` as the second argument.
+
+```go
+inertia.EncryptHistory(c, true)
+```
+
+#### Clearing history
+
+```go
+inertia.ClearHistory(c)
+```
 
 ### Asset versioning
 
