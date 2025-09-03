@@ -306,11 +306,11 @@ type RenderContext struct {
 	Writer   io.Writer
 }
 
-func (i *Inertia) Render(code int, component string, propsData any) error {
-	return i.RenderWithViewData(code, component, propsData, nil)
+func (i *Inertia) Render(component string, propsData any) error {
+	return i.RenderWithViewData(component, propsData, nil)
 }
 
-func (i *Inertia) RenderWithViewData(code int, component string, propsData any, viewData any) error {
+func (i *Inertia) RenderWithViewData(component string, propsData any, viewData any) error {
 	if i.renderer == nil {
 		return ErrRendererNotRegistered
 	}
@@ -376,7 +376,7 @@ func (i *Inertia) RenderWithViewData(code int, component string, propsData any, 
 	if req.Header.Get(HeaderXInertia) != "" {
 		// The request is an Inertia request, so we return JSON response
 		res.Header().Set(HeaderXInertia, "true")
-		return i.echoContext.JSON(code, page)
+		return i.echoContext.JSON(http.StatusOK, page)
 	}
 
 	// The request is a normal request, so we render HTML content.
@@ -391,7 +391,7 @@ func (i *Inertia) RenderWithViewData(code int, component string, propsData any, 
 	if err := i.renderer.Render(renderContext); err != nil {
 		return err
 	}
-	return i.echoContext.HTMLBlob(code, buf.Bytes())
+	return i.echoContext.HTMLBlob(http.StatusOK, buf.Bytes())
 }
 
 func (i *Inertia) mergeProps(props ...map[string]any) map[string]any {
@@ -641,10 +641,10 @@ func ClearHistory(c echo.Context) {
 	MustGet(c).ClearHistory()
 }
 
-func Render(c echo.Context, code int, component string, props any) error {
-	return MustGet(c).Render(code, component, props)
+func Render(c echo.Context, component string, props any) error {
+	return MustGet(c).Render(component, props)
 }
 
-func RenderWithViewData(c echo.Context, code int, component string, props any, viewData any) error {
-	return MustGet(c).RenderWithViewData(code, component, props, viewData)
+func RenderWithViewData(c echo.Context, component string, props any, viewData any) error {
+	return MustGet(c).RenderWithViewData(component, props, viewData)
 }

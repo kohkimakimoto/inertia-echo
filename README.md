@@ -122,7 +122,7 @@ func main() {
 	e.Static("/", "public")
 
 	e.GET("/", func(c echo.Context) error {
-		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
+		return inertia.Render(c, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})
@@ -271,7 +271,7 @@ The `inertia.Render` function accepts a `map[string]any` as its final argument, 
 ```go
 func ShowEventHandler(c echo.Context) error {
 	event := // retrieve a event...
-	return inertia.Render(c, http.StatusOK, "Event/Show", map[string]any{
+	return inertia.Render(c, "Event/Show", map[string]any{
 		"event": event,
 	})
 }
@@ -288,7 +288,7 @@ type ShowEventProps struct {
 
 func ShowEventHandler(c echo.Context) error {
 	event := // retrieve a event...
-	return inertia.Render(c, http.StatusOK, "Event/Show", &ShowEventProps{
+	return inertia.Render(c, "Event/Show", &ShowEventProps{
 		Event: event,
 	})
 }
@@ -308,7 +308,7 @@ In this case, you can use the `inertia.RenderWithViewData` function.
 ```go
 func ShowEventsHandler(c echo.Context) error {
 	event := // retrieve a event...
-	return inertia.RenderWithViewData(c, http.StatusOK, "Event/Show", map[string]any{
+	return inertia.RenderWithViewData(c, "Event/Show", map[string]any{
 		"event": event,
 	}, map[string]interface{}{
 		"meta": "Meta data...",
@@ -388,7 +388,7 @@ inertia.Share(c, map[string]any{
 :book: The related official document: [Partial reloads](https://inertiajs.com/partial-reloads)
 
 ```go
-inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
+inertia.Render(c, "Users/Index", map[string]any{
 	// ALWAYS included on standard visits
 	// OPTIONALLY included on partial reloads
 	// ALWAYS evaluated
@@ -428,7 +428,7 @@ inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 :book: The related official document: [Deferred props](https://inertiajs.com/deferred-props)
 
 ```go
-inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
+inertia.Render(c, "Users/Index", map[string]any{
 	"users": users,
 	"roles": roles,
 	"permissions": inertia.Defer(func() (any, error) {
@@ -444,7 +444,7 @@ inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 #### Grouping requests
 
 ```go
-inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
+inertia.Render(c, "Users/Index", map[string]any{
 	"users": users,
 	"roles": roles,
 	"permissions": inertia.Defer(func() (any, error) {
