@@ -266,7 +266,7 @@ For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/koh
 #### Creating responses
 
 The following code shows how to create an Inertia response.
-The `inertia.Render` function accepts a `map[string]any` as its final argument, which contains the properties to pass to the view.
+The `Render` function accepts a `map[string]any` as its final argument, which contains the properties to pass to the view.
 
 ```go
 func ShowEventHandler(c echo.Context) error {
@@ -303,7 +303,7 @@ You can access your properties in the root template.
 ```
 
 Sometimes you may even want to provide data that will not be sent to your JavaScript component.
-In this case, you can use the `inertia.RenderWithViewData` function.
+In this case, you can use the `RenderWithViewData` function.
 
 ```go
 func ShowEventsHandler(c echo.Context) error {
@@ -374,7 +374,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 
 #### Sharing data manually
 
-Alternatively, you can manually share data using the `inertia.Share` function.
+Alternatively, you can manually share data using the `Share` function.
 
 ```go
 inertia.Share(c, map[string]any{
@@ -525,11 +525,13 @@ e.Use(inertia.CSRF())
 
 #### Encrypt middleware
 
+To encrypt a group of routes, you may use `EncryptHistoryMiddleware`
+
 ```go
 e.Use(inertia.EncryptHistoryMiddleware())
 ```
 
-You are able to opt out of encryption on specific pages by calling the `inertia.EncryptHistory` function before returning the response.
+You are able to opt out of encryption on specific pages by calling the `EncryptHistory` function before returning the response.
 
 ```go
 inertia.EncryptHistory(c, false)
@@ -537,7 +539,7 @@ inertia.EncryptHistory(c, false)
 
 #### Per-request encryption
 
-To encrypt the history of an individual request, you can call the `inertia.EncryptHistory` function with `true` as the second argument.
+To encrypt the history of an individual request, you can call the `EncryptHistory` function with `true` as the second argument.
 
 ```go
 inertia.EncryptHistory(c, true)
