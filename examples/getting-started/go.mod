@@ -3,7 +3,7 @@ module github.com/kohkimakimoto/inertia-echo/examples/getting-started
 go 1.24.5
 
 require (
-	github.com/kohkimakimoto/inertia-echo/v2 v2.0.2
+	github.com/kohkimakimoto/inertia-echo/v2 v2.0.3
 	github.com/labstack/echo/v4 v4.13.4
 )
 
