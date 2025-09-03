@@ -55,14 +55,14 @@ func main() {
 		authEmail := sess.Values["auth_email"]
 		c.Logger().Debugf("authEmail: %v", authEmail)
 
-		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
+		return inertia.Render(c, "Index", map[string]any{
 			"message": "You are logged in!",
 			"email":   authEmail,
 		})
 	}, AuthMiddleware)
 
 	e.GET("/about", func(c echo.Context) error {
-		return inertia.Render(c, http.StatusOK, "About", map[string]any{
+		return inertia.Render(c, "About", map[string]any{
 			"title": "About inertia-echo",
 		})
 	}, AuthMiddleware)
@@ -75,7 +75,7 @@ func main() {
 			return c.Redirect(http.StatusFound, "/")
 		}
 
-		return inertia.Render(c, http.StatusOK, "Login", map[string]any{})
+		return inertia.Render(c, "Login", map[string]any{})
 	})
 
 	type Form struct {

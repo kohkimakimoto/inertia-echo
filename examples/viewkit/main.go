@@ -8,7 +8,6 @@ import (
 	inertia "github.com/kohkimakimoto/inertia-echo/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -58,14 +57,14 @@ func main() {
 	e.Static("/", filepath.Join(optDir, "public"))
 
 	e.GET("/", func(c echo.Context) error {
-		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
+		return inertia.Render(c, "Index", map[string]any{
 			"title":   "Echo ViewKit integration example powered by inertia-echo",
 			"message": "Echo ViewKit integration example ",
 		})
 	})
 
 	e.GET("/about", func(c echo.Context) error {
-		return inertia.Render(c, http.StatusOK, "About", map[string]any{
+		return inertia.Render(c, "About", map[string]any{
 			"title": "About inertia-echo",
 		})
 	})
