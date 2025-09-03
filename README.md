@@ -510,7 +510,13 @@ inertia.Render(c, "Users/Index", map[string]any{
 
 :book: The related official document: [CSRF protection](https://inertiajs.com/csrf-protection)
 
-TODO:...
+Inertia Echo has CSRF middleware that is configured for Inertia.js.
+This middleware provides `XSRF-TOKEN` cookie and verifies the `X-XSRF-TOKEN` header in the request.
+The following code shows how to set up the CSRF middleware in your Echo application.
+
+```go
+e.Use(inertia.CSRF())
+```
 
 ### History encryption
 
