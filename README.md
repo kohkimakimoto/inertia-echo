@@ -555,13 +555,25 @@ inertia.ClearHistory(c)
 
 :book: The related official document: [Asset versioning](https://inertiajs.com/asset-versioning)
 
-TODO:...
+Configure asset version via middleware.
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	VersionFunc: func() string { return version },
+}))
+```
+
+Configure asset version manually.
+
+```go
+inertia.SetVersion(c, func() string { return version })
+```
 
 ### Server-side Rendering (SSR)
 
 :book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/server-side-rendering)
 
-TODO:...
+The inertia-echo supports SSR. See [SSR example](./examples/ssr).
 
 ## Author
 
