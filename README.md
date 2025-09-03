@@ -482,7 +482,29 @@ inertia.Render(c, "Users/Index", map[string]any{
 
 :book: The related official document: [Merging props](https://inertiajs.com/merging-props)
 
-TODO:...
+#### Shallow merge
+
+```go
+inertia.Render(c, "Tags/Index", map[string]any{
+	"tags": inertia.Merge(tags),
+})
+```
+
+#### Deep merge
+
+```go
+inertia.Render(c, "Users/Index", map[string]any{
+	"tags": inertia.DeepMerge(users),
+})
+```
+
+You may chain the matchOn method to determine how existing items should be matched and updated.
+
+```go
+inertia.Render(c, "Users/Index", map[string]any{
+	"tags": inertia.DeepMerge(users).MatchesOn("data.id"),
+})
+```
 
 ### CSRF protection
 
