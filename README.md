@@ -299,7 +299,7 @@ func ShowEventHandler(c echo.Context) error {
 You can access your properties in the root template.
 
 ```html
-<meta name="twitter:title" content="{{ .page.Props.Event.Title }}">
+<meta name="twitter:title" content="{{ .page.Props.event.Title }}">
 ```
 
 Sometimes you may even want to provide data that will not be sent to your JavaScript component.
