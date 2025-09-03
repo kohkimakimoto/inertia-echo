@@ -573,7 +573,7 @@ inertia.SetVersion(c, func() string { return version })
 
 :book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/server-side-rendering)
 
-The inertia-echo supports SSR. See [SSR example](./examples/ssr).
+Inertia Echo supports SSR. See [SSR example](./examples/ssr).
 
 ## Author
 
