@@ -523,9 +523,7 @@ e.Use(inertia.CSRF())
 
 :book: The related official document: [History encryption](https://inertiajs.com/history-encryption)
 
-#### Global encryption
-
-If you'd like to enable history encryption globally, use `EncryptHistoryMiddleware` like this:
+#### Encrypt middleware
 
 ```go
 e.Use(inertia.EncryptHistoryMiddleware())
