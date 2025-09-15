@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"github.com/gorilla/sessions"
 	"github.com/kohkimakimoto/go-subprocess"
 	"github.com/kohkimakimoto/inertia-echo/v2"
 	"github.com/labstack/echo/v4"
@@ -42,8 +41,8 @@ func main() {
 	r.MustParseViteManifestFile(filepath.Join(optDir, "public/build/manifest.json"))
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-		Renderer: r,
-		Session:  sessions.NewCookieStore([]byte("secret")),
+		Renderer:     r,
+		SessionStore: inertia.NewCookieSessionStore([]byte("secret")),
 	}))
 	e.Use(inertia.CSRF())
 	e.Use(inertia.EncryptHistoryMiddleware())
@@ -51,7 +50,10 @@ func main() {
 	e.Static("/", filepath.Join(optDir, "public"))
 
 	e.GET("/", func(c echo.Context) error {
-		sess := inertia.MustSession(c)
+		sess, err := inertia.Session(c)
+		if err != nil {
+			return err
+		}
 		authEmail := sess.Values["auth_email"]
 		c.Logger().Debugf("authEmail: %v", authEmail)
 
@@ -68,7 +70,10 @@ func main() {
 	}, AuthMiddleware)
 
 	e.GET("/login", func(c echo.Context) error {
-		sess := inertia.MustSession(c)
+		sess, err := inertia.Session(c)
+		if err != nil {
+			return err
+		}
 		if _, ok := sess.Values["auth_email"]; ok {
 			// Redirect to the home page if already logged in
 			inertia.ClearHistory(c)
@@ -91,17 +96,24 @@ func main() {
 
 		if form.Email != "kohki.makimoto@gmail.com" {
 			// If the email is not valid, return an error message
-			inertia.MustUpdateErrorMessagesWithSession(c, map[string]string{
+			if err := inertia.UpdateErrorMessagesWithSession(c, map[string]string{
 				"email": "Invalid email address",
-			})
-			inertia.MustSaveSession(c)
+			}); err != nil {
+				return err
+			}
+			if err := inertia.SaveSession(c); err != nil {
+				return err
+			}
 
 			return c.Redirect(http.StatusFound, "/login")
 		}
 
 		// This is an example, so we are not checking the password.
 		// Any input can be used as valid credentials.
-		sess := inertia.MustSession(c)
+		sess, err := inertia.Session(c)
+		if err != nil {
+			return err
+		}
 		sess.Values["auth_email"] = form.Email
 		if err := sess.Save(c.Request(), c.Response()); err != nil {
 			return err
@@ -114,7 +126,10 @@ func main() {
 	})
 
 	e.GET("/logout", func(c echo.Context) error {
-		sess := inertia.MustSession(c)
+		sess, err := inertia.Session(c)
+		if err != nil {
+			return err
+		}
 		// Clear the session
 		delete(sess.Values, "auth_email")
 		if err := sess.Save(c.Request(), c.Response()); err != nil {
@@ -149,8 +164,11 @@ func main() {
 
 func AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		sess := inertia.MustSession(c)
-		c.Logger().Debugf("Session values: %v", sess.Values)
+		sess, err := inertia.Session(c)
+		if err != nil {
+			return err
+		}
+		c.Logger().Debugf("SessionStore values: %v", sess.Values)
 		authEmail, ok := sess.Values["auth_email"]
 		if !ok || authEmail == nil {
 			c.Logger().Debug("User is not authenticated, redirecting to login page")
