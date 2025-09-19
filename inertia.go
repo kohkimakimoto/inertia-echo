@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/gorilla/sessions"
-	"github.com/labstack/echo/v4"
-	"github.com/mitchellh/mapstructure"
 	"io"
 	"net/http"
 	"sync"
+
+	"github.com/labstack/echo/v4"
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -34,16 +34,11 @@ type Inertia struct {
 	encryptHistory        bool
 	clearHistoryCookieKey string
 	clearHistory          bool
-	sessionStore          sessions.Store
-	sessionName           string
-	sessionOptions        *sessions.Options
-	errorMessageMap       *ErrorMessageMap
 	isSsrDisabled         bool
 	partialComponent      string
 	onlyProps             []string
 	exceptProps           []string
 	resetProps            []string
-	errorBagKey           string
 }
 
 func (i *Inertia) EchoContext() echo.Context {
@@ -189,95 +184,6 @@ func (i *Inertia) Location(url string) error {
 	}
 }
 
-func (i *Inertia) Session() (*sessions.Session, error) {
-	if i.sessionStore == nil {
-		return nil, ErrSessionStoreNotRegistered
-	}
-	sess, err := i.sessionStore.Get(i.echoContext.Request(), i.sessionName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
-	}
-	if sess.Options != nil {
-		sess.Options = i.sessionOptions
-	}
-
-	return sess, nil
-}
-
-func (i *Inertia) MustSession() *sessions.Session {
-	sess, err := i.Session()
-	if err != nil {
-		panic(err)
-	}
-	return sess
-}
-
-// SaveSession saves the current session.
-// You have to call this method after modifying the session and before sending the response.
-func (i *Inertia) SaveSession() error {
-	if i.sessionStore == nil {
-		return ErrSessionStoreNotRegistered
-	}
-
-	sess, err := i.Session()
-	if err != nil {
-		return fmt.Errorf("failed to get session: %w", err)
-	}
-
-	if err := sess.Save(i.echoContext.Request(), i.echoContext.Response()); err != nil {
-		return fmt.Errorf("failed to save session: %w", err)
-	}
-	return nil
-}
-
-func (i *Inertia) MustSaveSession() {
-	if err := i.SaveSession(); err != nil {
-		panic(err)
-	}
-}
-
-func (i *Inertia) ErrorMessages() *ErrorMessageMap {
-	return i.errorMessageMap
-}
-
-func (i *Inertia) UpdateErrorMessages(errMessages map[string]string) {
-	i.errorMessageMap.Update(errMessages)
-}
-
-func (i *Inertia) UpdateErrorMessagesWithSession(errMessages map[string]string) error {
-	// Update the in-memory error message map
-	i.UpdateErrorMessages(errMessages)
-
-	// Sync the error messages to the session
-	if err := i.SyncErrorMessagesSession(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (i *Inertia) MustUpdateErrorMessagesWithSession(errMessages map[string]string) {
-	if err := i.UpdateErrorMessagesWithSession(errMessages); err != nil {
-		panic(err)
-	}
-}
-
-const sessionErrorsKey = "errors"
-
-// SyncErrorMessagesSession updates the session values with the current error messages.
-// This method just updates the in memory session values.
-// Therefore, you have to call SaveSession method after this method to save the session to the store.
-func (i *Inertia) SyncErrorMessagesSession() error {
-	sess, err := i.Session()
-	if err != nil {
-		return err
-	}
-	if i.errorMessageMap.Len() > 0 {
-		sess.Values[sessionErrorsKey] = i.errorMessageMap.ToMap()
-	}
-	return nil
-}
-
 func (i *Inertia) isPartial(component string) bool {
 	return i.partialComponent == component
 }
@@ -334,17 +240,22 @@ func (i *Inertia) RenderWithViewData(component string, propsData any, viewData a
 
 	// merge shared props
 	props = i.mergeProps(i.sharedProps, props)
-	// merge error messages
-	if err := i.resolveErrors(props); err != nil {
-		return fmt.Errorf("failed to resolve errors: %w", err)
-	}
 
 	// Note:
 	// The official `laravel-inertia` package executes the following methods:
 	// * `resolveInertiaPropsProviders`
 	// * `resolveArrayableProperties`
-	// but this package does not implement it. This is by design.
-	// I believe it represents an additional layer of data abstraction that doesn't align with the Go language philosophy.
+	// but this package does not implement them. This is by design.
+	// I believe that they represent additional layers of data abstraction that don't align with the Go language philosophy.
+
+	// Note:
+	// The official `laravel-inertia` package implements the `resolveValidationErrors` method to extract validation errors from the session.
+	// However, this package does not implement it because Echo does not have a built-in session implementation.
+	// Echo’s official documentation provides information about sessions:
+	// https://echo.labstack.com/docs/middleware/session
+	// Nonetheless, in my opinion, you probably need to implement your own logic to handle sessions.
+	// This means it is difficult to implement a common error-handling logic with sessions, or it may lead to a poor abstraction layer.
+	// It is not match to the Go language philosophy.
 
 	// process partial reloads
 	// https://inertiajs.com/partial-reloads
@@ -519,53 +430,6 @@ func (i *Inertia) resolveMergeProps(props map[string]any) ([]string, []string, [
 	return mergeProps, deepMergeProps, matchOnProps
 }
 
-func (i *Inertia) resolveErrors(props map[string]any) error {
-	resultErrs := make(map[string]string)
-
-	// Try to get errors from the session if it exists
-	if i.sessionStore != nil {
-		sess, err := i.Session()
-		if err != nil {
-			return fmt.Errorf("failed to get session: %w", err)
-		}
-		if sess.Values[sessionErrorsKey] != nil {
-			sessionErrors, ok := sess.Values[sessionErrorsKey].(map[string]string)
-			if !ok {
-				return fmt.Errorf("session value %q is not a map[string]string", sessionErrorsKey)
-			}
-			for k, v := range sessionErrors {
-				resultErrs[k] = v
-			}
-			// Clear session errors after reading them
-			delete(sess.Values, sessionErrorsKey)
-			if err := sess.Save(i.echoContext.Request(), i.echoContext.Response()); err != nil {
-				return fmt.Errorf("failed to save session: %w", err)
-			}
-		}
-	}
-
-	// If errors exist in the current request context, merge them with produced errors
-	if i.errorMessageMap != nil && i.errorMessageMap.Len() > 0 {
-		for k, v := range i.errorMessageMap.ToMap() {
-			resultErrs[k] = v
-		}
-		// Clear the error message map after reading it
-		i.errorMessageMap.Clear()
-	}
-
-	if len(resultErrs) > 0 {
-		if i.errorBagKey != "" {
-			props["errors"] = Always(map[string]map[string]string{
-				i.errorBagKey: resultErrs,
-			})
-		} else {
-			props["errors"] = Always(resultErrs)
-		}
-	}
-
-	return nil
-}
-
 func SetRootView(c echo.Context, name string) {
 	MustGet(c).SetRootView(name)
 }
@@ -596,41 +460,6 @@ func Version(c echo.Context) string {
 
 func Location(c echo.Context, url string) error {
 	return MustGet(c).Location(url)
-}
-
-func Session(c echo.Context) (*sessions.Session, error) {
-	sess, err := MustGet(c).Session()
-	if err != nil {
-		return nil, err
-	}
-	return sess, nil
-}
-
-func MustSession(c echo.Context) *sessions.Session {
-	return MustGet(c).MustSession()
-}
-
-func SaveSession(c echo.Context) error {
-	if err := MustGet(c).SaveSession(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func MustSaveSession(c echo.Context) {
-	MustGet(c).MustSaveSession()
-}
-
-func UpdateErrorMessages(c echo.Context, errMessages map[string]string) {
-	MustGet(c).UpdateErrorMessages(errMessages)
-}
-
-func UpdateErrorMessagesWithSession(c echo.Context, errMessages map[string]string) error {
-	return MustGet(c).UpdateErrorMessagesWithSession(errMessages)
-}
-
-func MustUpdateErrorMessagesWithSession(c echo.Context, errMessages map[string]string) {
-	MustGet(c).MustUpdateErrorMessagesWithSession(errMessages)
 }
 
 func EncryptHistory(c echo.Context, encrypt bool) {

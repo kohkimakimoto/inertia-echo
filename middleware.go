@@ -1,12 +1,12 @@
 package inertia
 
 import (
-	"github.com/gorilla/sessions"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 const (
@@ -28,13 +28,6 @@ type MiddlewareConfig struct {
 	Renderer Renderer
 	// ClearHistoryCookieKey is a key for the cookie that is used to clear the history state.
 	ClearHistoryCookieKey string
-	// Session is a session store used for Inertia's features. Currently, it is used for handling validation error messages.
-	// Session is an optional config. But it is used for built-in error message handling.
-	Session sessions.Store
-	// SessionName is a name of the session that is used for Inertia's features.
-	SessionName string
-	// SessionOptions is a session options that is used for Inertia's features.
-	SessionOptions *sessions.Options
 	// IsSsrDisabled is a flag that determines whether server-side rendering is disabled.
 	// If this is true, server-side rendering is disabled even if the renderer supports and is configured for it.
 	IsSsrDisabled bool
@@ -49,14 +42,7 @@ var DefaultMiddlewareConfig = MiddlewareConfig{
 	Share:                 nil,
 	Renderer:              nil,
 	ClearHistoryCookieKey: "inertia.clear_history",
-	Session:               nil,
-	SessionName:           "inertia.session",
-	SessionOptions: &sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7, // 7 days
-		HttpOnly: true,
-	},
-	IsSsrDisabled: false,
+	IsSsrDisabled:         false,
 }
 
 func defaultVersionFunc() VersionFunc {
@@ -92,12 +78,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	if config.ClearHistoryCookieKey == "" {
 		config.ClearHistoryCookieKey = DefaultMiddlewareConfig.ClearHistoryCookieKey
 	}
-	if config.SessionName == "" {
-		config.SessionName = DefaultMiddlewareConfig.SessionName
-	}
-	if config.SessionOptions == nil {
-		config.SessionOptions = DefaultMiddlewareConfig.SessionOptions
-	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) (err error) {
@@ -124,10 +104,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				version:               config.VersionFunc,
 				renderer:              config.Renderer,
 				clearHistoryCookieKey: config.ClearHistoryCookieKey,
-				sessionStore:          config.Session,
-				sessionName:           config.SessionName,
-				sessionOptions:        config.SessionOptions,
-				errorMessageMap:       NewErrorMessageMap(),
 				isSsrDisabled:         config.IsSsrDisabled,
 			}
 			c.Set(key, i)
@@ -139,7 +115,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			i.onlyProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
 			i.exceptProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ",")
 			i.resetProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ",")
-			i.errorBagKey = req.Header.Get(HeaderXInertiaErrorBag)
 
 			if req.Header.Get(HeaderXInertia) == "" {
 				// Not inertial request
