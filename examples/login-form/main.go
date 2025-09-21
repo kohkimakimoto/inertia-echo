@@ -2,13 +2,15 @@ package main
 
 import (
 	"flag"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	session "github.com/kohkimakimoto/echo-session"
 	"github.com/kohkimakimoto/go-subprocess"
 	"github.com/kohkimakimoto/inertia-echo/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"net/http"
-	"os"
-	"path/filepath"
 )
 
 var BuildMode = "debug"
@@ -40,9 +42,9 @@ func main() {
 	r.AddViteEntryPoint("assets/app.tsx")
 	r.MustParseViteManifestFile(filepath.Join(optDir, "public/build/manifest.json"))
 
+	e.Use(session.Middleware(session.NewCookieStore([]byte("secret"))))
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-		Renderer:     r,
-		SessionStore: inertia.NewCookieSessionStore([]byte("secret")),
+		Renderer: r,
 	}))
 	e.Use(inertia.CSRF())
 	e.Use(inertia.EncryptHistoryMiddleware())
@@ -50,11 +52,8 @@ func main() {
 	e.Static("/", filepath.Join(optDir, "public"))
 
 	e.GET("/", func(c echo.Context) error {
-		sess, err := inertia.Session(c)
-		if err != nil {
-			return err
-		}
-		authEmail := sess.Values["auth_email"]
+		s := session.MustGet(c)
+		authEmail := s.GetString("auth_email")
 		c.Logger().Debugf("authEmail: %v", authEmail)
 
 		return inertia.Render(c, "Index", map[string]any{
@@ -70,16 +69,12 @@ func main() {
 	}, AuthMiddleware)
 
 	e.GET("/login", func(c echo.Context) error {
-		sess, err := inertia.Session(c)
-		if err != nil {
-			return err
-		}
-		if _, ok := sess.Values["auth_email"]; ok {
+		s := session.MustGet(c)
+		if authEmail := s.GetString("auth_email"); authEmail != "" {
 			// Redirect to the home page if already logged in
 			inertia.ClearHistory(c)
 			return c.Redirect(http.StatusFound, "/")
 		}
-
 		return inertia.Render(c, "Login", map[string]any{})
 	})
 
@@ -95,27 +90,19 @@ func main() {
 		}
 
 		if form.Email != "kohki.makimoto@gmail.com" {
-			// If the email is not valid, return an error message
-			if err := inertia.UpdateErrorMessagesWithSession(c, map[string]string{
-				"email": "Invalid email address",
-			}); err != nil {
-				return err
-			}
-			if err := inertia.SaveSession(c); err != nil {
-				return err
-			}
-
-			return c.Redirect(http.StatusFound, "/login")
+			// display the login page again if the email is not correct
+			return inertia.Render(c, "Login", map[string]any{
+				"errors": map[string]string{
+					"email": "Invalid email address",
+				},
+			})
 		}
 
 		// This is an example, so we are not checking the password.
 		// Any input can be used as valid credentials.
-		sess, err := inertia.Session(c)
-		if err != nil {
-			return err
-		}
-		sess.Values["auth_email"] = form.Email
-		if err := sess.Save(c.Request(), c.Response()); err != nil {
+		s := session.MustGet(c)
+		s.Set("auth_email", form.Email)
+		if err := s.Save(); err != nil {
 			return err
 		}
 		c.Logger().Debugf("User authenticated: %s", form.Email)
@@ -126,13 +113,10 @@ func main() {
 	})
 
 	e.GET("/logout", func(c echo.Context) error {
-		sess, err := inertia.Session(c)
-		if err != nil {
-			return err
-		}
+		s := session.MustGet(c)
 		// Clear the session
-		delete(sess.Values, "auth_email")
-		if err := sess.Save(c.Request(), c.Response()); err != nil {
+		s.Clear()
+		if err := s.Save(); err != nil {
 			return err
 		}
 		c.Logger().Debug("User logged out")
@@ -164,18 +148,12 @@ func main() {
 
 func AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		sess, err := inertia.Session(c)
-		if err != nil {
-			return err
-		}
-		c.Logger().Debugf("SessionStore values: %v", sess.Values)
-		authEmail, ok := sess.Values["auth_email"]
-		if !ok || authEmail == nil {
+		s := session.MustGet(c)
+		authEmail := s.GetString("auth_email")
+		if authEmail == "" {
 			c.Logger().Debug("User is not authenticated, redirecting to login page")
 			return c.Redirect(http.StatusFound, "/login")
 		}
-
-		c.Set("auth_email", authEmail)
 		return next(c)
 	}
 }
