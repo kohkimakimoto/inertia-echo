@@ -642,6 +642,60 @@ inertia.SetVersion(c, func() string { return version })
 
 Inertia Echo supports SSR. See [SSR example](./examples/ssr).
 
+### Embed
+
+You can bundle frontend builds into single Go binary using embed.
+
+```go
+package main
+
+import (
+	"embed"
+	"io/fs"
+	"net/http"
+
+	inertia "github.com/kohkimakimoto/inertia-echo/v2"
+	"github.com/labstack/echo/v4"
+)
+
+//go:embed views/*.html
+var viewFiles embed.FS
+
+//go:embed public/*
+var publicFiles embed.FS
+
+func main() {
+	e := echo.New()
+	// ...
+
+	r := inertia.NewHTMLRenderer()
+	r.MustParseFS(viewFiles, "views/*.html")
+	r.MustParseViteManifestFS(publicFiles, "public/build/manifest.json")
+	// ...
+
+	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+		Renderer: r,
+	}))
+	// ...
+
+	fsys, err := fs.Sub(publicFiles, "public")
+	if err != nil {
+		panic(err)
+	}
+
+	assetHandler := http.FileServer(http.FS(fsys))
+	e.GET("/*", echo.WrapHandler(http.StripPrefix("/", assetHandler)))
+
+	e.GET("/", func(c echo.Context) error {
+		return inertia.Render(c, "Index", map[string]any{
+			"message": "Hello, World!",
+		})
+	})
+
+	e.Logger.Fatal(e.Start(":8080"))
+}
+```
+
 ## Author
 
 Kohki Makimoto <kohki.makimoto@gmail.com>
