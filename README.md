@@ -19,6 +19,7 @@ Table of Contents
   - [Write Go code](#write-go-code)
   - [Setup frontend](#setup-frontend)
   - [Run the application](#run-the-application)
+  - [Run in Dev mode](#run-in-dev-mode)
 - [Usage](#usage)
   - [Renderer](#renderer)
   - [Middleware](#middleware)
@@ -41,6 +42,7 @@ Table of Contents
   - [History encryption](#history-encryption)
   - [Asset versioning](#asset-versioning)
   - [Server-side Rendering (SSR)](#server-side-rendering-ssr)
+  - [Embed](#embed)
 - [Author](#author)
 - [License](#license)
 
