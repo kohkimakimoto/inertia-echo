@@ -19,6 +19,7 @@ Table of Contents
   - [Write Go code](#write-go-code)
   - [Setup frontend](#setup-frontend)
   - [Run the application](#run-the-application)
+  - [Run in Dev mode](#run-in-dev-mode)
 - [Usage](#usage)
   - [Renderer](#renderer)
   - [Middleware](#middleware)
@@ -41,6 +42,7 @@ Table of Contents
   - [History encryption](#history-encryption)
   - [Asset versioning](#asset-versioning)
   - [Server-side Rendering (SSR)](#server-side-rendering-ssr)
+  - [Embed](#embed)
 - [Author](#author)
 - [License](#license)
 
@@ -212,6 +214,76 @@ Then, open your browser and navigate to `http://localhost:8080`.
 You should see the message "Hello, World!" displayed on the page.
 
 You can find the complete code of this example in the [examples/getting-started](./examples/getting-started) directory of this repository.
+
+### Run in Dev mode
+
+If you want to run in dev mode so that you can hot-reload frontend updates, set `Debug` to `true`.
+
+```go
+r := inertia.NewHTMLRenderer()
+// ...
+r.Debug = true
+r.ViteDevServerURL = "http://localhost:5173" // set this to change your Vite server host/port.
+```
+
+You need to run Vite server while you running in dev mode. To do so, you also can use [kohkimakimoto/go-subprocess](https://github.com/kohkimakimoto/go-subprocess) to simplify your operation with Vite server.
+
+```go
+import (
+	// import go-subprocess
+	"github.com/kohkimakimoto/go-subprocess"
+)
+
+// ...
+func main(){
+	// ...
+
+	e.GET("/", func(c echo.Context) error {
+		return inertia.Render(c, "Index", map[string]any{
+			"message": "Hello, World!",
+		})
+	})
+
+	// Add this to run Vite server.
+	go func() {
+		if err := subprocess.Run(&subprocess.Config{
+			Command:         "bun",
+			Args:            []string{"run", "dev"},
+			Stdout:          os.Stdout,
+			StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
+			Stderr:          os.Stderr,
+			StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
+			Dir:             ".",
+		}); err != nil {
+			e.Logger.Errorf("the Vite subprocess returned an error: %v", err)
+		}
+	}()
+
+	e.Logger.Fatal(e.Start(":8080"))
+}
+
+
+```
+
+> [!NOTE]
+> If you're using React with `@vitejs/plugin-react`, you have to add `{{ vite_react_refresh }}` on your view file as well.  
+> For more information, see [Vite docs](https://vitejs.dev/guide/backend-integration.html).
+>
+> `views/app.html`
+>
+> ```html
+> <!DOCTYPE html>
+> <html>
+>   <head>
+>     <meta charset="UTF-8" />
+>     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+>     {{- .inertiaHead -}}
+>   </head>
+>   <body>
+>     {{ .inertia }} {{ vite_react_refresh }} {{ vite "js/app.jsx" }}
+>   </body>
+> </html>
+> ```
 
 ## Usage
 
@@ -571,6 +643,60 @@ inertia.SetVersion(c, func() string { return version })
 :book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/server-side-rendering)
 
 Inertia Echo supports SSR. See [SSR example](./examples/ssr).
+
+### Embed
+
+You can bundle frontend builds into single Go binary using embed.
+
+```go
+package main
+
+import (
+	"embed"
+	"io/fs"
+	"net/http"
+
+	inertia "github.com/kohkimakimoto/inertia-echo/v2"
+	"github.com/labstack/echo/v4"
+)
+
+//go:embed views/*.html
+var viewFiles embed.FS
+
+//go:embed public/*
+var publicFiles embed.FS
+
+func main() {
+	e := echo.New()
+	// ...
+
+	r := inertia.NewHTMLRenderer()
+	r.MustParseFS(viewFiles, "views/*.html")
+	r.MustParseViteManifestFS(publicFiles, "public/build/manifest.json")
+	// ...
+
+	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+		Renderer: r,
+	}))
+	// ...
+
+	fsys, err := fs.Sub(publicFiles, "public")
+	if err != nil {
+		panic(err)
+	}
+
+	assetHandler := http.FileServer(http.FS(fsys))
+	e.GET("/*", echo.WrapHandler(http.StripPrefix("/", assetHandler)))
+
+	e.GET("/", func(c echo.Context) error {
+		return inertia.Render(c, "Index", map[string]any{
+			"message": "Hello, World!",
+		})
+	})
+
+	e.Logger.Fatal(e.Start(":8080"))
+}
+```
 
 ## Author
 
