@@ -25,8 +25,7 @@ setup: ## Setup development environment
 	@echo "==> Setting up development environment..."
 	@mkdir -p $(CURDIR)/.dev/go-tools
 	@export GOPATH=$(CURDIR)/.dev/go-tools && \
-		go install github.com/axw/gocov/gocov@latest && \
-		go install github.com/matm/gocov-html/cmd/gocov-html@latest
+		go install github.com/chmouel/go-better-html-coverage@latest
 	@export GOPATH=$(CURDIR)/.dev/go-tools && go clean -modcache && rm -rf $(CURDIR)/.dev/go-tools/pkg
 
 .PHONY: clean
@@ -57,7 +56,7 @@ test-verbose: ## Run tests with verbose outputting
 test-cover: ## Run tests with coverage report
 	@mkdir -p $(CURDIR)/.dev/test
 	@go test -race -coverpkg=./... -coverprofile=$(CURDIR)/.dev/test/coverage.out ./...
-	@gocov convert $(CURDIR)/.dev/test/coverage.out | gocov-html > $(CURDIR)/.dev/test/coverage.html
+	@go-better-html-coverage -profile $(CURDIR)/.dev/test/coverage.out -o $(CURDIR)/.dev/test/coverage.html -n
 
 .PHONY: test-cover-open
 test-cover-open: ## Open coverage report in browser
