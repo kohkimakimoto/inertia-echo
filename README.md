@@ -1,8 +1,8 @@
 # Inertia Echo
 
-[![test](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml/badge.svg)](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kohkimakimoto/inertia-echo/blob/master/LICENSE)
-[![Go Reference](https://pkg.go.dev/badge/github.com/kohkimakimoto/inertia-echo.svg)](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v2)
+[![test](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml/badge.svg?branch=dev-v4)](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml?query=branch%3Adev-v4)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kohkimakimoto/inertia-echo/v4.svg)](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v4)
 
 This is the [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://echo.labstack.com/) Go web framework.
 
@@ -10,6 +10,9 @@ This is the [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](h
 I assume that you are familiar with Inertia.js and [how it works](https://inertiajs.com/how-it-works).
 You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a Go web framework.
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
+
+> [!NOTE]
+> This is the v4 maintenance line for Echo v4. See [Upgrading to v4](./MIGRATION_V4.md) when migrating from inertia-echo v2.
 
 Table of Contents
 
@@ -55,7 +58,7 @@ In this section, we provide step-by-step instructions on how to get started with
 Inertia Echo is a Go module that you can install with the following command:
 
 ```sh
-go get github.com/kohkimakimoto/inertia-echo/v2
+go get github.com/kohkimakimoto/inertia-echo/v4
 ```
 
 You also need to install Echo like this:
@@ -97,7 +100,7 @@ package main
 import (
 	"net/http"
 
-	inertia "github.com/kohkimakimoto/inertia-echo/v2"
+	inertia "github.com/kohkimakimoto/inertia-echo/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -292,7 +295,7 @@ func main(){
 Unlike Laravel, which is an officially supported framework for Inertia.js, Echo lacks built-in view rendering.
 This means you'll have to build your own view system and integrate it with Inertia.js.
 
-Inertia Echo defines [`Renderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v2#Renderer) interface to integrate view system with Inertia.js.
+Inertia Echo defines [`Renderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v4#Renderer) interface to integrate view system with Inertia.js.
 It also provides a built-in renderer implementation based on the `html/template` package.
 
 To setup Inertia Echo with your Echo application, you need to initialize the renderer and set it up with the [middleware](#middleware).
@@ -309,11 +312,6 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 }))
 ```
 
-> [!NOTE]
-> We also officially provide [`Echo Viewkit`](https://github.com/kohkimakimoto/echo-viewkit) renderer as an additional module.
-> It is a recommended renderer because it provides more powerful Vite support.
-> For more information see [viewkitext](./ext/viewkitext) module and the [example code](./examples/viewkit).
-
 ### Middleware
 
 After setting up the renderer, you need to add the Inertia middleware to your Echo application.
@@ -326,7 +324,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 
 The middleware handles Inertia requests, a foundational functionality of this package.
 You can pass a configuration to customize its behavior.
-For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v2#MiddlewareConfig) documentation.
+For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v4#MiddlewareConfig) documentation.
 
 ### Responses
 
@@ -656,7 +654,7 @@ import (
 	"io/fs"
 	"net/http"
 
-	inertia "github.com/kohkimakimoto/inertia-echo/v2"
+	inertia "github.com/kohkimakimoto/inertia-echo/v4"
 	"github.com/labstack/echo/v4"
 )
 

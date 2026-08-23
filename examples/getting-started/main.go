@@ -1,7 +1,7 @@
 package main
 
 import (
-	inertia "github.com/kohkimakimoto/inertia-echo/v2"
+	inertia "github.com/kohkimakimoto/inertia-echo/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )

@@ -5,14 +5,26 @@ on:
   push:
     branches:
       - master
+      - dev-v4
   pull_request:
     branches:
       - master
+      - dev-v4
 
 jobs:
   test:
+    name: test (${{ matrix.module }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - .
+          - examples/getting-started
+          - examples/helloworld
+          - examples/login-form
+          - examples/ssr
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,7 +32,10 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: ${{ matrix.module }}/go.mod
           cache: true
+          cache-dependency-path: ${{ matrix.module }}/go.sum
 
-      - run: make test
+      - name: Test
+        working-directory: ${{ matrix.module }}
+        run: go test -race -timeout 30m ./...

@@ -8,7 +8,7 @@ import (
 
 	session "github.com/kohkimakimoto/echo-session"
 	"github.com/kohkimakimoto/go-subprocess"
-	"github.com/kohkimakimoto/inertia-echo/v2"
+	"github.com/kohkimakimoto/inertia-echo/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
