@@ -1,10 +1,157 @@
 package inertia
 
 import (
+	"bufio"
+	"errors"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+type basicResponseWriter struct {
+	header http.Header
+}
+
+func newBasicResponseWriter() *basicResponseWriter {
+	return &basicResponseWriter{header: make(http.Header)}
+}
+
+func (w *basicResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *basicResponseWriter) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+func (w *basicResponseWriter) WriteHeader(statusCode int) {}
+
+type hijackableResponseWriter struct {
+	*basicResponseWriter
+	conn     net.Conn
+	hijacked bool
+}
+
+func (w *hijackableResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	w.hijacked = true
+	return w.conn, bufio.NewReadWriter(bufio.NewReader(w.conn), bufio.NewWriter(w.conn)), nil
+}
+
+func TestResponseWriterWrapper_PreservesRedirectStatusWhenBodyIsWritten(t *testing.T) {
+	rec := httptest.NewRecorder()
+	wrapper := NewResponseWriterWrapper(rec)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	http.Redirect(wrapper, req, "/next", http.StatusFound)
+	wrapper.FlushHeader()
+	wrapper.FlushHeader()
+
+	res := rec.Result()
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusFound {
+		t.Errorf("expected status code %d, got %d", http.StatusFound, res.StatusCode)
+	}
+	if location := res.Header.Get("Location"); location != "/next" {
+		t.Errorf("expected Location header %q, got %q", "/next", location)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count := strings.Count(string(body), "/next"); count != 1 {
+		t.Errorf("expected redirect body to contain the target once, got %d occurrences in %q", count, body)
+	}
+}
+
+func TestResponseWriterWrapper_ResponseControllerFlush(t *testing.T) {
+	t.Run("delegates to a supported writer", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		wrapper := NewResponseWriterWrapper(rec)
+
+		if err := http.NewResponseController(wrapper).Flush(); err != nil {
+			t.Fatalf("expected flush to succeed, got %v", err)
+		}
+		if !rec.Flushed {
+			t.Error("expected the underlying writer to be flushed")
+		}
+	})
+
+	t.Run("flushes a buffered redirect before delegating", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		wrapper := NewResponseWriterWrapper(rec)
+		wrapper.WriteHeader(http.StatusFound)
+		if _, err := wrapper.Write([]byte("redirect body")); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := http.NewResponseController(wrapper).Flush(); err != nil {
+			t.Fatalf("expected flush to succeed, got %v", err)
+		}
+
+		res := rec.Result()
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusFound {
+			t.Errorf("expected status code %d, got %d", http.StatusFound, res.StatusCode)
+		}
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(body) != "redirect body" {
+			t.Errorf("expected buffered body %q, got %q", "redirect body", body)
+		}
+	})
+
+	t.Run("returns ErrNotSupported for an unsupported writer", func(t *testing.T) {
+		wrapper := NewResponseWriterWrapper(newBasicResponseWriter())
+
+		err := http.NewResponseController(wrapper).Flush()
+		if !errors.Is(err, http.ErrNotSupported) {
+			t.Fatalf("expected ErrNotSupported, got %v", err)
+		}
+	})
+}
+
+func TestResponseWriterWrapper_ResponseControllerHijack(t *testing.T) {
+	t.Run("delegates to a supported writer", func(t *testing.T) {
+		serverConn, clientConn := net.Pipe()
+		t.Cleanup(func() {
+			serverConn.Close()
+			clientConn.Close()
+		})
+
+		underlying := &hijackableResponseWriter{
+			basicResponseWriter: newBasicResponseWriter(),
+			conn:                serverConn,
+		}
+		wrapper := NewResponseWriterWrapper(underlying)
+
+		conn, _, err := http.NewResponseController(wrapper).Hijack()
+		if err != nil {
+			t.Fatalf("expected hijack to succeed, got %v", err)
+		}
+		if conn != serverConn {
+			t.Error("expected the underlying connection")
+		}
+		if !underlying.hijacked {
+			t.Error("expected the underlying writer to be hijacked")
+		}
+	})
+
+	t.Run("returns ErrNotSupported for an unsupported writer", func(t *testing.T) {
+		wrapper := NewResponseWriterWrapper(newBasicResponseWriter())
+
+		_, _, err := http.NewResponseController(wrapper).Hijack()
+		if !errors.Is(err, http.ErrNotSupported) {
+			t.Fatalf("expected ErrNotSupported, got %v", err)
+		}
+	})
+}
 
 func TestResponseWriterWrapper_FlushHeader_WhenBuffered(t *testing.T) {
 	rec := httptest.NewRecorder()

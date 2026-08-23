@@ -1,6 +1,7 @@
 package inertia
 
 import (
+	"bytes"
 	"net/http"
 )
 
@@ -12,6 +13,7 @@ type ResponseWriterWrapper struct {
 	http.ResponseWriter
 	buffered   bool
 	statusCode int
+	body       bytes.Buffer
 }
 
 func NewResponseWriterWrapper(w http.ResponseWriter) *ResponseWriterWrapper {
@@ -37,8 +39,39 @@ func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
-func (w *ResponseWriterWrapper) FlushHeader() {
+func (w *ResponseWriterWrapper) Write(p []byte) (int, error) {
 	if w.buffered {
-		w.ResponseWriter.WriteHeader(w.statusCode)
+		return w.body.Write(p)
 	}
+
+	return w.ResponseWriter.Write(p)
+}
+
+// Unwrap returns the underlying response writer.
+func (w *ResponseWriterWrapper) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+// FlushError flushes a buffered response before flushing the underlying writer.
+func (w *ResponseWriterWrapper) FlushError() error {
+	if err := w.flushBufferedResponse(); err != nil {
+		return err
+	}
+
+	return http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+func (w *ResponseWriterWrapper) FlushHeader() {
+	_ = w.flushBufferedResponse()
+}
+
+func (w *ResponseWriterWrapper) flushBufferedResponse() error {
+	if !w.buffered {
+		return nil
+	}
+
+	w.buffered = false
+	w.ResponseWriter.WriteHeader(w.statusCode)
+	_, err := w.body.WriteTo(w.ResponseWriter)
+	return err
 }

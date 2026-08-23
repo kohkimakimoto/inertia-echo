@@ -1,8 +1,21 @@
 package inertia
 
 import (
+	"net/http"
 	"strings"
 )
+
+func addVaryHeader(header http.Header, value string) {
+	for _, existingValue := range header.Values("Vary") {
+		for _, existingToken := range splitAndRemoveEmpty(existingValue, ",") {
+			if existingToken == "*" || strings.EqualFold(existingToken, value) {
+				return
+			}
+		}
+	}
+
+	header.Add("Vary", value)
+}
 
 func inArray(needle string, heyStack []string) bool {
 	for _, v := range heyStack {

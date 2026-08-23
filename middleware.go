@@ -130,7 +130,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			// client-side location visit to force an update.
 			// see https://inertiajs.com/the-protocol#asset-versioning
 			if checkVersion(req, i.Version()) {
-				err = i.Location(req.URL.Path)
+				err = i.Location(req.URL.String())
 				return
 			}
 

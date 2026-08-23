@@ -282,7 +282,7 @@ func (i *Inertia) RenderWithViewData(component string, propsData any, viewData a
 	page.DeepMergeProps = deepMergeProps
 	page.MatchPropsOn = matchPropsOn
 
-	res.Header().Set("Vary", HeaderXInertia)
+	addVaryHeader(res.Header(), HeaderXInertia)
 
 	if req.Header.Get(HeaderXInertia) != "" {
 		// The request is an Inertia request, so we return JSON response

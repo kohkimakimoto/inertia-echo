@@ -2,6 +2,7 @@ package inertia
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -31,7 +32,8 @@ func (r *SsrResponse) BodyHTML() template.HTML {
 type SsrEngineHTTPGateway struct {
 	// Server URL
 	URL string
-	// HTTP client to communicate with the SSR server
+	// HTTP client to communicate with the SSR server.
+	// Its timeout is disabled by default and can be configured by the application.
 	HttpClient *http.Client
 }
 
@@ -48,7 +50,16 @@ func (s *SsrEngineHTTPGateway) Render(ctx *RenderContext) (*SsrResponse, error) 
 		return nil, fmt.Errorf("failed to marshal page json: %w", err)
 	}
 
-	req, err := http.NewRequest(
+	requestContext := context.Background()
+	if ctx.Inertia != nil {
+		echoContext := ctx.Inertia.EchoContext()
+		if echoContext != nil && echoContext.Request() != nil {
+			requestContext = echoContext.Request().Context()
+		}
+	}
+
+	req, err := http.NewRequestWithContext(
+		requestContext,
 		http.MethodPost,
 		s.URL+"/render",
 		bytes.NewBuffer(pJson),

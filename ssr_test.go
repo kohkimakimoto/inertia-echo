@@ -1,12 +1,23 @@
 package inertia
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/labstack/echo/v4"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 func TestSsrEngineHTTPGateway_Render(t *testing.T) {
 	tests := []struct {
@@ -153,6 +164,10 @@ func TestNewSsrEngineHTTPGateway(t *testing.T) {
 	if engine.HttpClient == nil {
 		t.Error("Expected non-nil HTTP client")
 	}
+
+	if engine.HttpClient.Timeout != 0 {
+		t.Errorf("Expected default HTTP client timeout to be disabled, got %s", engine.HttpClient.Timeout)
+	}
 }
 
 func TestSsrEngineHTTPGateway_Render_NetworkError(t *testing.T) {
@@ -174,6 +189,47 @@ func TestSsrEngineHTTPGateway_Render_NetworkError(t *testing.T) {
 	_, err := engine.Render(ctx)
 	if err == nil {
 		t.Error("Expected network error but got none")
+	}
+}
+
+func TestSsrEngineHTTPGateway_Render_PropagatesRequestContext(t *testing.T) {
+	requestContext, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(requestContext)
+	c := e.NewContext(req, httptest.NewRecorder())
+	engine := &SsrEngineHTTPGateway{
+		URL: "http://ssr.test",
+		HttpClient: &http.Client{
+			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				select {
+				case <-req.Context().Done():
+					return nil, req.Context().Err()
+				default:
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     make(http.Header),
+						Body:       io.NopCloser(strings.NewReader(`{"head":[],"body":""}`)),
+						Request:    req,
+					}, nil
+				}
+			}),
+		},
+	}
+	renderContext := &RenderContext{
+		Inertia: &Inertia{echoContext: c},
+		Page: &Page{
+			Component: "TestComponent",
+			Props:     map[string]any{},
+			URL:       "/",
+			Version:   "1.0.0",
+		},
+	}
+
+	_, err := engine.Render(renderContext)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation error, got %v", err)
 	}
 }
 

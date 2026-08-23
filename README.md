@@ -642,6 +642,16 @@ inertia.SetVersion(c, func() string { return version })
 
 Inertia Echo supports SSR. See [SSR example](./examples/ssr).
 
+The default SSR HTTP client does not set a request timeout. The current Echo request context is propagated to the SSR request, so its cancellation and deadline are respected. Configure an overall timeout when required by your application:
+
+```go
+gateway := inertia.NewSsrEngineHTTPGateway()
+gateway.HttpClient.Timeout = 5 * time.Second
+renderer.SsrEngine = gateway
+```
+
+The five-second timeout above is only an example, not a library default. SSR request errors, including cancellation and timeout errors, are returned without automatically falling back to client-side rendering.
+
 ### Embed
 
 You can bundle frontend builds into single Go binary using embed.
