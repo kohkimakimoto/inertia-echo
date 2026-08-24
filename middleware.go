@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 const (
@@ -33,7 +33,7 @@ type MiddlewareConfig struct {
 	IsSsrDisabled bool
 }
 
-type SharedDataFunc func(c echo.Context) (map[string]any, error)
+type SharedDataFunc func(c *echo.Context) (map[string]any, error)
 
 var DefaultMiddlewareConfig = MiddlewareConfig{
 	Skipper:               middleware.DefaultSkipper,
@@ -80,7 +80,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) (err error) {
+		return func(c *echo.Context) (err error) {
 			if config.Skipper(c) {
 				return next(c)
 			}
@@ -109,7 +109,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			c.Set(key, i)
 
 			req := c.Request()
-			res := c.Response()
 
 			i.partialComponent = req.Header.Get(HeaderXInertiaPartialComponent)
 			i.onlyProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
@@ -136,20 +135,20 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 
 			// Wrap the http response writer.
 			// The response status code might change after the handler executes.
-			w := NewResponseWriterWrapper(res.Writer)
-			res.Writer = w
-			defer func(w *ResponseWriterWrapper) {
-				// send buffered header and restore the original response writer
-				w.FlushHeader()
-				res.Writer = w.ResponseWriter
-			}(w)
+			originalWriter := c.Response()
+			w := NewResponseWriterWrapper(originalWriter)
+			c.SetResponse(w)
+			// Flush the buffered header before restoring the original writer. These are
+			// separate defers so the writer is restored even if flushing panics.
+			defer c.SetResponse(originalWriter)
+			defer w.FlushHeader()
 
 			if err = next(c); err != nil {
 				return
 			}
 			i.sendClearHistoryCookieIfNeeded()
 
-			changeRedirectCode(req, res)
+			changeRedirectCode(req, w)
 			return
 		}
 	}
@@ -168,16 +167,14 @@ func checkVersion(req *http.Request, version string) bool {
 // changeRedirectCode changes the status code during redirects, ensuring they are made as
 // GET requests, preventing "MethodNotAllowedHttpException" errors.
 // see https://inertiajs.com/redirects
-func changeRedirectCode(req *http.Request, res *echo.Response) {
+func changeRedirectCode(req *http.Request, w *ResponseWriterWrapper) {
 	if req.Header.Get(HeaderXInertia) != "" &&
-		res.Status == 302 &&
-		inArray(req.Method, []string{"PUT", "PATCH", "DELETE"}) {
-		res.Status = 303
-		res.Writer.WriteHeader(303)
+		inArray(req.Method, []string{http.MethodPut, http.MethodPatch, http.MethodDelete}) {
+		w.replaceBufferedStatusCode(http.StatusFound, http.StatusSeeOther)
 	}
 }
 
-func Get(c echo.Context) (*Inertia, error) {
+func Get(c *echo.Context) (*Inertia, error) {
 	in, ok := c.Get(key).(*Inertia)
 	if !ok {
 		return nil, ErrNoInertiaContext
@@ -185,7 +182,7 @@ func Get(c echo.Context) (*Inertia, error) {
 	return in, nil
 }
 
-func MustGet(c echo.Context) *Inertia {
+func MustGet(c *echo.Context) *Inertia {
 	in, err := Get(c)
 	if err != nil {
 		panic(err)
@@ -193,7 +190,7 @@ func MustGet(c echo.Context) *Inertia {
 	return in
 }
 
-func Has(c echo.Context) bool {
+func Has(c *echo.Context) bool {
 	_, ok := c.Get(key).(*Inertia)
 	return ok
 }
@@ -212,7 +209,7 @@ func EncryptHistoryMiddlewareWithConfig(config EncryptHistoryMiddlewareConfig) e
 			config.Skipper = middleware.DefaultSkipper
 		}
 
-		return func(c echo.Context) (err error) {
+		return func(c *echo.Context) (err error) {
 			if config.Skipper(c) {
 				return next(c)
 			}

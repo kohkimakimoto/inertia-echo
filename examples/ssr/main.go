@@ -2,12 +2,13 @@ package main
 
 import (
 	"flag"
-	"github.com/kohkimakimoto/go-subprocess"
-	"github.com/kohkimakimoto/inertia-echo/v4"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"os"
 	"path/filepath"
+
+	"github.com/kohkimakimoto/go-subprocess"
+	"github.com/kohkimakimoto/inertia-echo/v5"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 var BuildMode = "debug"
@@ -26,14 +27,13 @@ func main() {
 	}
 
 	e := echo.New()
-	e.Debug = IsDebug()
 
 	e.Use(middleware.Recover())
-	e.Use(middleware.Logger())
+	e.Use(middleware.RequestLogger())
 
 	// setup inertia
 	r := inertia.NewHTMLRenderer()
-	r.Debug = e.Debug
+	r.Debug = IsDebug()
 	r.MustParseGlob(filepath.Join(optDir, "views/*.html"))
 	r.ViteBasePath = "/build"
 	r.AddViteEntryPoint("assets/app.tsx")
@@ -48,13 +48,13 @@ func main() {
 
 	e.Static("/", filepath.Join(optDir, "public"))
 
-	e.GET("/", func(c echo.Context) error {
+	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]interface{}{
 			"title":   "SSR example powered by inertia-echo",
 			"message": "SSR example",
 		})
 	})
-	e.GET("/about", func(c echo.Context) error {
+	e.GET("/about", func(c *echo.Context) error {
 		return inertia.Render(c, "About", map[string]any{
 			"title": "About inertia-echo",
 		})
@@ -72,7 +72,7 @@ func main() {
 				StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
 				Dir:             optDir,
 			}); err != nil {
-				e.Logger.Errorf("the Vite subprocess returned an error: %v", err)
+				e.Logger.Error("the Vite subprocess returned an error", "error", err)
 			}
 		}()
 	}
@@ -88,9 +88,11 @@ func main() {
 			StderrFormatter: subprocess.PrefixFormatter("[SSR] "),
 			Dir:             optDir,
 		}); err != nil {
-			e.Logger.Errorf("the SSR subprocess returned an error: %v", err)
+			e.Logger.Error("the SSR subprocess returned an error", "error", err)
 		}
 	}()
 
-	e.Logger.Fatal(e.Start(":8080"))
+	if err := e.Start(":8080"); err != nil {
+		e.Logger.Error("failed to start server", "error", err)
+	}
 }

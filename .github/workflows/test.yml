@@ -5,11 +5,10 @@ on:
   push:
     branches:
       - master
-      - dev-v4
+      - dev-v5
   pull_request:
     branches:
       - master
-      - dev-v4
 
 jobs:
   test:
@@ -23,7 +22,6 @@ jobs:
           - .
           - examples/getting-started
           - examples/helloworld
-          - examples/login-form
           - examples/ssr
     steps:
       - name: Checkout
@@ -35,6 +33,25 @@ jobs:
           go-version-file: ${{ matrix.module }}/go.mod
           cache: true
           cache-dependency-path: ${{ matrix.module }}/go.sum
+
+      - name: Verify module dependencies
+        working-directory: ${{ matrix.module }}
+        run: |
+          go mod verify
+          go mod tidy -diff
+
+      - name: Check for Echo v4 dependencies
+        working-directory: ${{ matrix.module }}
+        run: |
+          if go list -m all | grep -q '^github.com/labstack/echo/v4 '; then
+            echo "::error::Echo v4 remains in the module graph"
+            go list -m all | grep '^github.com/labstack/echo/v4 '
+            exit 1
+          fi
+
+      - name: Vet
+        working-directory: ${{ matrix.module }}
+        run: go vet ./...
 
       - name: Test
         working-directory: ${{ matrix.module }}

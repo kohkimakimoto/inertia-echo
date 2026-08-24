@@ -3,8 +3,8 @@ package inertia
 import (
 	"net/http"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 // CSRF is a middleware for protecting cross-site request forgery with Inertia.js

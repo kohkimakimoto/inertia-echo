@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func TestRenderPreservesVaryHeader(t *testing.T) {
@@ -60,7 +60,7 @@ func TestRenderPreservesVaryHeader(t *testing.T) {
 					return nil
 				}),
 			})
-			h := m(func(c echo.Context) error {
+			h := m(func(c *echo.Context) error {
 				for _, value := range tt.initialVary {
 					c.Response().Header().Add(echo.HeaderVary, value)
 				}

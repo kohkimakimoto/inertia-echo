@@ -1,7 +1,11 @@
 package inertia
 
 import (
+	"bufio"
 	"bytes"
+	"errors"
+	"fmt"
+	"net"
 	"net/http"
 )
 
@@ -11,26 +15,34 @@ import (
 // see https://inertiajs.com/redirects
 type ResponseWriterWrapper struct {
 	http.ResponseWriter
-	buffered   bool
-	statusCode int
-	body       bytes.Buffer
+	buffered    bool
+	wroteHeader bool
+	statusCode  int
+	body        bytes.Buffer
 }
 
 func NewResponseWriterWrapper(w http.ResponseWriter) *ResponseWriterWrapper {
 	return &ResponseWriterWrapper{
 		ResponseWriter: w,
 		buffered:       false,
+		wroteHeader:    false,
 		statusCode:     http.StatusOK,
 	}
 }
 
-// WriteHeader stores header instead of sending it, if it is not 200
+// WriteHeader buffers redirect responses and forwards other status codes.
+// As required by net/http, only the first call takes effect.
 func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+	w.statusCode = statusCode
+
 	if statusCode == 302 || statusCode == 303 {
 		// buffering only 302 or 303 status. it is current Inertia.js protocol specification.
 		// see also https://inertiajs.com/redirects
 		w.buffered = true
-		w.statusCode = statusCode
 		return
 	}
 
@@ -40,6 +52,9 @@ func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
 }
 
 func (w *ResponseWriterWrapper) Write(p []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
 	if w.buffered {
 		return w.body.Write(p)
 	}
@@ -47,9 +62,28 @@ func (w *ResponseWriterWrapper) Write(p []byte) (int, error) {
 	return w.ResponseWriter.Write(p)
 }
 
+func (w *ResponseWriterWrapper) replaceBufferedStatusCode(from, to int) {
+	if w.buffered && w.statusCode == from {
+		w.statusCode = to
+	}
+}
+
 // Unwrap returns the underlying response writer.
 func (w *ResponseWriterWrapper) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
+}
+
+// Flush implements http.Flusher while preserving a buffered redirect response.
+func (w *ResponseWriterWrapper) Flush() {
+	err := w.FlushError()
+	if err != nil && errors.Is(err, http.ErrNotSupported) {
+		panic(fmt.Errorf("inertia-echo: response writer %T does not support flushing (http.Flusher interface)", w.ResponseWriter))
+	}
+}
+
+// Hijack implements http.Hijacker by delegating to the underlying response writer.
+func (w *ResponseWriterWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return http.NewResponseController(w.ResponseWriter).Hijack()
 }
 
 // FlushError flushes a buffered response before flushing the underlying writer.
