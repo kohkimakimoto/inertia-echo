@@ -22,6 +22,7 @@ jobs:
           - .
           - examples/getting-started
           - examples/helloworld
+          - examples/login-form
           - examples/ssr
     steps:
       - name: Checkout
