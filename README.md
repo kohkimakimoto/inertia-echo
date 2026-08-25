@@ -12,7 +12,7 @@ You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
 > [!NOTE]
-> Inertia Echo v5 supports Echo v5. See [Upgrading to v5](./MIGRATION_V5.md) when migrating from inertia-echo v4.
+> Inertia Echo v5 supports Echo v5.
 
 Table of Contents
 
