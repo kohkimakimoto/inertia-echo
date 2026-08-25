@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func TestCSRF(t *testing.T) {
@@ -15,7 +15,7 @@ func TestCSRF(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	csrf := CSRF()
-	h := csrf(func(c echo.Context) error {
+	h := csrf(func(c *echo.Context) error {
 		return c.String(http.StatusOK, "test")
 	})
 	_ = h(c)
@@ -33,11 +33,11 @@ func TestCSRFWithConfig(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		csrf := CSRFWithConfig(CSRFConfig{
-			Skipper: func(c echo.Context) bool {
+			Skipper: func(c *echo.Context) bool {
 				return true
 			},
 		})
-		h := csrf(func(c echo.Context) error {
+		h := csrf(func(c *echo.Context) error {
 			return c.String(http.StatusOK, "test")
 		})
 		_ = h(c)

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/mitchellh/mapstructure"
 )
 
@@ -25,7 +25,7 @@ const (
 
 // Inertia is a echo.Context wrapper that handles Inertia.js protocol.
 type Inertia struct {
-	echoContext           echo.Context
+	echoContext           *echo.Context
 	rootView              string
 	sharedProps           map[string]any
 	sharedPropsMutex      sync.RWMutex
@@ -41,7 +41,7 @@ type Inertia struct {
 	resetProps            []string
 }
 
-func (i *Inertia) EchoContext() echo.Context {
+func (i *Inertia) EchoContext() *echo.Context {
 	return i.echoContext
 }
 
@@ -430,50 +430,50 @@ func (i *Inertia) resolveMergeProps(props map[string]any) ([]string, []string, [
 	return mergeProps, deepMergeProps, matchOnProps
 }
 
-func SetRootView(c echo.Context, name string) {
+func SetRootView(c *echo.Context, name string) {
 	MustGet(c).SetRootView(name)
 }
 
-func RootView(c echo.Context) string {
+func RootView(c *echo.Context) string {
 	return MustGet(c).RootView()
 }
 
-func Share(c echo.Context, props map[string]any) {
+func Share(c *echo.Context, props map[string]any) {
 	MustGet(c).Share(props)
 }
 
-func Shared(c echo.Context) map[string]any {
+func Shared(c *echo.Context) map[string]any {
 	return MustGet(c).Shared()
 }
 
-func FlushShared(c echo.Context) {
+func FlushShared(c *echo.Context) {
 	MustGet(c).FlushShared()
 }
 
-func SetVersion(c echo.Context, version VersionFunc) {
+func SetVersion(c *echo.Context, version VersionFunc) {
 	MustGet(c).SetVersion(version)
 }
 
-func Version(c echo.Context) string {
+func Version(c *echo.Context) string {
 	return MustGet(c).Version()
 }
 
-func Location(c echo.Context, url string) error {
+func Location(c *echo.Context, url string) error {
 	return MustGet(c).Location(url)
 }
 
-func EncryptHistory(c echo.Context, encrypt bool) {
+func EncryptHistory(c *echo.Context, encrypt bool) {
 	MustGet(c).EncryptHistory(encrypt)
 }
 
-func ClearHistory(c echo.Context) {
+func ClearHistory(c *echo.Context) {
 	MustGet(c).ClearHistory()
 }
 
-func Render(c echo.Context, component string, props any) error {
+func Render(c *echo.Context, component string, props any) error {
 	return MustGet(c).Render(component, props)
 }
 
-func RenderWithViewData(c echo.Context, component string, props any, viewData any) error {
+func RenderWithViewData(c *echo.Context, component string, props any, viewData any) error {
 	return MustGet(c).RenderWithViewData(component, props, viewData)
 }

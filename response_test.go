@@ -11,6 +11,11 @@ import (
 	"testing"
 )
 
+var (
+	_ http.Flusher  = (*ResponseWriterWrapper)(nil)
+	_ http.Hijacker = (*ResponseWriterWrapper)(nil)
+)
+
 type basicResponseWriter struct {
 	header http.Header
 }
@@ -65,6 +70,31 @@ func TestResponseWriterWrapper_PreservesRedirectStatusWhenBodyIsWritten(t *testi
 	}
 	if count := strings.Count(string(body), "/next"); count != 1 {
 		t.Errorf("expected redirect body to contain the target once, got %d occurrences in %q", count, body)
+	}
+}
+
+func TestResponseWriterWrapper_FirstWriteHeaderWins(t *testing.T) {
+	rec := httptest.NewRecorder()
+	wrapper := NewResponseWriterWrapper(rec)
+
+	wrapper.WriteHeader(http.StatusFound)
+	if _, err := wrapper.Write([]byte("redirect body")); err != nil {
+		t.Fatal(err)
+	}
+	wrapper.WriteHeader(http.StatusNotFound)
+	wrapper.FlushHeader()
+
+	res := rec.Result()
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusFound {
+		t.Errorf("expected the first status code %d, got %d", http.StatusFound, res.StatusCode)
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "redirect body" {
+		t.Errorf("expected body %q, got %q", "redirect body", body)
 	}
 }
 
@@ -151,6 +181,57 @@ func TestResponseWriterWrapper_ResponseControllerHijack(t *testing.T) {
 			t.Fatalf("expected ErrNotSupported, got %v", err)
 		}
 	})
+}
+
+func TestResponseWriterWrapper_DirectFlush(t *testing.T) {
+	rec := httptest.NewRecorder()
+	wrapper := NewResponseWriterWrapper(rec)
+	wrapper.WriteHeader(http.StatusFound)
+
+	wrapper.Flush()
+
+	if !rec.Flushed {
+		t.Error("expected the underlying writer to be flushed")
+	}
+	if rec.Code != http.StatusFound {
+		t.Errorf("expected status code %d, got %d", http.StatusFound, rec.Code)
+	}
+}
+
+func TestResponseWriterWrapper_DirectFlushPanicsWhenUnsupported(t *testing.T) {
+	wrapper := NewResponseWriterWrapper(newBasicResponseWriter())
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected Flush to panic for an unsupported response writer")
+		}
+	}()
+
+	wrapper.Flush()
+}
+
+func TestResponseWriterWrapper_DirectHijack(t *testing.T) {
+	serverConn, clientConn := net.Pipe()
+	t.Cleanup(func() {
+		serverConn.Close()
+		clientConn.Close()
+	})
+
+	underlying := &hijackableResponseWriter{
+		basicResponseWriter: newBasicResponseWriter(),
+		conn:                serverConn,
+	}
+	wrapper := NewResponseWriterWrapper(underlying)
+
+	conn, _, err := wrapper.Hijack()
+	if err != nil {
+		t.Fatalf("expected hijack to succeed, got %v", err)
+	}
+	if conn != serverConn {
+		t.Error("expected the underlying connection")
+	}
+	if !underlying.hijacked {
+		t.Error("expected the underlying writer to be hijacked")
+	}
 }
 
 func TestResponseWriterWrapper_FlushHeader_WhenBuffered(t *testing.T) {

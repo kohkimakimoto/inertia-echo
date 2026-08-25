@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	session "github.com/kohkimakimoto/echo-session"
+	session "github.com/kohkimakimoto/echo-session/v5"
 	"github.com/kohkimakimoto/go-subprocess"
-	"github.com/kohkimakimoto/inertia-echo/v4"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/kohkimakimoto/inertia-echo/v5"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 var BuildMode = "debug"
@@ -29,14 +29,13 @@ func main() {
 	}
 
 	e := echo.New()
-	e.Debug = IsDebug()
 
 	e.Use(middleware.Recover())
-	e.Use(middleware.Logger())
+	e.Use(middleware.RequestLogger())
 
 	// setup inertia
 	r := inertia.NewHTMLRenderer()
-	r.Debug = e.Debug
+	r.Debug = IsDebug()
 	r.MustParseGlob(filepath.Join(optDir, "views/*.html"))
 	r.ViteBasePath = "/build"
 	r.AddViteEntryPoint("assets/app.tsx")
@@ -51,10 +50,10 @@ func main() {
 
 	e.Static("/", filepath.Join(optDir, "public"))
 
-	e.GET("/", func(c echo.Context) error {
+	e.GET("/", func(c *echo.Context) error {
 		s := session.MustGet(c)
 		authEmail := s.GetString("auth_email")
-		c.Logger().Debugf("authEmail: %v", authEmail)
+		c.Logger().Debug("authEmail", "email", authEmail)
 
 		return inertia.Render(c, "Index", map[string]any{
 			"message": "You are logged in!",
@@ -62,13 +61,13 @@ func main() {
 		})
 	}, AuthMiddleware)
 
-	e.GET("/about", func(c echo.Context) error {
+	e.GET("/about", func(c *echo.Context) error {
 		return inertia.Render(c, "About", map[string]any{
 			"title": "About inertia-echo",
 		})
 	}, AuthMiddleware)
 
-	e.GET("/login", func(c echo.Context) error {
+	e.GET("/login", func(c *echo.Context) error {
 		s := session.MustGet(c)
 		if authEmail := s.GetString("auth_email"); authEmail != "" {
 			// Redirect to the home page if already logged in
@@ -83,7 +82,7 @@ func main() {
 		Password string `json:"password"`
 	}
 
-	e.POST("login", func(c echo.Context) error {
+	e.POST("/login", func(c *echo.Context) error {
 		form := &Form{}
 		if err := c.Bind(form); err != nil {
 			return err
@@ -105,14 +104,14 @@ func main() {
 		if err := s.Save(); err != nil {
 			return err
 		}
-		c.Logger().Debugf("User authenticated: %s", form.Email)
+		c.Logger().Debug("User authenticated", "email", form.Email)
 
 		// Redirect to the home page after login
 		inertia.ClearHistory(c)
 		return c.Redirect(http.StatusFound, "/")
 	})
 
-	e.GET("/logout", func(c echo.Context) error {
+	e.GET("/logout", func(c *echo.Context) error {
 		s := session.MustGet(c)
 		// Clear the session
 		s.Clear()
@@ -138,16 +137,18 @@ func main() {
 				StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
 				Dir:             optDir,
 			}); err != nil {
-				e.Logger.Errorf("the Vite subprocess returned an error: %v", err)
+				e.Logger.Error("the Vite subprocess returned an error", "error", err)
 			}
 		}()
 	}
 
-	e.Logger.Fatal(e.Start(":8080"))
+	if err := e.Start(":8080"); err != nil {
+		e.Logger.Error("failed to start server", "error", err)
+	}
 }
 
 func AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		s := session.MustGet(c)
 		authEmail := s.GetString("auth_email")
 		if authEmail == "" {

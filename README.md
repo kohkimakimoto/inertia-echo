@@ -1,8 +1,8 @@
 # Inertia Echo
 
-[![test](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml/badge.svg?branch=dev-v4)](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml?query=branch%3Adev-v4)
+[![test](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/kohkimakimoto/inertia-echo/actions/workflows/test.yml?query=branch%3Amaster)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Go Reference](https://pkg.go.dev/badge/github.com/kohkimakimoto/inertia-echo/v4.svg)](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v4)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kohkimakimoto/inertia-echo/v5.svg)](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5)
 
 This is the [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://echo.labstack.com/) Go web framework.
 
@@ -12,7 +12,7 @@ You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
 > [!NOTE]
-> This is the v4 maintenance line for Echo v4. See [Upgrading to v4](./MIGRATION_V4.md) when migrating from inertia-echo v2.
+> Inertia Echo v5 supports Echo v5.
 
 Table of Contents
 
@@ -46,6 +46,7 @@ Table of Contents
   - [Asset versioning](#asset-versioning)
   - [Server-side Rendering (SSR)](#server-side-rendering-ssr)
   - [Embed](#embed)
+- [Compatibility](#compatibility)
 - [Author](#author)
 - [License](#license)
 
@@ -58,13 +59,13 @@ In this section, we provide step-by-step instructions on how to get started with
 Inertia Echo is a Go module that you can install with the following command:
 
 ```sh
-go get github.com/kohkimakimoto/inertia-echo/v4
+go get github.com/kohkimakimoto/inertia-echo/v5
 ```
 
 You also need to install Echo like this:
 
 ```sh
-go get github.com/labstack/echo/v4
+go get github.com/labstack/echo/v5
 ```
 
 ### Root template
@@ -98,18 +99,18 @@ Next, you need to implement Go application code with the Echo framework. Create 
 package main
 
 import (
-	"net/http"
+	"log/slog"
 
-	inertia "github.com/kohkimakimoto/inertia-echo/v4"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	inertia "github.com/kohkimakimoto/inertia-echo/v5"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 func main() {
 	e := echo.New()
 
 	e.Use(middleware.Recover())
-	e.Use(middleware.Logger())
+	e.Use(middleware.RequestLogger())
 
 	r := inertia.NewHTMLRenderer()
 	r.MustParseGlob("views/*.html")
@@ -123,13 +124,15 @@ func main() {
 
 	e.Static("/", "public")
 
-	e.GET("/", func(c echo.Context) error {
+	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})
 
-	e.Logger.Fatal(e.Start(":8080"))
+	if err := e.Start(":8080"); err != nil {
+		slog.Error("failed to start server", "error", err)
+	}
 }
 ```
 
@@ -233,7 +236,9 @@ You need to run Vite server while you running in dev mode. To do so, you also ca
 
 ```go
 import (
-	// import go-subprocess
+	"log/slog"
+	"os"
+
 	"github.com/kohkimakimoto/go-subprocess"
 )
 
@@ -241,7 +246,7 @@ import (
 func main(){
 	// ...
 
-	e.GET("/", func(c echo.Context) error {
+	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
@@ -258,11 +263,13 @@ func main(){
 			StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
 			Dir:             ".",
 		}); err != nil {
-			e.Logger.Errorf("the Vite subprocess returned an error: %v", err)
+			slog.Error("the Vite subprocess returned an error", "error", err)
 		}
 	}()
 
-	e.Logger.Fatal(e.Start(":8080"))
+	if err := e.Start(":8080"); err != nil {
+		slog.Error("failed to start server", "error", err)
+	}
 }
 
 
@@ -295,7 +302,7 @@ func main(){
 Unlike Laravel, which is an officially supported framework for Inertia.js, Echo lacks built-in view rendering.
 This means you'll have to build your own view system and integrate it with Inertia.js.
 
-Inertia Echo defines [`Renderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v4#Renderer) interface to integrate view system with Inertia.js.
+Inertia Echo defines [`Renderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#Renderer) interface to integrate view system with Inertia.js.
 It also provides a built-in renderer implementation based on the `html/template` package.
 
 To setup Inertia Echo with your Echo application, you need to initialize the renderer and set it up with the [middleware](#middleware).
@@ -324,7 +331,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 
 The middleware handles Inertia requests, a foundational functionality of this package.
 You can pass a configuration to customize its behavior.
-For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v4#MiddlewareConfig) documentation.
+For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#MiddlewareConfig) documentation.
 
 ### Responses
 
@@ -336,7 +343,7 @@ The following code shows how to create an Inertia response.
 The `Render` function accepts a `map[string]any` as its final argument, which contains the properties to pass to the view.
 
 ```go
-func ShowEventHandler(c echo.Context) error {
+func ShowEventHandler(c *echo.Context) error {
 	event := // retrieve a event...
 	return inertia.Render(c, "Event/Show", map[string]any{
 		"event": event,
@@ -353,7 +360,7 @@ type ShowEventProps struct {
 	Event *Event `prop:"event"`
 }
 
-func ShowEventHandler(c echo.Context) error {
+func ShowEventHandler(c *echo.Context) error {
 	event := // retrieve a event...
 	return inertia.Render(c, "Event/Show", &ShowEventProps{
 		Event: event,
@@ -373,7 +380,7 @@ Sometimes you may even want to provide data that will not be sent to your JavaSc
 In this case, you can use the `RenderWithViewData` function.
 
 ```go
-func ShowEventsHandler(c echo.Context) error {
+func ShowEventsHandler(c *echo.Context) error {
 	event := // retrieve a event...
 	return inertia.RenderWithViewData(c, "Event/Show", map[string]any{
 		"event": event,
@@ -429,7 +436,7 @@ You can set shared data via middleware.
 
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-	Share: func(c echo.Context) (map[string]any, error) {
+	Share: func(c *echo.Context) (map[string]any, error) {
 		user := // get auth user...
 		return map[string]any{
 			"appName":  "App Name",
@@ -662,10 +669,11 @@ package main
 import (
 	"embed"
 	"io/fs"
+	"log/slog"
 	"net/http"
 
-	inertia "github.com/kohkimakimoto/inertia-echo/v4"
-	"github.com/labstack/echo/v4"
+	inertia "github.com/kohkimakimoto/inertia-echo/v5"
+	"github.com/labstack/echo/v5"
 )
 
 //go:embed views/*.html
@@ -696,15 +704,28 @@ func main() {
 	assetHandler := http.FileServer(http.FS(fsys))
 	e.GET("/*", echo.WrapHandler(http.StripPrefix("/", assetHandler)))
 
-	e.GET("/", func(c echo.Context) error {
+	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})
 
-	e.Logger.Fatal(e.Start(":8080"))
+	if err := e.Start(":8080"); err != nil {
+		slog.Error("failed to start server", "error", err)
+	}
 }
 ```
+
+## Compatibility
+
+Inertia Echo aligns its major version with the supported Echo major version.
+
+| Inertia Echo | Echo | Go | Status |
+| --- | --- | --- | --- |
+| v5.x | v5.3.1 or later | 1.25 or later | Current |
+| v4.x | v4.15.4 or later | 1.25 or later | Maintained on the [`v4` branch](https://github.com/kohkimakimoto/inertia-echo/tree/v4) |
+
+The major versions align for compatibility; their minor and patch versions do not need to match.
 
 ## Author
 
