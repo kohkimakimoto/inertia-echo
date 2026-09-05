@@ -12,7 +12,7 @@ You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
 > [!NOTE]
-> Inertia Echo v5.1.0+ supports Echo v5 and Inertia.js v3. v5.0.x is the final release for Inertia.js v2.
+> Inertia Echo v5.1.0+ supports Echo v5 and Inertia.js v3. v5.0.0 is the final release for Inertia.js v2.
 
 Table of Contents
 
