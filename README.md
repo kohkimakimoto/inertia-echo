@@ -12,7 +12,7 @@ You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
 > [!NOTE]
-> Inertia Echo v5 supports Echo v5 and Inertia.js v3.
+> Inertia Echo v5.1.0+ supports Echo v5 and Inertia.js v3. v5.0.x is the final release for Inertia.js v2.
 
 Table of Contents
 
@@ -878,12 +878,11 @@ func main() {
 
 Inertia Echo aligns its major version with the supported Echo major version.
 
-| Inertia Echo | Echo | Inertia.js | Go | Status |
-| --- | --- | --- | --- | --- |
-| v5.x | v5.3.1 or later | v3.x (verified with v3.7.0) | 1.25 or later | Current |
-| v4.x | v4.15.4 or later | v2.x | 1.25 or later | Maintained on the [`v4` branch](https://github.com/kohkimakimoto/inertia-echo/tree/v4) |
-
-The major versions align for compatibility; their minor and patch versions do not need to match.
+| Inertia Echo | Echo | Inertia.js | Status |
+| --- | --- | --- | --- |
+| v5.1.0+ | v5 | v3 | Current |
+| v5.0.0 | v5 | v2 | Final |
+| v4.0.1 | v4 | v2 | Final |
 
 ## Author
 
