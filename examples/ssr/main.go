@@ -38,8 +38,20 @@ func main() {
 	r.ViteBasePath = "/build"
 	r.AddViteEntryPoint("assets/app.tsx")
 	r.MustParseViteManifestFile(filepath.Join(optDir, "public/build/manifest.json"))
+	r.SsrFallbackOnError = true
+	r.SsrErrorReporter = func(ctx *inertia.RenderContext, err error) {
+		e.Logger.Error("SSR failed; falling back to CSR",
+			"component", ctx.Page.Component,
+			"url", ctx.Page.URL,
+			"error", err,
+		)
+	}
 	// Use SSR engine for server-side rendering
-	r.SsrEngine = inertia.NewSsrEngineHTTPGateway()
+	ssrGateway := inertia.NewSsrEngineHTTPGateway()
+	if IsDebug() {
+		ssrGateway.Endpoint = r.ViteDevServerURL + "/__inertia_ssr"
+	}
+	r.SsrEngine = ssrGateway
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 		Renderer: r,
@@ -49,7 +61,7 @@ func main() {
 	e.Static("/", filepath.Join(optDir, "public"))
 
 	e.GET("/", func(c *echo.Context) error {
-		return inertia.Render(c, "Index", map[string]interface{}{
+		return inertia.Render(c, "Index", map[string]any{
 			"title":   "SSR example powered by inertia-echo",
 			"message": "SSR example",
 		})
@@ -77,20 +89,22 @@ func main() {
 		}()
 	}
 
-	go func() {
-		// Run SSR server.
-		if err := subprocess.Run(&subprocess.Config{
-			Command:         "npm",
-			Args:            []string{"run", "start-ssr"},
-			Stdout:          os.Stdout,
-			StdoutFormatter: subprocess.PrefixFormatter("[SSR] "),
-			Stderr:          os.Stderr,
-			StderrFormatter: subprocess.PrefixFormatter("[SSR] "),
-			Dir:             optDir,
-		}); err != nil {
-			e.Logger.Error("the SSR subprocess returned an error", "error", err)
-		}
-	}()
+	if !IsDebug() {
+		go func() {
+			// Run the standalone production SSR server.
+			if err := subprocess.Run(&subprocess.Config{
+				Command:         "npm",
+				Args:            []string{"run", "start-ssr"},
+				Stdout:          os.Stdout,
+				StdoutFormatter: subprocess.PrefixFormatter("[SSR] "),
+				Stderr:          os.Stderr,
+				StderrFormatter: subprocess.PrefixFormatter("[SSR] "),
+				Dir:             optDir,
+			}); err != nil {
+				e.Logger.Error("the SSR subprocess returned an error", "error", err)
+			}
+		}()
+	}
 
 	if err := e.Start(":8080"); err != nil {
 		e.Logger.Error("failed to start server", "error", err)

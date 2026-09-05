@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -30,8 +31,11 @@ func (r *SsrResponse) BodyHTML() template.HTML {
 // SsrEngineHTTPGateway is an SSR engine that communicates with a remote SSR server over HTTP.
 // The server is usually a Node.js server.
 type SsrEngineHTTPGateway struct {
-	// Server URL
+	// Server URL. When Endpoint is empty, requests are sent to URL + "/render".
 	URL string
+	// Endpoint is the complete SSR endpoint URL. When set, it takes precedence
+	// over URL. This supports endpoints such as Vite's /__inertia_ssr.
+	Endpoint string
 	// HTTP client to communicate with the SSR server.
 	// Its timeout is disabled by default and can be configured by the application.
 	HttpClient *http.Client
@@ -45,7 +49,7 @@ func NewSsrEngineHTTPGateway() *SsrEngineHTTPGateway {
 }
 
 func (s *SsrEngineHTTPGateway) Render(ctx *RenderContext) (*SsrResponse, error) {
-	pJson, err := json.Marshal(ctx.Page)
+	pageJSON, err := json.Marshal(ctx.Page)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal page json: %w", err)
 	}
@@ -61,14 +65,18 @@ func (s *SsrEngineHTTPGateway) Render(ctx *RenderContext) (*SsrResponse, error) 
 	req, err := http.NewRequestWithContext(
 		requestContext,
 		http.MethodPost,
-		s.URL+"/render",
-		bytes.NewBuffer(pJson),
+		s.endpoint(),
+		bytes.NewReader(pageJSON),
 	)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.HttpClient.Do(req)
+	client := s.HttpClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +85,33 @@ func (s *SsrEngineHTTPGateway) Render(ctx *RenderContext) (*SsrResponse, error) 
 		return nil, fmt.Errorf("ssr: status code is not 200: %d", resp.StatusCode)
 	}
 
-	var ssrResp SsrResponse
-	err = json.NewDecoder(resp.Body).Decode(&ssrResp)
-	if err != nil {
-		return nil, err
+	var payload *struct {
+		Head []string `json:"head"`
+		Body *string  `json:"body"`
 	}
-	return &ssrResp, nil
+	responseJSON, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("ssr: failed to read response: %w", err)
+	}
+	if err := json.Unmarshal(responseJSON, &payload); err != nil {
+		return nil, fmt.Errorf("ssr: failed to decode response: %w", err)
+	}
+	if payload == nil {
+		return nil, nil
+	}
+	if payload.Body == nil {
+		return nil, fmt.Errorf("ssr: response body is missing or null")
+	}
+
+	return &SsrResponse{
+		Head: payload.Head,
+		Body: *payload.Body,
+	}, nil
+}
+
+func (s *SsrEngineHTTPGateway) endpoint() string {
+	if s.Endpoint != "" {
+		return s.Endpoint
+	}
+	return strings.TrimRight(s.URL, "/") + "/render"
 }

@@ -12,7 +12,7 @@ You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
 > [!NOTE]
-> Inertia Echo v5 supports Echo v5.
+> Inertia Echo v5 supports Echo v5 and Inertia.js v3.
 
 Table of Contents
 
@@ -28,7 +28,6 @@ Table of Contents
   - [Middleware](#middleware)
   - [Responses](#responses)
     - [Creating responses](#creating-responses)
-    - [Creating responses using structs](#creating-responses-using-structs)
     - [Root template data](#root-template-data)
   - [Redirects](#redirects)
     - [External redirects](#external-redirects)
@@ -40,7 +39,13 @@ Table of Contents
   - [Partial reloads](#partial-reloads)
   - [Deferred props](#deferred-props)
     - [Grouping requests](#grouping-requests)
+    - [Rescuing deferred errors](#rescuing-deferred-errors)
+  - [Once props](#once-props)
   - [Merging props](#merging-props)
+  - [Infinite scroll props](#infinite-scroll-props)
+  - [Flash data](#flash-data)
+  - [Preserving URL fragments](#preserving-url-fragments)
+  - [Error responses](#error-responses)
   - [CSRF protection](#csrf-protection)
   - [History encryption](#history-encryption)
   - [Asset versioning](#asset-versioning)
@@ -71,6 +76,8 @@ go get github.com/labstack/echo/v5
 ### Root template
 
 Next, setup the root template that will be loaded on the first page visit to your application. This template should include your site's CSS and JavaScript assets, along with the `.inertia` and `.inertiaHead` variables.
+
+The built-in renderer emits the Inertia v3 initial page as a JSON `script` element followed by the root `div`. The `script` element's `data-page` value and the root element's `id` both use the renderer's `ContainerId`.
 
 In this tutorial, we will create the `views/app.html` file as the root template.
 
@@ -149,7 +156,7 @@ npm init -y
 Install the required packages:
 
 ```sh
-npm install -D @inertiajs/react react react-dom vite @vitejs/plugin-react
+npm install -D @inertiajs/react@3.7.0 react@19 react-dom@19 vite@7 @vitejs/plugin-react@5
 ```
 
 Create the `vite.config.js` file with the following content:
@@ -175,15 +182,11 @@ Create the `js/app.jsx` file with the following content:
 
 ```js
 import { createInertiaApp } from '@inertiajs/react'
-import { createRoot } from 'react-dom/client'
 
 createInertiaApp({
   resolve: name => {
     const pages = import.meta.glob('./pages/**/*.jsx', { eager: true })
     return pages[`./pages/${name}.jsx`]
-  },
-  setup({ el, App, props }) {
-    createRoot(el).render(<App {...props} />)
   },
 })
 ```
@@ -347,23 +350,6 @@ func ShowEventHandler(c *echo.Context) error {
 	event := // retrieve a event...
 	return inertia.Render(c, "Event/Show", map[string]any{
 		"event": event,
-	})
-}
-```
-
-#### Creating responses using structs
-
-You can also pass a struct with the `prop` struct tag.
-
-```go
-type ShowEventProps struct {
-	Event *Event `prop:"event"`
-}
-
-func ShowEventHandler(c *echo.Context) error {
-	event := // retrieve a event...
-	return inertia.Render(c, "Event/Show", &ShowEventProps{
-		Event: event,
 	})
 }
 ```
@@ -552,6 +538,39 @@ inertia.Render(c, "Users/Index", map[string]any{
 })
 ```
 
+#### Rescuing deferred errors
+
+Deferred callback errors are returned by default. Use `Rescue` to omit a failed deferred prop while allowing the rest of the response to render. Configure `RescueReporter` to observe rescued errors without exposing their contents to the client.
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	Renderer: r,
+	RescueReporter: func(path string, err error) {
+		logger.Error("deferred prop failed", "path", path, "error", err)
+	},
+}))
+
+inertia.Render(c, "Users/Index", map[string]any{
+	"permissions": inertia.Defer(func() (any, error) {
+		return loadPermissions()
+	}).Rescue(),
+})
+```
+
+### Once props
+
+Once props let the client reuse a previously loaded value. The server remains stateless; the client reports loaded keys in later requests.
+
+```go
+inertia.Render(c, "Dashboard", map[string]any{
+	"settings": inertia.Once(func() (any, error) {
+		return loadSettings()
+	}).As("dashboard-settings").For(10 * time.Minute),
+})
+```
+
+Use `Fresh(true)` to resolve the value even when the client already has it, `Until(time.Time)` to set an absolute expiration, or `For(time.Duration)` to set a relative expiration. `OptionalProp`, `DeferProp`, and `MergeProp` can opt in with `Once()`; calling `As`, `Fresh`, `Until`, or `For` on those prop types also enables once behavior. `ShareOnce` is a shortcut for sharing a callback-backed once prop.
+
 ### Merging props
 
 :book: The related official document: [Merging props](https://inertiajs.com/merging-props)
@@ -576,9 +595,105 @@ You may chain the matchOn method to determine how existing items should be match
 
 ```go
 inertia.Render(c, "Users/Index", map[string]any{
-	"tags": inertia.DeepMerge(users).MatchesOn("data.id"),
+	"tags": inertia.DeepMerge(users).MatchOn("data.id"),
 })
 ```
+
+Use `Append` or `Prepend` to select the client-side merge direction at the root or at nested paths:
+
+```go
+inertia.Render(c, "Users/Index", map[string]any{
+	"users": inertia.Merge(users).Append("data").MatchOn("data.id"),
+	"activity": inertia.Merge(activity).Prepend(),
+})
+```
+
+### Infinite scroll props
+
+`Scroll` receives the page value and pagination metadata together, so loading the data does not need to run twice. Page identifiers may be numbers, cursor strings, or `nil`.
+
+```go
+inertia.Render(c, "Users/Index", map[string]any{
+	"users": inertia.Scroll(func() (inertia.ScrollResult, error) {
+		users, err := loadUsers()
+		if err != nil {
+			return inertia.ScrollResult{}, err
+		}
+		return inertia.ScrollResult{
+			Value: map[string]any{"data": users},
+			Metadata: inertia.ScrollMetadata{
+				PageName: "page", PreviousPage: nil,
+				CurrentPage: 1, NextPage: 2,
+			},
+		}, nil
+	}),
+})
+```
+
+The default data path is `data`. Use `WithDataPath` to change it and `Defer` to defer the initial load.
+
+### Flash data
+
+`Flash` adds one-time data to the top-level Page `flash` object for the current render:
+
+```go
+inertia.Flash(c, map[string]any{
+	"message": "Profile updated.",
+})
+```
+
+The adapter does not persist arbitrary flash values in cookies. For POST-redirect-GET flows, store the data in the application's session implementation and connect it with the middleware's `FlashData` and `Reflash` callbacks:
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	Renderer:  r,
+	FlashData: loadFlashFromSession,
+	Reflash:   reflashSessionData,
+}))
+```
+
+`FlashData` has the signature `func(*echo.Context) (map[string]any, error)`. `Reflash` has the signature `func(*echo.Context) error`.
+
+### Preserving URL fragments
+
+Call `PreserveFragment` before a redirect to ask the client to retain the source visit's URL fragment on the next rendered page:
+
+```go
+inertia.PreserveFragment(c)
+return c.Redirect(http.StatusFound, "/account")
+```
+
+For Inertia requests, redirects whose destination already contains a fragment are converted to the v3 `409` and `X-Inertia-Redirect` response. Prefetch requests are excluded from this conversion.
+
+### Error responses
+
+Use `RenderWithStatus` when an Inertia page must retain an HTTP error status:
+
+```go
+return inertia.RenderWithStatus(c, http.StatusNotFound, "ErrorPage", map[string]any{
+	"status": http.StatusNotFound,
+})
+```
+
+For centralized error handling, reuse the middleware configuration so the error page has the same renderer, root view, version, and SSR settings:
+
+```go
+inertiaConfig := inertia.MiddlewareConfig{Renderer: r}
+e.Use(inertia.MiddlewareWithConfig(inertiaConfig))
+
+e.HTTPErrorHandler = inertia.HTTPErrorHandlerWithConfig(inertia.ErrorHandlerConfig{
+	Middleware: inertiaConfig,
+	Component:  "ErrorPage",
+	Statuses: []int{
+		http.StatusForbidden,
+		http.StatusNotFound,
+		http.StatusInternalServerError,
+		http.StatusServiceUnavailable,
+	},
+})
+```
+
+The default props contain `status`. Set `Props` to build application-specific props, `ResolveShared` to load shared props when no Inertia request context exists, and `Fallback` for statuses not handled as Inertia pages. If the application keeps its own Echo error handler, wrap it with `WrapHTTPErrorHandler` so Inertia redirect conversion and one-shot state finalization also run for error-handler responses.
 
 ### CSRF protection
 
@@ -649,6 +764,36 @@ inertia.SetVersion(c, func() string { return version })
 
 Inertia Echo supports SSR. See [SSR example](./examples/ssr).
 
+The HTTP gateway uses `URL + "/render"` for a standalone production SSR server. Set `Endpoint` when the complete SSR endpoint differs, including the Inertia Vite plugin's development endpoint:
+
+```go
+gateway := inertia.NewSsrEngineHTTPGateway()
+gateway.Endpoint = "http://localhost:5173/__inertia_ssr"
+renderer.SsrEngine = gateway
+```
+
+For Vite development SSR, install `@inertiajs/vite@3.7.0`, configure the SSR entry explicitly, and let Inertia v3 provide React's default CSR/SSR setup:
+
+```ts
+import inertia from '@inertiajs/vite'
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  plugins: [inertia({ ssr: 'assets/ssr.tsx' }), react()],
+})
+```
+
+```tsx
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
+
+const pages = import.meta.glob<{ default: ResolvedComponent }>('./pages/**/*.tsx', { eager: true })
+
+createInertiaApp({
+  resolve: name => pages[`./pages/${name}.tsx`],
+})
+```
+
 The default SSR HTTP client does not set a request timeout. The current Echo request context is propagated to the SSR request, so its cancellation and deadline are respected. Configure an overall timeout when required by your application:
 
 ```go
@@ -657,7 +802,20 @@ gateway.HttpClient.Timeout = 5 * time.Second
 renderer.SsrEngine = gateway
 ```
 
-The five-second timeout above is only an example, not a library default. SSR request errors, including cancellation and timeout errors, are returned without automatically falling back to client-side rendering.
+The five-second timeout above is only an example, not a library default. SSR request errors are returned by default. Enable an explicit CSR fallback and register an error reporter when the application should remain available after an SSR failure:
+
+```go
+renderer.SsrFallbackOnError = true
+renderer.SsrErrorReporter = func(ctx *inertia.RenderContext, err error) {
+	logger.Error("SSR failed; falling back to CSR",
+		"component", ctx.Page.Component,
+		"url", ctx.Page.URL,
+		"error", err,
+	)
+}
+```
+
+Request cancellation is always returned instead of being hidden by the fallback. An SSR engine response of `(nil, nil)`, including the Vite development endpoint's temporary JSON `null` response while warming up, is treated as an intentional skip and renders the normal CSR bootstrap.
 
 ### Embed
 
@@ -720,10 +878,10 @@ func main() {
 
 Inertia Echo aligns its major version with the supported Echo major version.
 
-| Inertia Echo | Echo | Go | Status |
-| --- | --- | --- | --- |
-| v5.x | v5.3.1 or later | 1.25 or later | Current |
-| v4.x | v4.15.4 or later | 1.25 or later | Maintained on the [`v4` branch](https://github.com/kohkimakimoto/inertia-echo/tree/v4) |
+| Inertia Echo | Echo | Inertia.js | Go | Status |
+| --- | --- | --- | --- | --- |
+| v5.x | v5.3.1 or later | v3.x (verified with v3.7.0) | 1.25 or later | Current |
+| v4.x | v4.15.4 or later | v2.x | 1.25 or later | Maintained on the [`v4` branch](https://github.com/kohkimakimoto/inertia-echo/tree/v4) |
 
 The major versions align for compatibility; their minor and patch versions do not need to match.
 

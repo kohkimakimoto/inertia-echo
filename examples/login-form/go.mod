@@ -14,6 +14,5 @@ require (
 require (
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/gorilla/sessions v1.4.0 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 )

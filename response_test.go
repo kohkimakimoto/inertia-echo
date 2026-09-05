@@ -20,6 +20,15 @@ type basicResponseWriter struct {
 	header http.Header
 }
 
+type failingResponseWriter struct {
+	*basicResponseWriter
+	err error
+}
+
+func (w *failingResponseWriter) Write([]byte) (int, error) {
+	return 0, w.err
+}
+
 func newBasicResponseWriter() *basicResponseWriter {
 	return &basicResponseWriter{header: make(http.Header)}
 }
@@ -279,5 +288,21 @@ func TestResponseWriterWrapper_FlushHeader_WhenNotBuffered(t *testing.T) {
 	// Status should remain the same
 	if rec.Code != 404 {
 		t.Errorf("expected underlying recorder code to remain 404 after flush, got %d", rec.Code)
+	}
+}
+
+func TestResponseWriterWrapper_FlushBufferedResponseReturnsWriteError(t *testing.T) {
+	wantErr := errors.New("write failed")
+	wrapper := NewResponseWriterWrapper(&failingResponseWriter{
+		basicResponseWriter: newBasicResponseWriter(),
+		err:                 wantErr,
+	})
+	wrapper.WriteHeader(http.StatusFound)
+	if _, err := wrapper.Write([]byte("redirect body")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := wrapper.flushBufferedResponse(); !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
 	}
 }

@@ -1,10 +1,11 @@
+import inertia from '@inertiajs/vite'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command, mode, isSsrBuild }) => {
+export default defineConfig(({ isSsrBuild }) => {
   return {
-    plugins: [react()],
+    plugins: [inertia({ ssr: 'assets/ssr.tsx' }), react()],
     publicDir: false,
     build: {
       manifest: isSsrBuild ? false : "manifest.json",

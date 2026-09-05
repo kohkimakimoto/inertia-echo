@@ -11,7 +11,7 @@ func Handler(component string) echo.HandlerFunc {
 	}
 }
 
-func HandlerWithProps(component string, props any) echo.HandlerFunc {
+func HandlerWithProps(component string, props map[string]any) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		return Render(c, component, props)
 	}

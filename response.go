@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 )
 
 // ResponseWriterWrapper is a wrapper of http.ResponseWriter for buffering a response status code.
@@ -39,9 +40,8 @@ func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
 	w.wroteHeader = true
 	w.statusCode = statusCode
 
-	if statusCode == 302 || statusCode == 303 {
-		// buffering only 302 or 303 status. it is current Inertia.js protocol specification.
-		// see also https://inertiajs.com/redirects
+	if isRedirectStatus(statusCode) || (statusCode == http.StatusConflict &&
+		(w.Header().Get(HeaderXInertiaLocation) != "" || w.Header().Get(HeaderXInertiaRedirect) != "")) {
 		w.buffered = true
 		return
 	}
@@ -65,6 +65,38 @@ func (w *ResponseWriterWrapper) Write(p []byte) (int, error) {
 func (w *ResponseWriterWrapper) replaceBufferedStatusCode(from, to int) {
 	if w.buffered && w.statusCode == from {
 		w.statusCode = to
+	}
+}
+
+func (w *ResponseWriterWrapper) replaceBufferedResponse(statusCode int, body []byte) {
+	if !w.buffered {
+		return
+	}
+	w.statusCode = statusCode
+	w.body.Reset()
+	if len(body) > 0 {
+		_, _ = w.body.Write(body)
+	}
+}
+
+func (w *ResponseWriterWrapper) hasFragmentRedirect() bool {
+	return w.buffered && isRedirectStatus(w.statusCode) && strings.Contains(w.Header().Get("Location"), "#")
+}
+
+func (w *ResponseWriterWrapper) isTransitionResponse() bool {
+	if !w.buffered {
+		return false
+	}
+	return isRedirectStatus(w.statusCode) || (w.statusCode == http.StatusConflict &&
+		(w.Header().Get(HeaderXInertiaLocation) != "" || w.Header().Get(HeaderXInertiaRedirect) != ""))
+}
+
+func isRedirectStatus(statusCode int) bool {
+	switch statusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		return true
+	default:
+		return false
 	}
 }
 

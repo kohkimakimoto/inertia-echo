@@ -3,42 +3,52 @@ package inertia
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/labstack/echo/v5"
-	"github.com/mitchellh/mapstructure"
 )
 
 const (
-	HeaderXInertia                 = "X-Inertia"
-	HeaderXInertiaErrorBag         = "X-Inertia-Error-Bag"
-	HeaderXInertiaLocation         = "X-Inertia-Location"
-	HeaderXInertiaVersion          = "X-Inertia-Version"
-	HeaderXInertiaPartialComponent = "X-Inertia-Partial-Component"
-	HeaderXInertiaPartialData      = "X-Inertia-Partial-Data"
-	HeaderXInertiaPartialExcept    = "X-Inertia-Partial-Except"
-	HeaderXInertiaReset            = "X-Inertia-Reset"
+	HeaderXInertia                          = "X-Inertia"
+	HeaderXInertiaErrorBag                  = "X-Inertia-Error-Bag"
+	HeaderXInertiaLocation                  = "X-Inertia-Location"
+	HeaderXInertiaVersion                   = "X-Inertia-Version"
+	HeaderXInertiaPartialComponent          = "X-Inertia-Partial-Component"
+	HeaderXInertiaPartialData               = "X-Inertia-Partial-Data"
+	HeaderXInertiaPartialExcept             = "X-Inertia-Partial-Except"
+	HeaderXInertiaReset                     = "X-Inertia-Reset"
+	HeaderXInertiaExceptOnceProps           = "X-Inertia-Except-Once-Props"
+	HeaderXInertiaInfiniteScrollMergeIntent = "X-Inertia-Infinite-Scroll-Merge-Intent"
+	HeaderXInertiaRedirect                  = "X-Inertia-Redirect"
 )
 
 // Inertia is a echo.Context wrapper that handles Inertia.js protocol.
 type Inertia struct {
-	echoContext           *echo.Context
-	rootView              string
-	sharedProps           map[string]any
-	sharedPropsMutex      sync.RWMutex
-	version               VersionFunc
-	renderer              Renderer
-	encryptHistory        bool
-	clearHistoryCookieKey string
-	clearHistory          bool
-	isSsrDisabled         bool
-	partialComponent      string
-	onlyProps             []string
-	exceptProps           []string
-	resetProps            []string
+	echoContext               *echo.Context
+	rootView                  string
+	sharedProps               map[string]any
+	sharedPropsMutex          sync.RWMutex
+	version                   VersionFunc
+	renderer                  Renderer
+	encryptHistory            bool
+	clearHistoryCookieKey     string
+	clearHistory              bool
+	preserveFragmentCookieKey string
+	preserveFragment          bool
+	flash                     map[string]any
+	flashLoaded               bool
+	flashData                 FlashDataFunc
+	reflash                   ReflashFunc
+	rescueReporter            RescueReporter
+	now                       func() time.Time
+	isSsrDisabled             bool
+	partialComponent          string
+	onlyProps                 []string
+	exceptProps               []string
+	resetProps                []string
 }
 
 func (i *Inertia) EchoContext() *echo.Context {
@@ -69,48 +79,57 @@ func (i *Inertia) ClearHistory() {
 // While the official inertia-laravel adapter uses a session for this purpose,
 // the Echo framework lacks a built-in session store, so we use a cookie as an alternative.
 func (i *Inertia) pullClearHistory() bool {
-	// Reset clearHistory after reading the current state or cookie value.
-	defer func() {
-		i.clearHistory = false
-	}()
-
-	// Check if the clear history cookie is set
-	cookie, err := i.echoContext.Request().Cookie(i.clearHistoryCookieKey)
-	if err != nil {
-		if errors.Is(err, http.ErrNoCookie) {
-			// No cookie found, use the current state
-			return i.clearHistory
-		}
-	}
-
-	// You got the cookie value, therefore you should delete the cookie
-	http.SetCookie(i.echoContext.Response(), &http.Cookie{
-		Name:     i.clearHistoryCookieKey,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1, // Negative value tells browser to delete immediately
-	})
-
-	if cookie.Value == "true" {
-		return true
-	}
-
-	return false
+	return i.pullBooleanFlag(i.clearHistoryCookieKey, &i.clearHistory)
 }
 
 func (i *Inertia) sendClearHistoryCookieIfNeeded() {
-	if i.clearHistory {
-		// In this case, you called the ClearHistory method, but you still haven't called the pullClearHistory method.
-		// Typically, this happens when you call ClearHistory and then redirect to another page.
-		// To keep the clearHistory flag, you need to set the cookie.
-		http.SetCookie(i.echoContext.Response(), &http.Cookie{
-			Name:     i.clearHistoryCookieKey,
-			Value:    "true",
-			Path:     "/",
-			HttpOnly: true,
-		})
+	i.sendBooleanFlag(i.clearHistoryCookieKey, i.clearHistory)
+}
+
+// PreserveFragment asks the client to carry the source URL fragment through
+// the next rendered page. The flag survives redirects in a boolean cookie.
+func (i *Inertia) PreserveFragment() {
+	i.preserveFragment = true
+}
+
+func (i *Inertia) pullPreserveFragment() bool {
+	return i.pullBooleanFlag(i.preserveFragmentCookieKey, &i.preserveFragment)
+}
+
+func (i *Inertia) sendPreserveFragmentCookieIfNeeded() {
+	i.sendBooleanFlag(i.preserveFragmentCookieKey, i.preserveFragment)
+}
+
+func (i *Inertia) pullBooleanFlag(cookieKey string, current *bool) bool {
+	value := *current
+	*current = false
+	cookie, err := i.echoContext.Request().Cookie(cookieKey)
+	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			return value
+		}
+		return value
 	}
+	http.SetCookie(i.echoContext.Response(), &http.Cookie{
+		Name:     cookieKey,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+	})
+	return cookie.Value == "true" || value
+}
+
+func (i *Inertia) sendBooleanFlag(cookieKey string, value bool) {
+	if !value {
+		return
+	}
+	http.SetCookie(i.echoContext.Response(), &http.Cookie{
+		Name:     cookieKey,
+		Value:    "true",
+		Path:     "/",
+		HttpOnly: true,
+	})
 }
 
 func (i *Inertia) IsSsrDisabled() bool {
@@ -141,17 +160,69 @@ func (i *Inertia) Share(props map[string]any) {
 	i.sharedPropsMutex.Lock()
 	defer i.sharedPropsMutex.Unlock()
 
-	// merge shared props
+	if i.sharedProps == nil {
+		i.sharedProps = map[string]any{}
+	}
 	for k, v := range props {
 		i.sharedProps[k] = v
 	}
+}
+
+// ShareOnce shares a callback-backed prop that the client can retain across
+// visits under the supplied top-level prop name.
+func (i *Inertia) ShareOnce(key string, callback func() (any, error)) *OnceProp {
+	prop := Once(callback)
+	i.Share(map[string]any{key: prop})
+	return prop
 }
 
 func (i *Inertia) Shared() map[string]any {
 	i.sharedPropsMutex.RLock()
 	defer i.sharedPropsMutex.RUnlock()
 
-	return i.sharedProps
+	props := make(map[string]any, len(i.sharedProps))
+	for key, value := range i.sharedProps {
+		props[key] = value
+	}
+	return props
+}
+
+// Flash adds data to the top-level Page flash object for the current render.
+func (i *Inertia) Flash(data map[string]any) {
+	if i.flash == nil {
+		i.flash = map[string]any{}
+	}
+	for key, value := range data {
+		i.flash[key] = value
+	}
+}
+
+func (i *Inertia) resolveFlash() (map[string]any, error) {
+	if !i.flashLoaded {
+		local := i.flash
+		i.flash = map[string]any{}
+		if i.flashData != nil {
+			stored, err := i.flashData(i.echoContext)
+			if err != nil {
+				return nil, err
+			}
+			for key, value := range stored {
+				i.flash[key] = value
+			}
+		}
+		for key, value := range local {
+			i.flash[key] = value
+		}
+		i.flashLoaded = true
+	}
+	if len(i.flash) == 0 {
+		return nil, nil
+	}
+	result := make(map[string]any, len(i.flash))
+	for key, value := range i.flash {
+		result[key] = value
+	}
+	return result, nil
 }
 
 func (i *Inertia) FlushShared() {
@@ -176,8 +247,9 @@ func (i *Inertia) Version() string {
 func (i *Inertia) Location(url string) error {
 	if i.echoContext.Request().Header.Get(HeaderXInertia) != "" {
 		res := i.echoContext.Response()
+		addVaryHeader(res.Header(), HeaderXInertia)
 		res.Header().Set(HeaderXInertiaLocation, url)
-		res.WriteHeader(409)
+		res.WriteHeader(http.StatusConflict)
 		return nil
 	} else {
 		return i.echoContext.Redirect(http.StatusFound, url)
@@ -189,16 +261,23 @@ func (i *Inertia) isPartial(component string) bool {
 }
 
 type Page struct {
-	Component      string         `json:"component"`
-	Props          map[string]any `json:"props"`
-	URL            string         `json:"url"`
-	Version        string         `json:"version"`
-	EncryptHistory bool           `json:"encryptHistory"`
-	ClearHistory   bool           `json:"clearHistory"`
-	DeferredProps  map[string]any `json:"deferredProps,omitempty"`
-	MergeProps     []string       `json:"mergeProps,omitempty"`
-	DeepMergeProps []string       `json:"deepMergeProps,omitempty"`
-	MatchPropsOn   []string       `json:"matchPropsOn,omitempty"`
+	Component        string                    `json:"component"`
+	Props            map[string]any            `json:"props"`
+	URL              string                    `json:"url"`
+	Version          string                    `json:"version"`
+	EncryptHistory   bool                      `json:"encryptHistory,omitempty"`
+	ClearHistory     bool                      `json:"clearHistory,omitempty"`
+	DeferredProps    map[string]any            `json:"deferredProps,omitempty"`
+	SharedProps      []string                  `json:"sharedProps,omitempty"`
+	MergeProps       []string                  `json:"mergeProps,omitempty"`
+	PrependProps     []string                  `json:"prependProps,omitempty"`
+	DeepMergeProps   []string                  `json:"deepMergeProps,omitempty"`
+	MatchPropsOn     []string                  `json:"matchPropsOn,omitempty"`
+	ScrollProps      map[string]ScrollMetadata `json:"scrollProps,omitempty"`
+	OnceProps        map[string]OnceMetadata   `json:"onceProps,omitempty"`
+	Flash            map[string]any            `json:"flash,omitempty"`
+	PreserveFragment bool                      `json:"preserveFragment,omitempty"`
+	RescuedProps     []string                  `json:"rescuedProps,omitempty"`
 }
 
 type RenderContext struct {
@@ -212,222 +291,85 @@ type RenderContext struct {
 	Writer   io.Writer
 }
 
-func (i *Inertia) Render(component string, propsData any) error {
-	return i.RenderWithViewData(component, propsData, nil)
+func (i *Inertia) Render(component string, props map[string]any) error {
+	return i.render(http.StatusOK, component, props, nil)
 }
 
-func (i *Inertia) RenderWithViewData(component string, propsData any, viewData any) error {
+func (i *Inertia) RenderWithViewData(component string, props map[string]any, viewData any) error {
+	return i.render(http.StatusOK, component, props, viewData)
+}
+
+func (i *Inertia) RenderWithStatus(status int, component string, props map[string]any) error {
+	return i.render(status, component, props, nil)
+}
+
+func (i *Inertia) RenderWithStatusAndViewData(status int, component string, props map[string]any, viewData any) error {
+	return i.render(status, component, props, viewData)
+}
+
+func (i *Inertia) render(status int, component string, props map[string]any, viewData any) error {
 	if i.renderer == nil {
 		return ErrRendererNotRegistered
 	}
-
 	req := i.echoContext.Request()
 	res := i.echoContext.Response()
-
-	props, ok := propsData.(map[string]any)
-	if !ok {
-		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			TagName: "prop",
-			Result:  &props,
-		})
-		if err != nil {
-			return err
-		}
-		if err := decoder.Decode(propsData); err != nil {
-			return fmt.Errorf("failed to decode propsData: %w", err)
-		}
+	resolver := newPropsResolver(i, component)
+	validProps, metadata, err := resolver.resolve(i.Shared(), props)
+	if err != nil {
+		return err
 	}
-
-	// merge shared props
-	props = i.mergeProps(i.sharedProps, props)
-
-	// Note:
-	// The official `laravel-inertia` package executes the following methods:
-	// * `resolveInertiaPropsProviders`
-	// * `resolveArrayableProperties`
-	// but this package does not implement them. This is by design.
-	// I believe that they represent additional layers of data abstraction that don't align with the Go language philosophy.
-
-	// Note:
-	// The official `laravel-inertia` package implements the `resolveValidationErrors` method to extract validation errors from the session.
-	// However, this package does not implement it because Echo does not have a built-in session implementation.
-	// Echo’s official documentation provides information about sessions:
-	// https://echo.labstack.com/docs/middleware/session
-	// Nonetheless, in my opinion, you probably need to implement your own logic to handle sessions.
-	// This means it is difficult to implement a common error-handling logic with sessions, or it may lead to a poor abstraction layer.
-	// It is not match to the Go language philosophy.
-
-	// process partial reloads
-	// https://inertiajs.com/partial-reloads
-	validProps := i.copyProps(props)
-	validProps = i.resolvePartialProps(component, validProps)
-	validProps = i.resolveAlwaysProps(props, validProps)
-
-	if err := evaluateProps(validProps); err != nil {
+	if validProps == nil {
+		validProps = map[string]any{}
+	}
+	flash, err := i.resolveFlash()
+	if err != nil {
 		return err
 	}
 
 	page := &Page{
-		Component:      component,
-		Props:          validProps,
-		URL:            req.URL.String(),
-		Version:        i.Version(),
-		EncryptHistory: i.encryptHistory,
-		ClearHistory:   i.pullClearHistory(),
-		DeferredProps:  i.resolveDeferredProps(component, props),
+		Component: component, Props: validProps, URL: req.URL.String(), Version: i.Version(),
+		EncryptHistory: i.encryptHistory, ClearHistory: i.pullClearHistory(),
+		PreserveFragment: i.pullPreserveFragment(), Flash: flash,
+		SharedProps: metadata.sharedProps, DeferredProps: emptyMapAsNil(metadata.deferredProps),
+		MergeProps: metadata.mergeProps, PrependProps: metadata.prependProps,
+		DeepMergeProps: metadata.deepMergeProps, MatchPropsOn: metadata.matchPropsOn,
+		ScrollProps: emptyScrollMapAsNil(metadata.scrollProps), OnceProps: emptyOnceMapAsNil(metadata.onceProps),
+		RescuedProps: metadata.rescuedProps,
 	}
-
-	mergeProps, deepMergeProps, matchPropsOn := i.resolveMergeProps(props)
-	page.MergeProps = mergeProps
-	page.DeepMergeProps = deepMergeProps
-	page.MatchPropsOn = matchPropsOn
 
 	addVaryHeader(res.Header(), HeaderXInertia)
-
 	if req.Header.Get(HeaderXInertia) != "" {
-		// The request is an Inertia request, so we return JSON response
 		res.Header().Set(HeaderXInertia, "true")
-		return i.echoContext.JSON(http.StatusOK, page)
+		return i.echoContext.JSON(status, page)
 	}
 
-	// The request is a normal request, so we render HTML content.
 	buf := new(bytes.Buffer)
-	renderContext := &RenderContext{
-		Inertia:  i,
-		ViewName: i.rootView,
-		Page:     page,
-		ViewData: viewData,
-		Writer:   buf,
-	}
-	if err := i.renderer.Render(renderContext); err != nil {
+	ctx := &RenderContext{Inertia: i, ViewName: i.rootView, Page: page, ViewData: viewData, Writer: buf}
+	if err := i.renderer.Render(ctx); err != nil {
 		return err
 	}
-	return i.echoContext.HTMLBlob(http.StatusOK, buf.Bytes())
+	return i.echoContext.HTMLBlob(status, buf.Bytes())
 }
 
-func (i *Inertia) mergeProps(props ...map[string]any) map[string]any {
-	merged := map[string]any{}
-	for _, a := range props {
-		for k, v := range a {
-			merged[k] = v
-		}
-	}
-	return merged
-}
-
-func (i *Inertia) copyProps(props map[string]any) map[string]any {
-	newProps := make(map[string]any, len(props))
-	for k, v := range props {
-		newProps[k] = v
-	}
-	return newProps
-}
-
-func (i *Inertia) resolvePartialProps(component string, validProps map[string]any) map[string]any {
-	if !i.isPartial(component) {
-		// Not a partial request, filter out IgnoreFirstLoad props
-		newProps := make(map[string]any)
-		for key, value := range validProps {
-			if _, isIgnoreFirstLoad := value.(IgnoreFirstLoadProp); !isIgnoreFirstLoad {
-				newProps[key] = value
-			}
-		}
-		return newProps
-	}
-
-	if len(i.onlyProps) > 0 {
-		newProps := make(map[string]any)
-		for _, key := range i.onlyProps {
-			if value, exists := validProps[key]; exists {
-				newProps[key] = value
-			}
-		}
-		validProps = newProps
-	}
-
-	if len(i.exceptProps) > 0 {
-		for _, key := range i.exceptProps {
-			if _, exists := validProps[key]; exists {
-				delete(validProps, key)
-			}
-		}
-	}
-
-	return validProps
-}
-
-func (i *Inertia) resolveAlwaysProps(props, validProps map[string]any) map[string]any {
-	for k, v := range props {
-		if _, ok := v.(*AlwaysProp); ok {
-			validProps[k] = v
-		}
-	}
-
-	return validProps
-}
-
-func (i *Inertia) resolveDeferredProps(component string, props map[string]any) map[string]any {
-	if i.isPartial(component) {
+func emptyMapAsNil(value map[string]any) map[string]any {
+	if len(value) == 0 {
 		return nil
 	}
-
-	groups := make(map[string][]string)
-	for key, prop := range props {
-		if deferProp, ok := prop.(*DeferProp); ok {
-			group := deferProp.Group()
-			groups[group] = append(groups[group], key)
-		}
-	}
-
-	if len(groups) == 0 {
-		return nil
-	}
-
-	// Convert to map[string]any
-	result := make(map[string]any)
-	for k, v := range groups {
-		result[k] = v
-	}
-	return result
+	return value
 }
 
-func (i *Inertia) resolveMergeProps(props map[string]any) ([]string, []string, []string) {
-	var mergeProps []string
-	var deepMergeProps []string
-	var matchOnProps []string
-
-	// Extract props for mergeProps
-	for key, prop := range props {
-		if mergeable, ok := prop.(Mergeable); ok && mergeable.ShouldMerge() {
-			// reject the prop if it is in resetProps
-			if inArray(key, i.resetProps) {
-				continue
-			}
-
-			// if onlyProps is specified, skip the prop if it is not in onlyProps
-			if len(i.onlyProps) > 0 && !inArray(key, i.onlyProps) {
-				continue
-			}
-
-			// skip the prop if it is in exceptProps
-			if inArray(key, i.exceptProps) {
-				continue
-			}
-
-			if mergeable.ShouldDeepMerge() {
-				deepMergeProps = append(deepMergeProps, key)
-			} else {
-				mergeProps = append(mergeProps, key)
-			}
-
-			matchesOn := mergeable.MatchesOn()
-			for _, strategy := range matchesOn {
-				matchOnProps = append(matchOnProps, key+"."+strategy)
-			}
-		}
+func emptyScrollMapAsNil(value map[string]ScrollMetadata) map[string]ScrollMetadata {
+	if len(value) == 0 {
+		return nil
 	}
+	return value
+}
 
-	return mergeProps, deepMergeProps, matchOnProps
+func emptyOnceMapAsNil(value map[string]OnceMetadata) map[string]OnceMetadata {
+	if len(value) == 0 {
+		return nil
+	}
+	return value
 }
 
 func SetRootView(c *echo.Context, name string) {
@@ -440,6 +382,10 @@ func RootView(c *echo.Context) string {
 
 func Share(c *echo.Context, props map[string]any) {
 	MustGet(c).Share(props)
+}
+
+func ShareOnce(c *echo.Context, key string, callback func() (any, error)) *OnceProp {
+	return MustGet(c).ShareOnce(key, callback)
 }
 
 func Shared(c *echo.Context) map[string]any {
@@ -470,10 +416,26 @@ func ClearHistory(c *echo.Context) {
 	MustGet(c).ClearHistory()
 }
 
-func Render(c *echo.Context, component string, props any) error {
+func PreserveFragment(c *echo.Context) {
+	MustGet(c).PreserveFragment()
+}
+
+func Flash(c *echo.Context, data map[string]any) {
+	MustGet(c).Flash(data)
+}
+
+func Render(c *echo.Context, component string, props map[string]any) error {
 	return MustGet(c).Render(component, props)
 }
 
-func RenderWithViewData(c *echo.Context, component string, props any, viewData any) error {
+func RenderWithViewData(c *echo.Context, component string, props map[string]any, viewData any) error {
 	return MustGet(c).RenderWithViewData(component, props, viewData)
+}
+
+func RenderWithStatus(c *echo.Context, status int, component string, props map[string]any) error {
+	return MustGet(c).RenderWithStatus(status, component, props)
+}
+
+func RenderWithStatusAndViewData(c *echo.Context, status int, component string, props map[string]any, viewData any) error {
+	return MustGet(c).RenderWithStatusAndViewData(status, component, props, viewData)
 }

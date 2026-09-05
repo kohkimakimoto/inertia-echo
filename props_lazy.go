@@ -8,6 +8,7 @@ type LazyProp struct {
 
 func (p *LazyProp) IsIgnoreFirstLoad() {}
 
+// Deprecated: use Optional instead.
 func Lazy(callback func() (any, error)) *LazyProp {
 	return &LazyProp{
 		callback: callback,

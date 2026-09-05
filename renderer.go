@@ -35,20 +35,24 @@ type HTMLRenderer struct {
 
 	// SSR
 
-	SsrEngine SsrEngine
+	SsrEngine          SsrEngine
+	SsrFallbackOnError bool
+	SsrErrorReporter   func(ctx *RenderContext, err error)
 }
 
 func NewHTMLRenderer() *HTMLRenderer {
 	r := &HTMLRenderer{
-		Debug:            false,
-		ContainerId:      "app",
-		Vite:             true,
-		ViteDevServerURL: "http://localhost:5173",
-		ViteBasePath:     "/",
-		ViteDisableReact: false,
-		ViteEntryPoints:  []string{},
-		viteManifest:     nil,
-		SsrEngine:        nil,
+		Debug:              false,
+		ContainerId:        "app",
+		Vite:               true,
+		ViteDevServerURL:   "http://localhost:5173",
+		ViteBasePath:       "/",
+		ViteDisableReact:   false,
+		ViteEntryPoints:    []string{},
+		viteManifest:       nil,
+		SsrEngine:          nil,
+		SsrFallbackOnError: false,
+		SsrErrorReporter:   nil,
 	}
 	r.templates = template.New("T").Funcs(r.funcMap())
 	return r
@@ -122,7 +126,10 @@ func (r *HTMLRenderer) Render(ctx *RenderContext) error {
 		if !ok {
 			return errors.New("HTMLRenderer requires ViewData to be a map[string]any")
 		}
-		data = _data
+		data = make(map[string]any, len(_data)+3)
+		for key, value := range _data {
+			data[key] = value
+		}
 	} else {
 		data = map[string]any{}
 	}
@@ -130,22 +137,27 @@ func (r *HTMLRenderer) Render(ctx *RenderContext) error {
 	data["page"] = ctx.Page
 
 	if ctx.Inertia.IsSsrEnabled() && r.SsrEngine != nil {
-		// server-side rendering
 		ssr, err := r.SsrEngine.Render(ctx)
 		if err != nil {
-			return err
+			if r.SsrErrorReporter != nil {
+				r.SsrErrorReporter(ctx, err)
+			}
+			if !r.SsrFallbackOnError || ctx.Inertia.EchoContext().Request().Context().Err() != nil {
+				return err
+			}
+		} else if ssr != nil {
+			data["inertia"] = ssr.BodyHTML()
+			data["inertiaHead"] = ssr.HeadHTML()
+			return r.templates.ExecuteTemplate(ctx.Writer, ctx.ViewName, data)
 		}
-		data["inertia"] = ssr.BodyHTML()
-		data["inertiaHead"] = ssr.HeadHTML()
-	} else {
-		// client-side rendering
-		_inertia, err := r.renderInertia(ctx.Page)
-		if err != nil {
-			return err
-		}
-		data["inertia"] = _inertia
-		data["inertiaHead"] = ""
 	}
+
+	_inertia, err := r.renderInertia(ctx.Page)
+	if err != nil {
+		return err
+	}
+	data["inertia"] = _inertia
+	data["inertiaHead"] = ""
 
 	return r.templates.ExecuteTemplate(ctx.Writer, ctx.ViewName, data)
 }
@@ -156,8 +168,13 @@ func (r *HTMLRenderer) renderInertia(page *Page) (template.HTML, error) {
 		return "", err
 	}
 	builder := new(strings.Builder)
-	builder.WriteString(`<div id="` + r.ContainerId + `" data-page="`)
-	template.HTMLEscape(builder, pageJson)
+	id := template.HTMLEscapeString(r.ContainerId)
+	builder.WriteString(`<script type="application/json" data-page="`)
+	builder.WriteString(id)
+	builder.WriteString(`">`)
+	builder.Write(pageJson)
+	builder.WriteString(`</script><div id="`)
+	builder.WriteString(id)
 	builder.WriteString(`"></div>`)
 
 	return template.HTML(builder.String()), nil

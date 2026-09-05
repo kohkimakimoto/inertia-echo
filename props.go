@@ -5,6 +5,10 @@ type IgnoreFirstLoadProp interface {
 	IsIgnoreFirstLoad()
 }
 
+// RescueReporter receives errors rescued from explicitly configured deferred
+// props. The failing prop is omitted from the response.
+type RescueReporter func(path string, err error)
+
 // evaluateProps evaluates the given props and update it.
 // It is the same purpose as resolvePropertyInstances that is used in official inertia-laravel package.
 func evaluateProps(values map[string]any) error {
@@ -42,6 +46,12 @@ func evaluatePropValue(value any) (any, error) {
 		return evaluatePropValue(v.value)
 	case *MergeProp:
 		return evaluatePropValue(v.value)
+	case *OnceProp:
+		vv, err := v.callback()
+		if err != nil {
+			return nil, err
+		}
+		return evaluatePropValue(vv)
 	case func() (any, error):
 		vv, err := v()
 		if err != nil {

@@ -5,13 +5,15 @@ on:
   push:
     branches:
       - master
+      - dev-5
   pull_request:
     branches:
       - master
+      - dev-5
 
 jobs:
   test:
-    name: test
+    name: Go / root
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -35,3 +37,120 @@ jobs:
 
       - name: Test
         run: go test -race -timeout 30m ./...
+
+  examples-go:
+    name: Go / ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - getting-started
+          - helloworld
+          - login-form
+          - ssr
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.example }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: examples/${{ matrix.example }}/go.mod
+          cache: true
+          cache-dependency-path: examples/${{ matrix.example }}/go.sum
+
+      - name: Verify module dependencies
+        run: |
+          go mod verify
+          go mod tidy -diff
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -timeout 30m ./...
+
+  examples-frontend:
+    name: Frontend / ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - getting-started
+          - helloworld
+          - login-form
+          - ssr
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.example }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: examples/${{ matrix.example }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build client assets
+        run: npm run build
+
+      - name: Build SSR assets
+        if: matrix.example == 'ssr'
+        run: npm run build:ssr
+
+  browser:
+    name: Browser / CSR and SSR
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/*/go.sum
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            examples/*/package-lock.json
+            tests/browser/package-lock.json
+
+      - name: Build example assets
+        run: |
+          for example in getting-started helloworld login-form ssr; do
+            npm --prefix "examples/${example}" ci
+            npm --prefix "examples/${example}" run build
+          done
+          npm --prefix examples/ssr run build:ssr
+
+      - name: Install browser test dependencies
+        working-directory: tests/browser
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        working-directory: tests/browser
+        run: npm test

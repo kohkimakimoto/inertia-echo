@@ -1,17 +1,20 @@
 {
   "name": "ssr",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "dev": "vite --clearScreen=false",
     "build": "tsc --noEmit && vite build",
+    "build:ssr": "vite build --ssr",
     "clean": "rm -rf public/build && rm -rf .build",
-    "start-ssr": "vite build --ssr && node .build/ssr/ssr.mjs"
+    "start-ssr": "npm run build:ssr && node .build/ssr/ssr.js"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@inertiajs/react": "^2.0.17",
+    "@inertiajs/react": "3.7.0",
+    "@inertiajs/vite": "3.7.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",

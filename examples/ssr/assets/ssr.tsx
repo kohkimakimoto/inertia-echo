@@ -1,15 +1,7 @@
-import { createInertiaApp } from '@inertiajs/react'
-import createServer from '@inertiajs/react/server'
-import ReactDOMServer from 'react-dom/server'
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
 
-createServer(page =>
-  createInertiaApp({
-    page,
-    render: ReactDOMServer.renderToString,
-    resolve: name => {
-      const pages = import.meta.glob('./pages/**/*.tsx', { eager: true })
-      return pages[`./pages/${name}.tsx`]
-    },
-    setup: ({ App, props }) => <App {...props} />,
-  }),
-)
+const pages = import.meta.glob<{ default: ResolvedComponent }>('./pages/**/*.tsx', { eager: true })
+
+createInertiaApp({
+  resolve: name => pages[`./pages/${name}.tsx`],
+})
