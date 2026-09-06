@@ -8,7 +8,7 @@ export default defineConfig({
     manifest: "manifest.json",
     outDir: "public/build",
     rollupOptions: {
-      input: ['js/app.jsx'],
+      input: ['resources/js/app.jsx'],
     },
   },
 })

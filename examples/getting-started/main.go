@@ -13,7 +13,7 @@ func main() {
 	e.Use(middleware.RequestLogger())
 
 	r := inertia.NewHTMLRenderer()
-	r.MustParseGlob("views/*.html")
+	r.MustParseGlob("resources/views/*.html")
 	r.ViteBasePath = "/build"
 	r.MustParseViteManifestFile("public/build/manifest.json")
 

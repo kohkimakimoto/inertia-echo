@@ -79,7 +79,7 @@ Next, setup the root template that will be loaded on the first page visit to you
 
 The built-in renderer emits the Inertia v3 initial page as a JSON `script` element followed by the root `div`. The `script` element's `data-page` value and the root element's `id` both use the renderer's `ContainerId`.
 
-In this tutorial, we will create the `views/app.html` file as the root template.
+In this tutorial, we will create the `resources/views/app.html` file as the root template.
 
 ```html
 <!DOCTYPE html>
@@ -91,7 +91,7 @@ In this tutorial, we will create the `views/app.html` file as the root template.
   </head>
   <body>
   {{ .inertia }}
-  {{ vite "js/app.jsx" }}
+  {{ vite "resources/js/app.jsx" }}
   </body>
 </html>
 
@@ -120,7 +120,7 @@ func main() {
 	e.Use(middleware.RequestLogger())
 
 	r := inertia.NewHTMLRenderer()
-	r.MustParseGlob("views/*.html")
+	r.MustParseGlob("resources/views/*.html")
 	r.ViteBasePath = "/build"
 	r.MustParseViteManifestFile("public/build/manifest.json")
 
@@ -156,7 +156,7 @@ npm init -y
 Install the required packages:
 
 ```sh
-npm install -D @inertiajs/react@3.7.0 react@19 react-dom@19 vite@7 @vitejs/plugin-react@5
+npm install @inertiajs/react react react-dom vite @vitejs/plugin-react
 ```
 
 Create the `vite.config.js` file with the following content:
@@ -172,26 +172,26 @@ export default defineConfig({
     manifest: "manifest.json",
     outDir: "public/build",
     rollupOptions: {
-      input: ['js/app.jsx'],
+      input: ['resources/js/app.jsx'],
     },
   },
 })
 ```
 
-Create the `js/app.jsx` file with the following content:
+Create the `resources/js/app.jsx` file with the following content:
 
 ```js
 import { createInertiaApp } from '@inertiajs/react'
 
 createInertiaApp({
   resolve: name => {
-    const pages = import.meta.glob('./pages/**/*.jsx', { eager: true })
-    return pages[`./pages/${name}.jsx`]
+    const pages = import.meta.glob('./pages/**/*.jsx')
+    return pages[`./pages/${name}.jsx`]()
   },
 })
 ```
 
-Create a [page component](https://inertiajs.com/docs/v3/the-basics/pages) as the  `js/pages/Index.jsx` file with the following content:
+Create a [page component](https://inertiajs.com/docs/v3/the-basics/pages) as the  `resources/js/pages/Index.jsx` file with the following content:
 
 ```jsx
 import React from 'react';
@@ -282,7 +282,7 @@ func main(){
 > If you're using React with `@vitejs/plugin-react`, you have to add `{{ vite_react_refresh }}` on your view file as well.  
 > For more information, see [Vite docs](https://vitejs.dev/guide/backend-integration.html).
 >
-> `views/app.html`
+> `resources/views/app.html`
 >
 > ```html
 > <!DOCTYPE html>
@@ -293,7 +293,7 @@ func main(){
 >     {{- .inertiaHead -}}
 >   </head>
 >   <body>
->     {{ .inertia }} {{ vite_react_refresh }} {{ vite "js/app.jsx" }}
+>     {{ .inertia }} {{ vite_react_refresh }} {{ vite "resources/js/app.jsx" }}
 >   </body>
 > </html>
 > ```
@@ -313,7 +313,7 @@ To setup Inertia Echo with your Echo application, you need to initialize the ren
 ```go
 // Create and configure the renderer...
 r := inertia.NewHTMLRenderer()
-r.MustParseGlob("views/*.html")
+r.MustParseGlob("resources/views/*.html")
 r.ViteBasePath = "/build"
 
 // Setup the middleware with the renderer
@@ -778,7 +778,7 @@ gateway.Endpoint = "http://localhost:5173/__inertia_ssr"
 renderer.SsrEngine = gateway
 ```
 
-For Vite development SSR, install `@inertiajs/vite@3.7.0`, configure the SSR entry explicitly, and let Inertia v3 provide React's default CSR/SSR setup:
+For Vite development SSR, install `@inertiajs/vite`, configure the SSR entry explicitly, and let Inertia v3 provide React's default CSR/SSR setup:
 
 ```ts
 import inertia from '@inertiajs/vite'
@@ -842,7 +842,7 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-//go:embed views/*.html
+//go:embed resources/views/*.html
 var viewFiles embed.FS
 
 //go:embed public/*
@@ -853,7 +853,7 @@ func main() {
 	// ...
 
 	r := inertia.NewHTMLRenderer()
-	r.MustParseFS(viewFiles, "views/*.html")
+	r.MustParseFS(viewFiles, "resources/views/*.html")
 	r.MustParseViteManifestFS(publicFiles, "public/build/manifest.json")
 	// ...
 
