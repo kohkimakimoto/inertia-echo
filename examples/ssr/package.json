@@ -7,7 +7,7 @@
     "build": "tsc --noEmit && vite build",
     "build:ssr": "vite build --ssr",
     "clean": "rm -rf public/build && rm -rf .build",
-    "start-ssr": "npm run build:ssr && node .build/ssr/ssr.js"
+    "start-ssr": "npm run build:ssr && node .build/ssr/app.js"
   },
   "author": "",
   "license": "ISC",

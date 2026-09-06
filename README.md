@@ -780,7 +780,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  plugins: [inertia({ ssr: 'assets/ssr.tsx' }), react()],
+  plugins: [inertia({ ssr: 'assets/app.tsx' }), react()],
 })
 ```
 
@@ -793,6 +793,8 @@ createInertiaApp({
   resolve: name => pages[`./pages/${name}.tsx`],
 })
 ```
+
+The same `assets/app.tsx` entry is used for both the browser bundle and SSR. The Vite plugin wraps `createInertiaApp` for SSR builds and the development `/__inertia_ssr` endpoint.
 
 The default SSR HTTP client does not set a request timeout. The current Echo request context is propagated to the SSR request, so its cancellation and deadline are respected. Configure an overall timeout when required by your application:
 
