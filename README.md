@@ -7,7 +7,7 @@
 This is the [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://echo.labstack.com/) Go web framework.
 
 [Inertia.js](https://inertiajs.com) is a JavaScript library that allows you to build a fully JavaScript-based single-page app without complexity.
-I assume that you are familiar with Inertia.js and [how it works](https://inertiajs.com/how-it-works).
+I assume that you are familiar with Inertia.js and [how it works](https://inertiajs.com/docs/v3/core-concepts/how-it-works).
 You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a Go web framework.
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
@@ -191,7 +191,7 @@ createInertiaApp({
 })
 ```
 
-Create a [page component](https://inertiajs.com/pages) as the  `js/pages/Index.jsx` file with the following content:
+Create a [page component](https://inertiajs.com/docs/v3/the-basics/pages) as the  `js/pages/Index.jsx` file with the following content:
 
 ```jsx
 import React from 'react';
@@ -338,7 +338,7 @@ For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/koh
 
 ### Responses
 
-:book: The related official document: [Responses](https://inertiajs.com/responses)
+:book: The related official document: [Responses](https://inertiajs.com/docs/v3/the-basics/responses)
 
 #### Creating responses
 
@@ -384,7 +384,7 @@ You can then access this variable like a regular template variable.
 
 ### Redirects
 
-:book: The related official document: [Redirects](https://inertiajs.com/redirects)
+:book: The related official document: [Redirects](https://inertiajs.com/docs/v3/the-basics/redirects)
 
 You can use Echo's standard way to redirect.
 
@@ -402,7 +402,7 @@ return inertia.Location(c, "/path/to/external")
 
 ### Routing
 
-:book: The related official document: [Routing](https://inertiajs.com/routing)
+:book: The related official document: [Routing](https://inertiajs.com/docs/v3/the-basics/routing)
 
 #### Shorthand routes
 
@@ -414,7 +414,7 @@ e.GET("/about", inertia.Handler("About"))
 
 ### Shared data
 
-:book: The related official document: [Shared data](https://inertiajs.com/shared-data)
+:book: The related official document: [Shared data](https://inertiajs.com/docs/v3/data-props/shared-data)
 
 #### Sharing data using middleware
 
@@ -445,7 +445,7 @@ inertia.Share(c, map[string]any{
 
 ### Partial reloads
 
-:book: The related official document: [Partial reloads](https://inertiajs.com/partial-reloads)
+:book: The related official document: [Partial reloads](https://inertiajs.com/docs/v3/data-props/partial-reloads)
 
 ```go
 inertia.Render(c, "Users/Index", map[string]any{
@@ -485,7 +485,7 @@ inertia.Render(c, "Users/Index", map[string]any{
 
 ### Deferred props
 
-:book: The related official document: [Deferred props](https://inertiajs.com/deferred-props)
+:book: The related official document: [Deferred props](https://inertiajs.com/docs/v3/data-props/deferred-props)
 
 ```go
 inertia.Render(c, "Users/Index", map[string]any{
@@ -571,9 +571,11 @@ inertia.Render(c, "Dashboard", map[string]any{
 
 Use `Fresh(true)` to resolve the value even when the client already has it, `Until(time.Time)` to set an absolute expiration, or `For(time.Duration)` to set a relative expiration. `OptionalProp`, `DeferProp`, and `MergeProp` can opt in with `Once()`; calling `As`, `Fresh`, `Until`, or `For` on those prop types also enables once behavior. `ShareOnce` is a shortcut for sharing a callback-backed once prop.
 
+:book: The related official document: [Once props](https://inertiajs.com/docs/v3/data-props/once-props)
+
 ### Merging props
 
-:book: The related official document: [Merging props](https://inertiajs.com/merging-props)
+:book: The related official document: [Merging props](https://inertiajs.com/docs/v3/data-props/merging-props)
 
 #### Shallow merge
 
@@ -632,6 +634,8 @@ inertia.Render(c, "Users/Index", map[string]any{
 
 The default data path is `data`. Use `WithDataPath` to change it and `Defer` to defer the initial load.
 
+:book: The related official document: [Infinite Scroll](https://inertiajs.com/docs/v3/data-props/infinite-scroll)
+
 ### Flash data
 
 `Flash` adds one-time data to the top-level Page `flash` object for the current render:
@@ -653,6 +657,8 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 ```
 
 `FlashData` has the signature `func(*echo.Context) (map[string]any, error)`. `Reflash` has the signature `func(*echo.Context) error`.
+
+:book: The related official document: [Flash data](https://inertiajs.com/docs/v3/data-props/flash-data)
 
 ### Preserving URL fragments
 
@@ -697,7 +703,7 @@ The default props contain `status`. Set `Props` to build application-specific pr
 
 ### CSRF protection
 
-:book: The related official document: [CSRF protection](https://inertiajs.com/csrf-protection)
+:book: The related official document: [CSRF protection](https://inertiajs.com/docs/v3/security/csrf-protection)
 
 Inertia Echo has CSRF middleware that is configured for Inertia.js.
 This middleware provides `XSRF-TOKEN` cookie and verifies the `X-XSRF-TOKEN` header in the request.
@@ -710,7 +716,7 @@ e.Use(inertia.CSRF())
 
 ### History encryption
 
-:book: The related official document: [History encryption](https://inertiajs.com/history-encryption)
+:book: The related official document: [History encryption](https://inertiajs.com/docs/v3/security/history-encryption)
 
 #### Encrypt middleware
 
@@ -742,7 +748,7 @@ inertia.ClearHistory(c)
 
 ### Asset versioning
 
-:book: The related official document: [Asset versioning](https://inertiajs.com/asset-versioning)
+:book: The related official document: [Asset versioning](https://inertiajs.com/docs/v3/advanced/asset-versioning)
 
 Configure asset version via middleware.
 
@@ -760,7 +766,7 @@ inertia.SetVersion(c, func() string { return version })
 
 ### Server-side Rendering (SSR)
 
-:book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/server-side-rendering)
+:book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/docs/v3/advanced/server-side-rendering)
 
 Inertia Echo supports SSR. See [SSR example](./examples/ssr).
 
