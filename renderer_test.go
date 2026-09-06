@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"html"
+	"html/template"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -105,12 +106,11 @@ func TestHTMLRendererSSRSkipAndFallback(t *testing.T) {
 				i.EchoContext().SetRequest(i.EchoContext().Request().WithContext(requestContext))
 			}
 			r := NewHTMLRenderer()
-			r.Vite = false
 			r.SsrEngine = tt.engine
 			r.SsrFallbackOnError = tt.fallback
 			reported := false
 			r.SsrErrorReporter = func(*RenderContext, error) { reported = true }
-			r.MustParse(`{{ define "app.html" }}{{ .inertia }}{{ end }}`)
+			r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).Parse(`{{ define "app.html" }}{{ .inertia }}{{ end }}`))
 			var out strings.Builder
 			err := r.Render(&RenderContext{Inertia: i, Page: &Page{Props: map[string]any{}}, ViewName: "app.html", Writer: &out})
 			if (err != nil) != tt.wantErr {

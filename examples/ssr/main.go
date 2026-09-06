@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"html/template"
 	"os"
 	"path/filepath"
 
@@ -34,10 +35,11 @@ func main() {
 	// setup inertia
 	r := inertia.NewHTMLRenderer()
 	r.Debug = IsDebug()
-	r.MustParseGlob(filepath.Join(optDir, "views/*.html"))
 	r.ViteBasePath = "/build"
-	r.AddViteEntryPoint("assets/app.tsx")
-	r.MustParseViteManifestFile(filepath.Join(optDir, "public/build/manifest.json"))
+	if !r.Debug {
+		r.ViteManifest = inertia.MustParseViteManifestFile(filepath.Join(optDir, "public/build/manifest.json"))
+	}
+	r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).ParseGlob(filepath.Join(optDir, "views/*.html")))
 	r.SsrFallbackOnError = true
 	r.SsrErrorReporter = func(ctx *inertia.RenderContext, err error) {
 		e.Logger.Error("SSR failed; falling back to CSR",

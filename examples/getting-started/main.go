@@ -1,6 +1,8 @@
 package main
 
 import (
+	"html/template"
+
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
@@ -13,9 +15,9 @@ func main() {
 	e.Use(middleware.RequestLogger())
 
 	r := inertia.NewHTMLRenderer()
-	r.MustParseGlob("resources/views/*.html")
 	r.ViteBasePath = "/build"
-	r.MustParseViteManifestFile("public/build/manifest.json")
+	r.ViteManifest = inertia.MustParseViteManifestFile("public/build/manifest.json")
+	r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).ParseGlob("resources/views/*.html"))
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 		Renderer: r,

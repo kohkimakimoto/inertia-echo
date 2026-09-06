@@ -87,11 +87,11 @@ In this tutorial, we will create the `resources/views/app.html` file as the root
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{ vite "resources/js/app.jsx" }}
     {{- .inertiaHead -}}
   </head>
   <body>
-  {{ .inertia }}
-  {{ vite "resources/js/app.jsx" }}
+    {{ .inertia }}
   </body>
 </html>
 
@@ -106,6 +106,7 @@ Next, you need to implement Go application code with the Echo framework. Create 
 package main
 
 import (
+	"html/template"
 	"log/slog"
 
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
@@ -120,9 +121,9 @@ func main() {
 	e.Use(middleware.RequestLogger())
 
 	r := inertia.NewHTMLRenderer()
-	r.MustParseGlob("resources/views/*.html")
 	r.ViteBasePath = "/build"
-	r.MustParseViteManifestFile("public/build/manifest.json")
+	r.ViteManifest = inertia.MustParseViteManifestFile("public/build/manifest.json")
+	r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).ParseGlob("resources/views/*.html"))
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 		Renderer: r,
@@ -290,10 +291,12 @@ func main(){
 >   <head>
 >     <meta charset="UTF-8" />
 >     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+>     {{ vite_react_refresh }}
+>     {{ vite "resources/js/app.jsx" }}
 >     {{- .inertiaHead -}}
 >   </head>
 >   <body>
->     {{ .inertia }} {{ vite_react_refresh }} {{ vite "resources/js/app.jsx" }}
+>     {{ .inertia }}
 >   </body>
 > </html>
 > ```
@@ -307,14 +310,16 @@ This means you'll have to build your own view system and integrate it with Inert
 
 Inertia Echo defines [`Renderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#Renderer) interface to integrate view system with Inertia.js.
 It also provides a built-in renderer implementation based on the `html/template` package.
+You create and parse templates yourself; call [`FuncMap`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer.FuncMap) before parsing so helpers like `vite` are available.
 
 To setup Inertia Echo with your Echo application, you need to initialize the renderer and set it up with the [middleware](#middleware).
 
 ```go
 // Create and configure the renderer...
 r := inertia.NewHTMLRenderer()
-r.MustParseGlob("resources/views/*.html")
 r.ViteBasePath = "/build"
+// Apply Inertia FuncMap before parsing, then assign the template set.
+r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).ParseGlob("resources/views/*.html"))
 
 // Setup the middleware with the renderer
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -834,6 +839,7 @@ package main
 
 import (
 	"embed"
+	"html/template"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -853,8 +859,8 @@ func main() {
 	// ...
 
 	r := inertia.NewHTMLRenderer()
-	r.MustParseFS(viewFiles, "resources/views/*.html")
-	r.MustParseViteManifestFS(publicFiles, "public/build/manifest.json")
+	r.ViteManifest = inertia.MustParseViteManifestFS(publicFiles, "public/build/manifest.json")
+	r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).ParseFS(viewFiles, "resources/views/*.html"))
 	// ...
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{

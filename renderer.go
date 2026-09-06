@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io/fs"
-	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -19,107 +17,69 @@ type Renderer interface {
 
 // HTMLRenderer is a html/template renderer for Echo framework with inertia.js.
 type HTMLRenderer struct {
-	templates *template.Template
-
-	Debug       bool
+	// Templates is the parsed html/template set used by Render.
+	// Callers must create it themselves (typically with FuncMap) and assign it here.
+	Templates *template.Template
+	// Debug enables Vite development mode helpers (dev server tags and React refresh).
+	// When true, vite template functions talk to ViteDevServerURL instead of ViteManifest.
+	Debug bool
+	// ContainerId is the DOM id of the Inertia root element (and data-page script target).
+	// Defaults to "app".
 	ContainerId string
 
-	// Vite integration
-
-	Vite             bool
+	// ViteDevServerURL is the origin of the Vite development server.
+	// Used when Debug is true. Defaults to "http://localhost:5173".
 	ViteDevServerURL string
-	ViteBasePath     string
-	ViteDisableReact bool
-	ViteEntryPoints  []string
-	viteManifest     ViteManifest
+	// ViteBasePath is the URL path prefix for built assets from ViteManifest.
+	// Used when Debug is false. Defaults to "/".
+	ViteBasePath string
+	// ViteManifest is the production Vite manifest. Required when Debug is false.
+	// Build it with ParseViteManifest* helpers (or your own loader) and assign it here.
+	ViteManifest ViteManifest
 
-	// SSR
-
-	SsrEngine          SsrEngine
+	// SsrEngine renders the page on the server when SSR is enabled for the request.
+	// If nil, SSR is skipped and the CSR bootstrap is used.
+	SsrEngine SsrEngine
+	// SsrFallbackOnError falls back to the CSR bootstrap when SsrEngine returns an error.
+	// Request cancellation is never hidden by this fallback.
 	SsrFallbackOnError bool
-	SsrErrorReporter   func(ctx *RenderContext, err error)
+	// SsrErrorReporter is called when SsrEngine returns an error, before fallback or return.
+	SsrErrorReporter func(ctx *RenderContext, err error)
 }
 
 func NewHTMLRenderer() *HTMLRenderer {
-	r := &HTMLRenderer{
+	return &HTMLRenderer{
 		Debug:              false,
 		ContainerId:        "app",
-		Vite:               true,
 		ViteDevServerURL:   "http://localhost:5173",
 		ViteBasePath:       "/",
-		ViteDisableReact:   false,
-		ViteEntryPoints:    []string{},
-		viteManifest:       nil,
+		ViteManifest:       nil,
 		SsrEngine:          nil,
 		SsrFallbackOnError: false,
 		SsrErrorReporter:   nil,
 	}
-	r.templates = template.New("T").Funcs(r.funcMap())
-	return r
 }
 
-func (r *HTMLRenderer) AddViteEntryPoint(entryPoint ...string) {
-	r.ViteEntryPoints = append(r.ViteEntryPoints, entryPoint...)
-}
-
-func (r *HTMLRenderer) Funcs(funcMap template.FuncMap) *HTMLRenderer {
-	r.templates = r.templates.Funcs(funcMap)
-	return r
-}
-
-func (r *HTMLRenderer) Parse(text string) (*HTMLRenderer, error) {
-	t, err := r.templates.Parse(text)
-	if err != nil {
-		return nil, err
+// FuncMap returns template functions required by Inertia/Vite helpers
+// (json_marshal, vite, vite_react_refresh).
+// Apply them with template.Funcs before parsing templates.
+func (r *HTMLRenderer) FuncMap() template.FuncMap {
+	return template.FuncMap{
+		// This function is a primitive way to render a data-page value for Inertia.
+		// Generally, you don't have to use this function. You can use {{ .inertia }} instead.
+		"json_marshal": r.fnJsonMarshal,
+		// see https://vitejs.dev/guide/backend-integration.html
+		"vite_react_refresh": r.fnReactRefresh,
+		"vite":               r.fnVite,
 	}
-	r.templates = t
-	return r, nil
-}
-
-func (r *HTMLRenderer) MustParse(text string) *HTMLRenderer {
-	t, err := r.Parse(text)
-	if err != nil {
-		panic(err)
-	}
-	return t
-}
-
-func (r *HTMLRenderer) ParseGlob(pattern string) (*HTMLRenderer, error) {
-	t, err := r.templates.ParseGlob(pattern)
-	if err != nil {
-		return nil, err
-	}
-	r.templates = t
-	return r, nil
-}
-
-func (r *HTMLRenderer) MustParseGlob(pattern string) *HTMLRenderer {
-	t, err := r.ParseGlob(pattern)
-	if err != nil {
-		panic(err)
-	}
-	return t
-}
-
-func (r *HTMLRenderer) ParseFS(f fs.FS, pattern string) (*HTMLRenderer, error) {
-	t, err := r.templates.ParseFS(f, pattern)
-	if err != nil {
-		return nil, err
-	}
-	r.templates = t
-	return r, nil
-}
-
-func (r *HTMLRenderer) MustParseFS(f fs.FS, pattern string) *HTMLRenderer {
-	t, err := r.ParseFS(f, pattern)
-	if err != nil {
-		panic(err)
-	}
-	return t
 }
 
 // Render renders HTML by using templates.
 func (r *HTMLRenderer) Render(ctx *RenderContext) error {
+	if r.Templates == nil {
+		return errors.New("HTMLRenderer: Templates is nil")
+	}
+
 	var data map[string]any
 	if ctx.ViewData != nil {
 		_data, ok := ctx.ViewData.(map[string]any)
@@ -148,7 +108,7 @@ func (r *HTMLRenderer) Render(ctx *RenderContext) error {
 		} else if ssr != nil {
 			data["inertia"] = ssr.BodyHTML()
 			data["inertiaHead"] = ssr.HeadHTML()
-			return r.templates.ExecuteTemplate(ctx.Writer, ctx.ViewName, data)
+			return r.Templates.ExecuteTemplate(ctx.Writer, ctx.ViewName, data)
 		}
 	}
 
@@ -159,7 +119,7 @@ func (r *HTMLRenderer) Render(ctx *RenderContext) error {
 	data["inertia"] = _inertia
 	data["inertiaHead"] = ""
 
-	return r.templates.ExecuteTemplate(ctx.Writer, ctx.ViewName, data)
+	return r.Templates.ExecuteTemplate(ctx.Writer, ctx.ViewName, data)
 }
 
 func (r *HTMLRenderer) renderInertia(page *Page) (template.HTML, error) {
@@ -178,17 +138,6 @@ func (r *HTMLRenderer) renderInertia(page *Page) (template.HTML, error) {
 	builder.WriteString(`"></div>`)
 
 	return template.HTML(builder.String()), nil
-}
-
-func (r *HTMLRenderer) funcMap() template.FuncMap {
-	return template.FuncMap{
-		// This function is a primitive way to render a data-page value for Inertia.
-		// Generally, you don't have to use this function. You can use {{ .inertia }} instead.
-		"json_marshal": r.fnJsonMarshal,
-		// see https://vitejs.dev/guide/backend-integration.html
-		"vite_react_refresh": r.fnReactRefresh,
-		"vite":               r.fnVite,
-	}
 }
 
 func (r *HTMLRenderer) fnJsonMarshal(v any) (template.JS, error) {
@@ -215,7 +164,7 @@ func (r *HTMLRenderer) fnReactRefresh() template.HTML {
 
 func (r *HTMLRenderer) fnVite(entryPoints ...string) (template.HTML, error) {
 	if len(entryPoints) == 0 {
-		entryPoints = r.ViteEntryPoints
+		return "", errors.New("vite: at least one entry point is required")
 	}
 
 	if r.Debug {
@@ -228,13 +177,13 @@ func (r *HTMLRenderer) fnVite(entryPoints ...string) (template.HTML, error) {
 		return template.HTML(strings.Join(tags, "")), nil
 	}
 
-	if r.viteManifest == nil {
+	if r.ViteManifest == nil {
 		return "", errors.New("manifest is not loaded")
 	}
 
 	tags := []string{}
 	for _, entryPoint := range entryPoints {
-		chunk, ok := r.viteManifest[entryPoint]
+		chunk, ok := r.ViteManifest[entryPoint]
 		if !ok {
 			panic(fmt.Sprintf("unable to locate file in Vite manifest: %s", entryPoint))
 		}
@@ -269,87 +218,4 @@ var cssRe = regexp.MustCompile(`\.(css|less|sass|scss|styl|stylus|pcss|postcss)$
 
 func isCssPath(name string) bool {
 	return cssRe.MatchString(name)
-}
-
-func (r *HTMLRenderer) ParseViteManifest(data []byte) error {
-	if r.Debug {
-		return nil
-	}
-
-	m, err := parseViteManifest(data)
-	if err != nil {
-		return err
-	}
-	r.viteManifest = m
-	return nil
-}
-
-func (r *HTMLRenderer) MustParseViteManifest(data []byte) {
-	if err := r.ParseViteManifest(data); err != nil {
-		panic(err)
-	}
-}
-
-func (r *HTMLRenderer) ParseViteManifestFile(name string) error {
-	if r.Debug {
-		return nil
-	}
-
-	m, err := parseViteManifestFile(name)
-	if err != nil {
-		return err
-	}
-	r.viteManifest = m
-	return nil
-}
-
-func (r *HTMLRenderer) MustParseViteManifestFile(name string) {
-	if err := r.ParseViteManifestFile(name); err != nil {
-		panic(err)
-	}
-}
-
-func (r *HTMLRenderer) ParseViteManifestFS(f fs.FS, name string) error {
-	if r.Debug {
-		return nil
-	}
-
-	m, err := parseViteManifestFS(f, name)
-	if err != nil {
-		return err
-	}
-	r.viteManifest = m
-	return nil
-}
-
-func (r *HTMLRenderer) MustParseViteManifestFS(f fs.FS, name string) {
-	if err := r.ParseViteManifestFS(f, name); err != nil {
-		panic(err)
-	}
-}
-
-type ViteManifest map[string]any
-
-func parseViteManifest(data []byte) (ViteManifest, error) {
-	var manifest ViteManifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, err
-	}
-	return manifest, nil
-}
-
-func parseViteManifestFile(name string) (ViteManifest, error) {
-	b, err := os.ReadFile(name)
-	if err != nil {
-		return nil, err
-	}
-	return parseViteManifest(b)
-}
-
-func parseViteManifestFS(f fs.FS, name string) (ViteManifest, error) {
-	b, err := fs.ReadFile(f, name)
-	if err != nil {
-		return nil, err
-	}
-	return parseViteManifest(b)
 }
