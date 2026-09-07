@@ -7,9 +7,9 @@ export default defineConfig({
   publicDir: false,
   build: {
     manifest: "manifest.json",
-    outDir: "public/build",
+    outDir: "resources/public/build",
     rollupOptions: {
-      input: ['assets/app.tsx'],
+      input: ['resources/js/app.tsx'],
     },
   },
 })

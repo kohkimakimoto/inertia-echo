@@ -121,7 +121,7 @@ func main() {
 
 	r := inertia.NewHTMLRenderer()
 	r.ViteBasePath = "/build"
-	r.ViteManifest = inertia.MustParseViteManifestFile("public/build/manifest.json")
+	r.ViteManifest = inertia.MustParseViteManifestFile("resources/public/build/manifest.json")
 	r.MustParseGlob("resources/views/*.html")
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -129,7 +129,7 @@ func main() {
 	}))
 	e.Use(inertia.CSRF())
 
-	e.Static("/", "public")
+	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{
@@ -170,7 +170,7 @@ export default defineConfig({
   publicDir: false,
   build: {
     manifest: "manifest.json",
-    outDir: "public/build",
+    outDir: "resources/public/build",
     rollupOptions: {
       input: ['resources/js/app.jsx'],
     },
@@ -848,7 +848,7 @@ import (
 //go:embed resources/views/*.html
 var viewFiles embed.FS
 
-//go:embed public/*
+//go:embed resources/public/*
 var publicFiles embed.FS
 
 func main() {
@@ -856,7 +856,7 @@ func main() {
 	// ...
 
 	r := inertia.NewHTMLRenderer()
-	r.ViteManifest = inertia.MustParseViteManifestFS(publicFiles, "public/build/manifest.json")
+	r.ViteManifest = inertia.MustParseViteManifestFS(publicFiles, "resources/public/build/manifest.json")
 	r.MustParseFS(viewFiles, "resources/views/*.html")
 	// ...
 
@@ -865,7 +865,7 @@ func main() {
 	}))
 	// ...
 
-	fsys, err := fs.Sub(publicFiles, "public")
+	fsys, err := fs.Sub(publicFiles, "resources/public")
 	if err != nil {
 		panic(err)
 	}

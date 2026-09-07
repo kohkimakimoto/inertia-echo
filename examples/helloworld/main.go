@@ -1,29 +1,30 @@
 package main
 
 import (
-	"flag"
 	"os"
 	"path/filepath"
 
 	"github.com/kohkimakimoto/go-subprocess"
+	"github.com/kohkimakimoto/inertia-echo/examples/helloworld/resources"
 	"github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
 
+// BuildMode is overwritten at build time via -ldflags "-X main.BuildMode=production".
 var BuildMode = "debug"
 
-func IsDebug() bool {
-	return BuildMode == "debug"
-}
-
 func main() {
-	var optDir string
-	flag.StringVar(&optDir, "dir", "", "project directory")
-	flag.Parse()
+	isDebug := BuildMode == "debug"
 
-	if optDir == "" {
-		optDir, _ = os.Getwd()
+	var root string
+	if isDebug {
+		var err error
+		root, err = os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+		resources.UseDir(filepath.Join(root, "resources"))
 	}
 
 	e := echo.New()
@@ -33,19 +34,19 @@ func main() {
 
 	// setup inertia
 	r := inertia.NewHTMLRenderer()
-	r.Debug = IsDebug()
+	r.Debug = isDebug
 	r.ViteBasePath = "/build"
 	if !r.Debug {
-		r.ViteManifest = inertia.MustParseViteManifestFile(filepath.Join(optDir, "public/build/manifest.json"))
+		r.ViteManifest = inertia.MustParseViteManifestFS(resources.Public(), "build/manifest.json")
 	}
-	r.MustParseGlob(filepath.Join(optDir, "views/*.html"))
+	r.MustParseFS(resources.Views(), "*.html")
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 		Renderer: r,
 	}))
 	e.Use(inertia.CSRF())
 
-	e.Static("/", filepath.Join(optDir, "public"))
+	e.StaticFS("/", resources.Public())
 
 	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{
@@ -63,7 +64,7 @@ func main() {
 		})
 	})
 
-	if IsDebug() {
+	if isDebug {
 		go func() {
 			// Run a subprocess for Vite development server.
 			if err := subprocess.Run(&subprocess.Config{
@@ -73,7 +74,7 @@ func main() {
 				StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
 				Stderr:          os.Stderr,
 				StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
-				Dir:             optDir,
+				Dir:             root,
 			}); err != nil {
 				e.Logger.Error("the Vite subprocess returned an error", "error", err)
 			}

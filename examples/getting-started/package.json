@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite --clearScreen=false",
     "build": "vite build",
-    "clean": "rm -rf public/build"
+    "clean": "rm -rf resources/public/build"
   },
   "keywords": [],
   "author": "",

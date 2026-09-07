@@ -14,7 +14,7 @@ func main() {
 
 	r := inertia.NewHTMLRenderer()
 	r.ViteBasePath = "/build"
-	r.ViteManifest = inertia.MustParseViteManifestFile("public/build/manifest.json")
+	r.ViteManifest = inertia.MustParseViteManifestFile("resources/public/build/manifest.json")
 	r.MustParseGlob("resources/views/*.html")
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -22,7 +22,7 @@ func main() {
 	}))
 	e.Use(inertia.CSRF())
 
-	e.Static("/", "public")
+	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{

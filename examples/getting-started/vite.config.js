@@ -6,7 +6,7 @@ export default defineConfig({
   publicDir: false,
   build: {
     manifest: "manifest.json",
-    outDir: "public/build",
+    outDir: "resources/public/build",
     rollupOptions: {
       input: ['resources/js/app.jsx'],
     },

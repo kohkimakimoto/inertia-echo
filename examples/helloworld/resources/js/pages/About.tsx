@@ -16,7 +16,7 @@ export default function Index({ title, deferredMessage }: AboutProps) {
           <h1>About Page</h1>
           <p>The inertia-echo is a Go library that combines Inertia.js and Echo, allowing you to build modern single-page applications.</p>
           <p>
-            <Deferred data="deferredMessage" fallback={<div>Loading...</div>}>
+            <Deferred data="deferredMessage" fallback={<span>Loading...</span>}>
               {deferredMessage}
             </Deferred>
           </p>
