@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"path"
 	"regexp"
 	"strings"
@@ -18,7 +19,8 @@ type Renderer interface {
 // HTMLRenderer is a html/template renderer for Echo framework with inertia.js.
 type HTMLRenderer struct {
 	// Templates is the parsed html/template set used by Render.
-	// Callers must create it themselves (typically with FuncMap) and assign it here.
+	// Prefer ParseGlob, ParseFS, or ParseFiles (or their Must* variants), which apply FuncMap and set this field.
+	// You may also build a template set yourself with FuncMap and assign it here.
 	Templates *template.Template
 	// Debug enables Vite development mode helpers (dev server tags and React refresh).
 	// When true, vite template functions talk to ViteDevServerURL instead of ViteManifest.
@@ -62,7 +64,8 @@ func NewHTMLRenderer() *HTMLRenderer {
 
 // FuncMap returns template functions required by Inertia/Vite helpers
 // (json_marshal, vite, vite_react_refresh).
-// Apply them with template.Funcs before parsing templates.
+// Prefer ParseGlob, ParseFS, or ParseFiles, which apply this map automatically.
+// Use FuncMap directly when you build templates yourself with html/template.
 func (r *HTMLRenderer) FuncMap() template.FuncMap {
 	return template.FuncMap{
 		// This function is a primitive way to render a data-page value for Inertia.
@@ -72,6 +75,66 @@ func (r *HTMLRenderer) FuncMap() template.FuncMap {
 		"vite_react_refresh": r.fnReactRefresh,
 		"vite":               r.fnVite,
 	}
+}
+
+// ParseFiles parses the named files with FuncMap applied and sets Templates.
+// It mirrors html/template.ParseFiles.
+func (r *HTMLRenderer) ParseFiles(filenames ...string) (*template.Template, error) {
+	t, err := template.New("").Funcs(r.FuncMap()).ParseFiles(filenames...)
+	if err != nil {
+		return nil, err
+	}
+	r.Templates = t
+	return t, nil
+}
+
+// MustParseFiles is like ParseFiles but panics on error.
+func (r *HTMLRenderer) MustParseFiles(filenames ...string) *template.Template {
+	t, err := r.ParseFiles(filenames...)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+// ParseGlob parses files matching the pattern with FuncMap applied and sets Templates.
+// It mirrors html/template.ParseGlob.
+func (r *HTMLRenderer) ParseGlob(pattern string) (*template.Template, error) {
+	t, err := template.New("").Funcs(r.FuncMap()).ParseGlob(pattern)
+	if err != nil {
+		return nil, err
+	}
+	r.Templates = t
+	return t, nil
+}
+
+// MustParseGlob is like ParseGlob but panics on error.
+func (r *HTMLRenderer) MustParseGlob(pattern string) *template.Template {
+	t, err := r.ParseGlob(pattern)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+// ParseFS parses files from fsys matching the patterns with FuncMap applied and sets Templates.
+// It mirrors html/template.ParseFS.
+func (r *HTMLRenderer) ParseFS(fsys fs.FS, patterns ...string) (*template.Template, error) {
+	t, err := template.New("").Funcs(r.FuncMap()).ParseFS(fsys, patterns...)
+	if err != nil {
+		return nil, err
+	}
+	r.Templates = t
+	return t, nil
+}
+
+// MustParseFS is like ParseFS but panics on error.
+func (r *HTMLRenderer) MustParseFS(fsys fs.FS, patterns ...string) *template.Template {
+	t, err := r.ParseFS(fsys, patterns...)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
 
 // Render renders HTML by using templates.

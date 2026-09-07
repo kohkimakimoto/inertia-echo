@@ -7,8 +7,11 @@ import (
 	"html"
 	"html/template"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/labstack/echo/v5"
 )
@@ -124,4 +127,76 @@ func TestHTMLRendererSSRSkipAndFallback(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHTMLRendererParseHelpers(t *testing.T) {
+	const body = `{{ define "app.html" }}{{ vite "resources/js/app.tsx" }}{{ end }}`
+
+	t.Run("ParseFiles", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "app.html")
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		r := NewHTMLRenderer()
+		r.Debug = true
+		tpl, err := r.ParseFiles(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Templates != tpl {
+			t.Fatal("ParseFiles did not set Templates")
+		}
+		if tpl.Lookup("app.html") == nil {
+			t.Fatal("expected app.html template")
+		}
+	})
+
+	t.Run("MustParseGlob", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "app.html")
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		r := NewHTMLRenderer()
+		r.Debug = true
+		tpl := r.MustParseGlob(filepath.Join(dir, "*.html"))
+		if r.Templates != tpl {
+			t.Fatal("MustParseGlob did not set Templates")
+		}
+		if tpl.Lookup("app.html") == nil {
+			t.Fatal("expected app.html template")
+		}
+	})
+
+	t.Run("ParseFS", func(t *testing.T) {
+		fsys := fstest.MapFS{
+			"views/app.html": &fstest.MapFile{Data: []byte(body)},
+		}
+		r := NewHTMLRenderer()
+		r.Debug = true
+		tpl, err := r.ParseFS(fsys, "views/*.html")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Templates != tpl {
+			t.Fatal("ParseFS did not set Templates")
+		}
+		if tpl.Lookup("app.html") == nil {
+			t.Fatal("expected app.html template")
+		}
+	})
+
+	t.Run("ParseGlob error leaves Templates unset", func(t *testing.T) {
+		r := NewHTMLRenderer()
+		_, err := r.ParseGlob(filepath.Join(t.TempDir(), "missing-*.html"))
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if r.Templates != nil {
+			t.Fatal("Templates should remain nil on error")
+		}
+	})
 }

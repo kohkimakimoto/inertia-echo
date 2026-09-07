@@ -106,7 +106,6 @@ Next, you need to implement Go application code with the Echo framework. Create 
 package main
 
 import (
-	"html/template"
 	"log/slog"
 
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
@@ -123,7 +122,7 @@ func main() {
 	r := inertia.NewHTMLRenderer()
 	r.ViteBasePath = "/build"
 	r.ViteManifest = inertia.MustParseViteManifestFile("public/build/manifest.json")
-	r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).ParseGlob("resources/views/*.html"))
+	r.MustParseGlob("resources/views/*.html")
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 		Renderer: r,
@@ -310,7 +309,7 @@ This means you'll have to build your own view system and integrate it with Inert
 
 Inertia Echo defines [`Renderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#Renderer) interface to integrate view system with Inertia.js.
 It also provides a built-in renderer implementation based on the `html/template` package.
-You create and parse templates yourself; call [`FuncMap`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer.FuncMap) before parsing so helpers like `vite` are available.
+Use [`ParseGlob`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer.ParseGlob), [`ParseFS`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer.ParseFS), or [`ParseFiles`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer.ParseFiles) (or their `Must*` variants) to load templates with Inertia/Vite helpers applied.
 
 To setup Inertia Echo with your Echo application, you need to initialize the renderer and set it up with the [middleware](#middleware).
 
@@ -318,8 +317,7 @@ To setup Inertia Echo with your Echo application, you need to initialize the ren
 // Create and configure the renderer...
 r := inertia.NewHTMLRenderer()
 r.ViteBasePath = "/build"
-// Apply Inertia FuncMap before parsing, then assign the template set.
-r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).ParseGlob("resources/views/*.html"))
+r.MustParseGlob("resources/views/*.html")
 
 // Setup the middleware with the renderer
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -839,7 +837,6 @@ package main
 
 import (
 	"embed"
-	"html/template"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -860,7 +857,7 @@ func main() {
 
 	r := inertia.NewHTMLRenderer()
 	r.ViteManifest = inertia.MustParseViteManifestFS(publicFiles, "public/build/manifest.json")
-	r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).ParseFS(viewFiles, "resources/views/*.html"))
+	r.MustParseFS(viewFiles, "resources/views/*.html")
 	// ...
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
