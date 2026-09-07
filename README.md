@@ -373,7 +373,7 @@ func ShowEventsHandler(c *echo.Context) error {
 	event := // retrieve a event...
 	return inertia.RenderWithViewData(c, "Event/Show", map[string]any{
 		"event": event,
-	}, map[string]interface{}{
+	}, map[string]any{
 		"meta": "Meta data...",
 	})
 }

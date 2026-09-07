@@ -143,20 +143,10 @@ func (r *HTMLRenderer) Render(ctx *RenderContext) error {
 		return errors.New("HTMLRenderer: Templates is nil")
 	}
 
-	var data map[string]any
-	if ctx.ViewData != nil {
-		_data, ok := ctx.ViewData.(map[string]any)
-		if !ok {
-			return errors.New("HTMLRenderer requires ViewData to be a map[string]any")
-		}
-		data = make(map[string]any, len(_data)+3)
-		for key, value := range _data {
-			data[key] = value
-		}
-	} else {
-		data = map[string]any{}
+	data := make(map[string]any, len(ctx.ViewData)+3)
+	for key, value := range ctx.ViewData {
+		data[key] = value
 	}
-
 	data["page"] = ctx.Page
 
 	if ctx.Inertia.IsSsrEnabled() && r.SsrEngine != nil {

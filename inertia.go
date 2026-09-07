@@ -285,9 +285,9 @@ type RenderContext struct {
 	Page    *Page
 	// ViewName is the name of the view to render.
 	ViewName string
-	// You can set any data you want to ViewData, but the renderer needs to be able to handle it.
-	// For example, the official HTMLRenderer can only accept ViewData as a map[string]any.
-	ViewData any
+	// ViewData is optional data passed to the root view template.
+	// HTMLRenderer copies it and adds page, inertia, and inertiaHead.
+	ViewData map[string]any
 	Writer   io.Writer
 }
 
@@ -295,7 +295,7 @@ func (i *Inertia) Render(component string, props map[string]any) error {
 	return i.render(http.StatusOK, component, props, nil)
 }
 
-func (i *Inertia) RenderWithViewData(component string, props map[string]any, viewData any) error {
+func (i *Inertia) RenderWithViewData(component string, props map[string]any, viewData map[string]any) error {
 	return i.render(http.StatusOK, component, props, viewData)
 }
 
@@ -303,11 +303,11 @@ func (i *Inertia) RenderWithStatus(status int, component string, props map[strin
 	return i.render(status, component, props, nil)
 }
 
-func (i *Inertia) RenderWithStatusAndViewData(status int, component string, props map[string]any, viewData any) error {
+func (i *Inertia) RenderWithStatusAndViewData(status int, component string, props map[string]any, viewData map[string]any) error {
 	return i.render(status, component, props, viewData)
 }
 
-func (i *Inertia) render(status int, component string, props map[string]any, viewData any) error {
+func (i *Inertia) render(status int, component string, props map[string]any, viewData map[string]any) error {
 	if i.renderer == nil {
 		return ErrRendererNotRegistered
 	}
@@ -428,7 +428,7 @@ func Render(c *echo.Context, component string, props map[string]any) error {
 	return MustGet(c).Render(component, props)
 }
 
-func RenderWithViewData(c *echo.Context, component string, props map[string]any, viewData any) error {
+func RenderWithViewData(c *echo.Context, component string, props map[string]any, viewData map[string]any) error {
 	return MustGet(c).RenderWithViewData(component, props, viewData)
 }
 
@@ -436,6 +436,6 @@ func RenderWithStatus(c *echo.Context, status int, component string, props map[s
 	return MustGet(c).RenderWithStatus(status, component, props)
 }
 
-func RenderWithStatusAndViewData(c *echo.Context, status int, component string, props map[string]any, viewData any) error {
+func RenderWithStatusAndViewData(c *echo.Context, status int, component string, props map[string]any, viewData map[string]any) error {
 	return MustGet(c).RenderWithStatusAndViewData(status, component, props, viewData)
 }
