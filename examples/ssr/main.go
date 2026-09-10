@@ -76,7 +76,7 @@ func main() {
 	if IsDebug() {
 		go func() {
 			// Run a subprocess for Vite development server.
-			if err := subprocess.Run(&subprocess.Config{
+			if err := subprocess.Run(subprocess.Config{
 				Command:         "npm",
 				Args:            []string{"run", "dev"},
 				Stdout:          os.Stdout,
@@ -93,7 +93,7 @@ func main() {
 	if !IsDebug() {
 		go func() {
 			// Run the standalone production SSR server.
-			if err := subprocess.Run(&subprocess.Config{
+			if err := subprocess.Run(subprocess.Config{
 				Command:         "npm",
 				Args:            []string{"run", "start-ssr"},
 				Stdout:          os.Stdout,

@@ -257,7 +257,7 @@ func main(){
 
 	// Add this to run Vite server.
 	go func() {
-		if err := subprocess.Run(&subprocess.Config{
+		if err := subprocess.Run(subprocess.Config{
 			Command:         "bun",
 			Args:            []string{"run", "dev"},
 			Stdout:          os.Stdout,
