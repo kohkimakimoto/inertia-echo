@@ -1,20 +1,32 @@
 package main
 
 import (
+	"log/slog"
+	"os"
+
+	"github.com/kohkimakimoto/go-subprocess"
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
 
+// BuildMode is overwritten at build time via -ldflags "-X main.BuildMode=production".
+var BuildMode = "debug"
+
 func main() {
+	isDebug := BuildMode == "debug"
+
 	e := echo.New()
 
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLogger())
 
 	r := inertia.NewHTMLRenderer()
+	r.Debug = isDebug
 	r.ViteBasePath = "/build"
-	r.ViteManifest = inertia.MustParseViteManifestFile("resources/public/build/manifest.json")
+	if !isDebug {
+		r.ViteManifest = inertia.MustParseViteManifestFile("resources/public/build/manifest.json")
+	}
 	r.MustParseGlob("resources/views/*.html")
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -30,7 +42,23 @@ func main() {
 		})
 	})
 
+	if isDebug {
+		go func() {
+			if err := subprocess.Run(subprocess.Config{
+				Command:         "npx",
+				Args:            []string{"vite"},
+				Stdout:          os.Stdout,
+				StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
+				Stderr:          os.Stderr,
+				StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
+				Dir:             ".",
+			}); err != nil {
+				slog.Error("the Vite subprocess returned an error", "error", err)
+			}
+		}()
+	}
+
 	if err := e.Start(":8080"); err != nil {
-		e.Logger.Error("failed to start server", "error", err)
+		slog.Error("failed to start server", "error", err)
 	}
 }

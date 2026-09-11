@@ -101,7 +101,6 @@ In this tutorial, we will create the `resources/views/app.html` file as the root
 
 Next, you need to implement Go application code with the Echo framework. Create the `main.go` file with the following code:
 
-
 ```go
 package main
 
@@ -219,35 +218,52 @@ Now you can run the application with the following command:
 go run .
 ```
 
-Then, open your browser and navigate to `http://localhost:8080`.
-You should see the message "Hello, World!" displayed on the page.
-
-You can find the complete code of this example in the [examples/getting-started](./examples/getting-started) directory of this repository.
+Then, open your browser and navigate to `http://localhost:8080`. You should see the message "Hello, World!" displayed on the page.
 
 ### Run in Dev mode
 
-If you want to run in dev mode so that you can hot-reload frontend updates, set `Debug` to `true`.
+If you want to run in dev mode so that you can hot-reload frontend updates, introduce a `BuildMode` variable that is overwritten at build time via `-ldflags`.
+
+Update your `main.go` as follows:
 
 ```go
-r := inertia.NewHTMLRenderer()
-// ...
-r.Debug = true
-r.ViteDevServerURL = "http://localhost:5173" // set this to change your Vite server host/port.
-```
+package main
 
-You need to run Vite server while you running in dev mode. To do so, you also can use [kohkimakimoto/go-subprocess](https://github.com/kohkimakimoto/go-subprocess) to simplify your operation with Vite server.
-
-```go
 import (
 	"log/slog"
 	"os"
 
 	"github.com/kohkimakimoto/go-subprocess"
+	inertia "github.com/kohkimakimoto/inertia-echo/v5"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
-// ...
-func main(){
-	// ...
+// BuildMode is overwritten at build time via -ldflags "-X main.BuildMode=production".
+var BuildMode = "debug"
+
+func main() {
+	isDebug := BuildMode == "debug"
+
+	e := echo.New()
+
+	e.Use(middleware.Recover())
+	e.Use(middleware.RequestLogger())
+
+	r := inertia.NewHTMLRenderer()
+	r.Debug = isDebug
+	r.ViteBasePath = "/build"
+	if !isDebug {
+		r.ViteManifest = inertia.MustParseViteManifestFile("resources/public/build/manifest.json")
+	}
+	r.MustParseGlob("resources/views/*.html")
+
+	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+		Renderer: r,
+	}))
+	e.Use(inertia.CSRF())
+
+	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{
@@ -255,50 +271,63 @@ func main(){
 		})
 	})
 
-	// Add this to run Vite server.
-	go func() {
-		if err := subprocess.Run(subprocess.Config{
-			Command:         "bun",
-			Args:            []string{"run", "dev"},
-			Stdout:          os.Stdout,
-			StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
-			Stderr:          os.Stderr,
-			StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
-			Dir:             ".",
-		}); err != nil {
-			slog.Error("the Vite subprocess returned an error", "error", err)
-		}
-	}()
+	if isDebug {
+		go func() {
+			if err := subprocess.Run(subprocess.Config{
+				Command:         "npx",
+				Args:            []string{"vite"},
+				Stdout:          os.Stdout,
+				StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
+				Stderr:          os.Stderr,
+				StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
+				Dir:             ".",
+			}); err != nil {
+				slog.Error("the Vite subprocess returned an error", "error", err)
+			}
+		}()
+	}
 
 	if err := e.Start(":8080"); err != nil {
 		slog.Error("failed to start server", "error", err)
 	}
 }
-
-
 ```
 
-> [!NOTE]
-> If you're using React with `@vitejs/plugin-react`, you have to add `{{ vite_react_refresh }}` on your view file as well.  
-> For more information, see [Vite docs](https://vitejs.dev/guide/backend-integration.html).
->
-> `resources/views/app.html`
->
-> ```html
-> <!DOCTYPE html>
-> <html>
->   <head>
->     <meta charset="UTF-8" />
->     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
->     {{ vite_react_refresh }}
->     {{ vite "resources/js/app.jsx" }}
->     {{- .inertiaHead -}}
->   </head>
->   <body>
->     {{ .inertia }}
->   </body>
-> </html>
-> ```
+This example uses [kohkimakimoto/go-subprocess](https://github.com/kohkimakimoto/go-subprocess) to start the Vite server only when `BuildMode` is `"debug"`.
+
+Also add `{{ vite_react_refresh }}` to your root template for React Fast Refresh with `@vitejs/plugin-react`.
+For more information, see [Vite docs](https://vitejs.dev/guide/backend-integration.html).
+
+`resources/views/app.html`
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {{ vite_react_refresh }}
+    {{ vite "resources/js/app.jsx" }}
+    {{- .inertiaHead -}}
+  </head>
+  <body>
+    {{ .inertia }}
+  </body>
+</html>
+```
+
+Run in debug mode. This starts the Vite development server so you can hot-reload frontend updates:
+
+```sh
+go run .
+```
+
+Run in production mode. This serves the compiled frontend assets produced by `npx vite build`:
+
+```sh
+npx vite build
+go run -ldflags="-X main.BuildMode=production" .
+```
 
 ## Usage
 
