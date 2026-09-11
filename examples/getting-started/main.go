@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kohkimakimoto/go-subprocess"
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
@@ -15,6 +20,9 @@ var BuildMode = "debug"
 
 func main() {
 	isDebug := BuildMode == "debug"
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	e := echo.New()
 
@@ -42,23 +50,31 @@ func main() {
 		})
 	})
 
+	var vite *subprocess.Process
 	if isDebug {
-		go func() {
-			if err := subprocess.Run(subprocess.Config{
-				Command:         "npx",
-				Args:            []string{"vite"},
-				Stdout:          os.Stdout,
-				StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
-				Stderr:          os.Stderr,
-				StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
-				Dir:             ".",
-			}); err != nil {
-				slog.Error("the Vite subprocess returned an error", "error", err)
-			}
-		}()
+		p, err := subprocess.Start(ctx, subprocess.Config{
+			Command:         "npx",
+			Args:            []string{"vite"},
+			Stdout:          os.Stdout,
+			StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
+			Stderr:          os.Stderr,
+			StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
+			Dir:             ".",
+		})
+		if err != nil {
+			slog.Error("failed to start Vite subprocess", "error", err)
+			return
+		}
+		vite = p
 	}
 
-	if err := e.Start(":8080"); err != nil {
+	if err := (echo.StartConfig{Address: ":8080"}).Start(ctx, e); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
+	}
+
+	if vite != nil {
+		if err := vite.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("the Vite subprocess returned an error", "error", err)
+		}
 	}
 }

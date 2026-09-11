@@ -6,7 +6,7 @@ replace github.com/kohkimakimoto/inertia-echo/v5 => ../..
 
 require (
 	github.com/kohkimakimoto/echo-session/v5 v5.0.0
-	github.com/kohkimakimoto/go-subprocess v0.4.0
+	github.com/kohkimakimoto/go-subprocess v0.5.0
 	github.com/kohkimakimoto/inertia-echo/v5 v5.0.0
 	github.com/labstack/echo/v5 v5.3.1
 )
