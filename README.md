@@ -17,13 +17,12 @@ Inertia Echo assists you in developing web applications that leverage both of th
 Table of Contents
 
 - [Getting started](#getting-started)
-  - [Step 1: Serve built assets](#step-1-serve-built-assets)
-    - [Installation](#installation)
-    - [Root template](#root-template)
-    - [Write Go code](#write-go-code)
-    - [Setup frontend](#setup-frontend)
-    - [Run the application](#run-the-application)
-  - [Step 2: Run in Dev mode](#step-2-run-in-dev-mode)
+  - [Installation](#installation)
+  - [Root template](#root-template)
+  - [Write Go code](#write-go-code)
+  - [Setup frontend](#setup-frontend)
+  - [Run the application](#run-the-application)
+  - [Run in Dev mode](#run-in-dev-mode)
 - [Usage](#usage)
   - [Renderer](#renderer)
   - [Middleware](#middleware)
@@ -59,21 +58,8 @@ Table of Contents
 ## Getting started
 
 In this section, we provide step-by-step instructions on how to get started with Inertia Echo.
-The tutorial progresses through three implementation stages:
 
-1. **Step 1** — Serve prebuilt frontend assets
-2. **Step 2** — Add Vite development mode with hot reload
-3. **Step 3** — Embed assets into a single Go binary (coming later)
-
-Each completed step has a matching example under `examples/`.
-
-### Step 1: Serve built assets
-
-This step builds a minimal app that serves Vite production assets.
-
-Example: [examples/getting-started-step1](./examples/getting-started-step1)
-
-#### Installation
+### Installation
 
 Inertia Echo is a Go module that you can install with the following command:
 
@@ -87,7 +73,7 @@ You also need to install Echo like this:
 go get github.com/labstack/echo/v5
 ```
 
-#### Root template
+### Root template
 
 Next, setup the root template that will be loaded on the first page visit to your application. This template should include your site's CSS and JavaScript assets, along with the `.inertia` and `.inertiaHead` variables.
 
@@ -111,7 +97,7 @@ In this tutorial, we will create the `resources/views/app.html` file as the root
 
 ```
 
-#### Write Go code
+### Write Go code
 
 Next, you need to implement Go application code with the Echo framework. Create the `main.go` file with the following code:
 
@@ -156,7 +142,7 @@ func main() {
 }
 ```
 
-#### Setup frontend
+### Setup frontend
 
 Next, you need to setup the frontend of your application. In this tutorial, we will use Vite and React.
 
@@ -224,7 +210,7 @@ Build the frontend assets with the following command:
 npx vite build
 ```
 
-#### Run the application
+### Run the application
 
 Now you can run the application with the following command:
 
@@ -234,13 +220,11 @@ go run .
 
 Then, open your browser and navigate to `http://localhost:8080`. You should see the message "Hello, World!" displayed on the page.
 
-You can find the complete code for this step in [examples/getting-started-step1](./examples/getting-started-step1).
+You can find the complete code of this example in the [examples/getting-started-step1](./examples/getting-started-step1) directory of this repository.
 
-### Step 2: Run in Dev mode
+### Run in Dev mode
 
 If you want to run in dev mode so that you can hot-reload frontend updates, introduce a `BuildMode` variable that is overwritten at build time via `-ldflags`.
-
-Example: [examples/getting-started-step2](./examples/getting-started-step2)
 
 Update your `main.go` as follows:
 
@@ -364,7 +348,7 @@ npx vite build
 go run -ldflags="-X main.BuildMode=production" .
 ```
 
-You can find the complete code for this step in [examples/getting-started-step2](./examples/getting-started-step2).
+You can find the complete code of this example in the [examples/getting-started-step2](./examples/getting-started-step2) directory of this repository.
 
 ## Usage
 
