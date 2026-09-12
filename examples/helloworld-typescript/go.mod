@@ -1,4 +1,4 @@
-module github.com/kohkimakimoto/inertia-echo/examples/helloworld
+module github.com/kohkimakimoto/inertia-echo/examples/helloworld-typescript
 
 go 1.25.0
 

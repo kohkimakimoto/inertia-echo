@@ -21,17 +21,16 @@ dev: ## Run the application in development mode
 
 .PHONY: run
 run: build ## Run the application in production mode
-	@.build/go-app
+	@./app
 
 
 .PHONY: build
 build: ## Build the application
-	@mkdir -p .build
 	@if [[ ! -d "node_modules" ]]; then \
 		npm install; \
 	fi
 	@npm run build
-	@go build -ldflags=$(BUILD_LDFLAGS) -o .build/go-app
+	@go build -ldflags=$(BUILD_LDFLAGS) -o app
 
 
 .PHONY: clean

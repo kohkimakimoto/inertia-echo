@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,8 +11,8 @@ import (
 	"syscall"
 
 	"github.com/kohkimakimoto/go-subprocess"
-	"github.com/kohkimakimoto/inertia-echo/examples/helloworld/resources"
-	"github.com/kohkimakimoto/inertia-echo/v5"
+	"github.com/kohkimakimoto/inertia-echo/examples/helloworld-typescript/resources"
+	inertia "github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
@@ -40,7 +41,6 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLogger())
 
-	// setup inertia
 	r := inertia.NewHTMLRenderer()
 	r.Debug = isDebug
 	r.ViteBasePath = "/build"
@@ -75,8 +75,8 @@ func main() {
 	var vite *subprocess.Process
 	if isDebug {
 		p, err := subprocess.Start(ctx, subprocess.Config{
-			Command:         "npm",
-			Args:            []string{"run", "dev"},
+			Command:         "npx",
+			Args:            []string{"vite"},
 			Stdout:          os.Stdout,
 			StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
 			Stderr:          os.Stderr,
@@ -84,19 +84,19 @@ func main() {
 			Dir:             root,
 		})
 		if err != nil {
-			e.Logger.Error("failed to start Vite subprocess", "error", err)
+			slog.Error("failed to start Vite subprocess", "error", err)
 			return
 		}
 		vite = p
 	}
 
 	if err := (echo.StartConfig{Address: ":8080"}).Start(ctx, e); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		e.Logger.Error("failed to start server", "error", err)
+		slog.Error("failed to start server", "error", err)
 	}
 
 	if vite != nil {
 		if err := vite.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-			e.Logger.Error("the Vite subprocess returned an error", "error", err)
+			slog.Error("the Vite subprocess returned an error", "error", err)
 		}
 	}
 }

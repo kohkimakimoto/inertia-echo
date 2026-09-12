@@ -22,12 +22,8 @@ type FS struct {
 	dir   string // resources directory; used only when debug
 }
 
-// std is the package-level default, analogous to log's standard logger.
-// The default mode is production (embedded files).
+// std is the package-level default. The default mode is production (embedded files).
 var std = &FS{}
-
-// UseEmbed switches the package-level FS to embedded (production) mode.
-func UseEmbed() { std.UseEmbed() }
 
 // UseDir switches the package-level FS to filesystem (debug) mode.
 // dir is the resources directory that contains views/ and public/.
@@ -39,14 +35,7 @@ func Views() fs.FS { return std.Views() }
 // Public returns the package-level public filesystem.
 func Public() fs.FS { return std.Public() }
 
-// UseEmbed switches this FS to embedded (production) mode.
-func (f *FS) UseEmbed() {
-	f.debug = false
-	f.dir = ""
-}
-
 // UseDir switches this FS to filesystem (debug) mode.
-// dir is the resources directory that contains views/ and public/.
 func (f *FS) UseDir(dir string) {
 	if dir == "" {
 		panic("resources: dir must not be empty")
