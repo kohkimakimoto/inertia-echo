@@ -23,6 +23,7 @@ Table of Contents
   - [Setup frontend](#setup-frontend)
   - [Run the application](#run-the-application)
   - [Run in Dev mode](#run-in-dev-mode)
+  - [Embed assets into a single binary](#embed-assets-into-a-single-binary)
 - [Usage](#usage)
   - [Renderer](#renderer)
   - [Middleware](#middleware)
@@ -226,6 +227,12 @@ You can find the complete code of this example in the [examples/getting-started-
 
 If you want to run in dev mode so that you can hot-reload frontend updates, introduce a `BuildMode` variable that is overwritten at build time via `-ldflags`.
 
+Install [kohkimakimoto/go-subprocess](https://github.com/kohkimakimoto/go-subprocess) to start the Vite development server from your Go process:
+
+```sh
+go get github.com/kohkimakimoto/go-subprocess
+```
+
 Update your `main.go` as follows:
 
 ```go
@@ -349,6 +356,28 @@ go run -ldflags="-X main.BuildMode=production" .
 ```
 
 You can find the complete code of this example in the [examples/getting-started-step2](./examples/getting-started-step2) directory of this repository.
+
+### Embed assets into a single binary
+
+For production, you can embed the root template and built frontend assets into the Go binary.
+Inertia Echo accepts `fs.FS` for templates and the Vite manifest (`MustParseFS`, `MustParseViteManifestFS`, and Echo's `StaticFS`), so the same application code can serve files from disk in development and from the embedded filesystem in production.
+
+See the complete code in the [examples/getting-started-step3](./examples/getting-started-step3) directory of this repository.
+
+With that example, build the frontend assets, then compile with production `BuildMode` so the binary embeds those assets:
+
+```sh
+npx vite build
+go build -ldflags="-X main.BuildMode=production" -o app
+```
+
+Run the resulting binary:
+
+```sh
+./app
+```
+
+Open `http://localhost:8080`. The server no longer depends on `resources/` on disk; the views and public assets are inside the binary.
 
 ## Usage
 
