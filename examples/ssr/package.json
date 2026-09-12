@@ -6,7 +6,7 @@
     "dev": "vite --clearScreen=false",
     "build": "tsc --noEmit && vite build",
     "build:ssr": "vite build --ssr",
-    "clean": "rm -rf public/build && rm -rf .build",
+    "clean": "rm -rf resources/public/build && rm -rf .build && rm -rf app",
     "start-ssr": "npm run build:ssr && node .build/ssr/app.js"
   },
   "author": "",
