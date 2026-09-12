@@ -1,10 +1,10 @@
 {
-  "name": "helloworld",
+  "name": "login-form",
   "version": "1.0.0",
   "scripts": {
     "dev": "vite --clearScreen=false",
     "build": "tsc --noEmit && vite build",
-    "clean": "rm -rf public/build && rm -rf .build"
+    "clean": "rm -rf resources/public/build && rm -rf app"
   },
   "author": "",
   "license": "ISC",
