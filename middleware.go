@@ -1,6 +1,7 @@
 package inertia
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -24,6 +25,10 @@ type MiddlewareConfig struct {
 	// Defines the props that are shared by default.
 	// see https://inertiajs.com/docs/v3/data-props/shared-data
 	Share SharedDataFunc
+	// Defines once props shared on every request. Map values should be
+	// func() (any, error) or *OnceProp (same contract as Laravel's shareOnce).
+	// see https://inertiajs.com/docs/v3/data-props/shared-data#sharing-once-props
+	ShareOnce SharedDataFunc
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer Renderer
 	// ClearHistoryCookieKey is a key for the cookie that is used to clear the history state.
@@ -132,6 +137,22 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			i.onlyProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
 			i.exceptProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ",")
 			i.resetProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ",")
+			if config.ShareOnce != nil {
+				onceShared, err := config.ShareOnce(c)
+				if err != nil {
+					return err
+				}
+				for key, value := range onceShared {
+					switch v := value.(type) {
+					case *OnceProp:
+						i.Share(map[string]any{key: v})
+					case func() (any, error):
+						i.ShareOnce(key, v)
+					default:
+						return fmt.Errorf("inertia-echo: ShareOnce %q: want func() (any, error) or *OnceProp, got %T", key, value)
+					}
+				}
+			}
 			c.Set(key, i)
 
 			// In the event that the assets change, initiate a

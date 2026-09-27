@@ -438,6 +438,59 @@ func TestFlashAndRenderWithStatus(t *testing.T) {
 	}
 }
 
+func TestMiddlewareShareOnce(t *testing.T) {
+	e := echo.New()
+	var page *Page
+	countriesCalls := 0
+	e.Use(MiddlewareWithConfig(MiddlewareConfig{
+		VersionFunc: func() string { return "v3" },
+		Share: func(*echo.Context) (map[string]any, error) {
+			return map[string]any{"appName": "Demo"}, nil
+		},
+		ShareOnce: func(*echo.Context) (map[string]any, error) {
+			return map[string]any{
+				"countries": func() (any, error) {
+					countriesCalls++
+					return []string{"JP", "US"}, nil
+				},
+				"features": Once(func() (any, error) {
+					return []string{"billing"}, nil
+				}).As("feature-flags"),
+			}, nil
+		},
+		Renderer: testNewMockRenderer(t, func(ctx *RenderContext) error {
+			page = ctx.Page
+			return nil
+		}),
+	}))
+	e.GET("/", func(c *echo.Context) error {
+		return Render(c, "Home", nil)
+	})
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusOK || page == nil {
+		t.Fatalf("status=%d page=%#v", rec.Code, page)
+	}
+	if page.Props["appName"] != "Demo" {
+		t.Fatalf("shared props=%v", page.Props)
+	}
+	if got, _ := page.Props["countries"].([]string); len(got) != 2 || got[0] != "JP" {
+		t.Fatalf("countries=%v", page.Props["countries"])
+	}
+	if got, _ := page.Props["features"].([]string); len(got) != 1 || got[0] != "billing" {
+		t.Fatalf("features=%v", page.Props["features"])
+	}
+	if countriesCalls != 1 {
+		t.Fatalf("countriesCalls=%d", countriesCalls)
+	}
+	if page.OnceProps["countries"].Prop != "countries" {
+		t.Fatalf("onceProps=%v", page.OnceProps)
+	}
+	if meta, ok := page.OnceProps["feature-flags"]; !ok || meta.Prop != "features" {
+		t.Fatalf("onceProps=%v", page.OnceProps)
+	}
+}
+
 func TestPageOmitsFalseHistoryFlags(t *testing.T) {
 	encoded, err := json.Marshal(Page{Props: map[string]any{}})
 	if err != nil {

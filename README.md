@@ -511,8 +511,19 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 			"authUser": user,
 		}, nil
 	},
+	// Once props remembered by the client across navigations.
+	// see https://inertiajs.com/docs/v3/data-props/shared-data#sharing-once-props
+	ShareOnce: func(c *echo.Context) (map[string]any, error) {
+		return map[string]any{
+			"countries": func() (any, error) {
+				return loadCountries()
+			},
+		}, nil
+	},
 }))
 ```
+
+You can also put `inertia.Once(...)` in `Share`, or call `inertia.ShareOnce` manually after the middleware has run.
 
 #### Sharing data manually
 
