@@ -438,54 +438,6 @@ func TestFlashAndRenderWithStatus(t *testing.T) {
 	}
 }
 
-func TestWrapHTTPErrorHandlerTransformsRedirect(t *testing.T) {
-	e := echo.New()
-	e.Use(MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func() string { return "v3" }}))
-	e.HTTPErrorHandler = WrapHTTPErrorHandler(func(c *echo.Context, _ error) {
-		_ = c.Redirect(http.StatusFound, "/errors#server")
-	})
-	e.GET("/", func(*echo.Context) error { return errors.New("failed") })
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set(HeaderXInertia, "true")
-	req.Header.Set(HeaderXInertiaVersion, "v3")
-	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
-	if rec.Code != http.StatusConflict || rec.Header().Get(HeaderXInertiaRedirect) != "/errors#server" {
-		t.Fatalf("status=%d headers=%v body=%q", rec.Code, rec.Header(), rec.Body.String())
-	}
-}
-
-func TestHTTPErrorHandlerWithConfigWithoutMiddlewareContext(t *testing.T) {
-	e := echo.New()
-	shareCalls := 0
-	var page *Page
-	e.HTTPErrorHandler = HTTPErrorHandlerWithConfig(ErrorHandlerConfig{
-		Middleware: MiddlewareConfig{
-			Renderer: testNewMockRenderer(t, func(ctx *RenderContext) error {
-				page = ctx.Page
-				return nil
-			}),
-			VersionFunc: func() string { return "v3" },
-			Share: func(*echo.Context) (map[string]any, error) {
-				shareCalls++
-				return map[string]any{"shared": true}, nil
-			},
-		},
-		Component: "Errors/Show",
-	})
-	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/missing", nil))
-	if rec.Code != http.StatusNotFound || page == nil || page.Component != "Errors/Show" {
-		t.Fatalf("status=%d page=%#v", rec.Code, page)
-	}
-	if shareCalls != 0 {
-		t.Fatalf("shared props must not be reloaded without opt-in: %d", shareCalls)
-	}
-	if page.Props["status"] != http.StatusNotFound {
-		t.Fatalf("props=%v", page.Props)
-	}
-}
-
 func TestPageOmitsFalseHistoryFlags(t *testing.T) {
 	encoded, err := json.Marshal(Page{Props: map[string]any{}})
 	if err != nil {

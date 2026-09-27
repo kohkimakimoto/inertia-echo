@@ -78,10 +78,24 @@ func defaultVersionFunc() VersionFunc {
 
 // MiddlewareWithConfig returns an echo middleware that adds the Inertia instance to the context.
 func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
-	applyMiddlewareDefaults(&config)
+	if config.Skipper == nil {
+		config.Skipper = DefaultMiddlewareConfig.Skipper
+	}
+	if config.RootView == "" {
+		config.RootView = DefaultMiddlewareConfig.RootView
+	}
+	if config.VersionFunc == nil {
+		config.VersionFunc = DefaultMiddlewareConfig.VersionFunc
+	}
+	if config.ClearHistoryCookieKey == "" {
+		config.ClearHistoryCookieKey = DefaultMiddlewareConfig.ClearHistoryCookieKey
+	}
+	if config.PreserveFragmentCookieKey == "" {
+		config.PreserveFragmentCookieKey = DefaultMiddlewareConfig.PreserveFragmentCookieKey
+	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) (err error) {
+		return func(c *echo.Context) error {
 			if config.Skipper(c) {
 				return next(c)
 			}
@@ -98,10 +112,27 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				sharedProps = map[string]any{}
 			}
 
-			i := newInertia(c, config, sharedProps)
-			c.Set(key, i)
-
+			i := &Inertia{
+				echoContext:               c,
+				rootView:                  config.RootView,
+				sharedProps:               sharedProps,
+				version:                   config.VersionFunc,
+				renderer:                  config.Renderer,
+				clearHistoryCookieKey:     config.ClearHistoryCookieKey,
+				preserveFragmentCookieKey: config.PreserveFragmentCookieKey,
+				flash:                     map[string]any{},
+				flashData:                 config.FlashData,
+				reflash:                   config.Reflash,
+				rescueReporter:            config.RescueReporter,
+				now:                       config.Now,
+				isSsrDisabled:             config.IsSsrDisabled,
+			}
 			req := c.Request()
+			i.partialComponent = req.Header.Get(HeaderXInertiaPartialComponent)
+			i.onlyProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
+			i.exceptProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ",")
+			i.resetProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ",")
+			c.Set(key, i)
 
 			// In the event that the assets change, initiate a
 			// client-side location visit to force an update.
@@ -127,14 +158,19 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			c.SetResponse(w)
 			defer c.SetResponse(originalWriter)
 
-			if err = next(c); err != nil {
-				return
+			if err := next(c); err != nil {
+				// Propagate to the calling middleware or Echo's HTTPErrorHandler.
+				// This package intentionally does not provide an inertia-laravel's style
+				// error-handling framework. Echo and Go favor explicit application logic.
+				// Typically, you should handle errors in your application's echo.HTTPErrorHandler,
+				// and if you want to render an Inertia error page, you can do so there.
+				return err
 			}
 			addVaryHeader(w.Header(), HeaderXInertia)
 
 			if w.isTransitionResponse() && i.reflash != nil {
-				if err = i.reflash(c); err != nil {
-					return
+				if err := i.reflash(c); err != nil {
+					return err
 				}
 			}
 			i.sendClearHistoryCookieIfNeeded()
@@ -143,51 +179,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			return w.flushBufferedResponse()
 		}
 	}
-}
-
-func applyMiddlewareDefaults(config *MiddlewareConfig) {
-	if config.Skipper == nil {
-		config.Skipper = DefaultMiddlewareConfig.Skipper
-	}
-	if config.RootView == "" {
-		config.RootView = DefaultMiddlewareConfig.RootView
-	}
-	if config.VersionFunc == nil {
-		config.VersionFunc = DefaultMiddlewareConfig.VersionFunc
-	}
-	if config.ClearHistoryCookieKey == "" {
-		config.ClearHistoryCookieKey = DefaultMiddlewareConfig.ClearHistoryCookieKey
-	}
-	if config.PreserveFragmentCookieKey == "" {
-		config.PreserveFragmentCookieKey = DefaultMiddlewareConfig.PreserveFragmentCookieKey
-	}
-}
-
-func newInertia(c *echo.Context, config MiddlewareConfig, sharedProps map[string]any) *Inertia {
-	if sharedProps == nil {
-		sharedProps = map[string]any{}
-	}
-	i := &Inertia{
-		echoContext:               c,
-		rootView:                  config.RootView,
-		sharedProps:               sharedProps,
-		version:                   config.VersionFunc,
-		renderer:                  config.Renderer,
-		clearHistoryCookieKey:     config.ClearHistoryCookieKey,
-		preserveFragmentCookieKey: config.PreserveFragmentCookieKey,
-		flash:                     map[string]any{},
-		flashData:                 config.FlashData,
-		reflash:                   config.Reflash,
-		rescueReporter:            config.RescueReporter,
-		now:                       config.Now,
-		isSsrDisabled:             config.IsSsrDisabled,
-	}
-	req := c.Request()
-	i.partialComponent = req.Header.Get(HeaderXInertiaPartialComponent)
-	i.onlyProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
-	i.exceptProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ",")
-	i.resetProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ",")
-	return i
 }
 
 // checkVersion checks the assets version change.
@@ -258,7 +249,7 @@ func EncryptHistoryMiddlewareWithConfig(config EncryptHistoryMiddlewareConfig) e
 			config.Skipper = middleware.DefaultSkipper
 		}
 
-		return func(c *echo.Context) (err error) {
+		return func(c *echo.Context) error {
 			if config.Skipper(c) {
 				return next(c)
 			}

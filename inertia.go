@@ -299,6 +299,10 @@ func (i *Inertia) RenderWithViewData(component string, props map[string]any, vie
 	return i.render(http.StatusOK, component, props, viewData)
 }
 
+// RenderWithStatus renders an Inertia page with a non-200 HTTP status.
+// This package does not provide an inertia-laravel-style error-handling
+// framework; Echo and Go favor explicit application logic. For centralized
+// error pages, use your application's echo.HTTPErrorHandler with Get.
 func (i *Inertia) RenderWithStatus(status int, component string, props map[string]any) error {
 	return i.render(status, component, props, nil)
 }

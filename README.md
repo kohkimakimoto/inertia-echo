@@ -755,7 +755,13 @@ For Inertia requests, redirects whose destination already contains a fragment ar
 
 ### Error responses
 
-Use `RenderWithStatus` when an Inertia page must retain an HTTP error status:
+This package does not provide an inertia-laravel-style error-handling framework
+(`handleExceptionsUsing` / `ExceptionResponse`). Echo already has
+`HTTPErrorHandler`, and Inertia request state is available on `echo.Context`
+after the middleware runs. Prefer those primitives over a library-specific
+abstraction.
+
+**In a handler**, render an error page with `RenderWithStatus`:
 
 ```go
 return inertia.RenderWithStatus(c, http.StatusNotFound, "ErrorPage", map[string]any{
@@ -763,25 +769,37 @@ return inertia.RenderWithStatus(c, http.StatusNotFound, "ErrorPage", map[string]
 })
 ```
 
-For centralized error handling, reuse the middleware configuration so the error page has the same renderer, root view, version, and SSR settings:
+**Centrally**, use Echo's `HTTPErrorHandler`. When the Inertia middleware has
+already run, `inertia.Get(c)` succeeds and shared props / renderer settings are
+available:
 
 ```go
-inertiaConfig := inertia.MiddlewareConfig{Renderer: r}
-e.Use(inertia.MiddlewareWithConfig(inertiaConfig))
+e.HTTPErrorHandler = func(c *echo.Context, err error) {
+	status := http.StatusInternalServerError
+	var he *echo.HTTPError
+	if errors.As(err, &he) && he.Code != 0 {
+		status = he.Code
+	}
 
-e.HTTPErrorHandler = inertia.HTTPErrorHandlerWithConfig(inertia.ErrorHandlerConfig{
-	Middleware: inertiaConfig,
-	Component:  "ErrorPage",
-	Statuses: []int{
-		http.StatusForbidden,
-		http.StatusNotFound,
-		http.StatusInternalServerError,
-		http.StatusServiceUnavailable,
-	},
-})
+	if i, e := inertia.Get(c); e == nil {
+		switch status {
+		case http.StatusForbidden, http.StatusNotFound, http.StatusInternalServerError, http.StatusServiceUnavailable:
+			if renderErr := i.RenderWithStatus(status, "ErrorPage", map[string]any{
+				"status": status,
+			}); renderErr == nil {
+				return
+			}
+		}
+	}
+
+	echo.DefaultHTTPErrorHandler(false)(c, err)
+}
 ```
 
-The default props contain `status`. Set `Props` to build application-specific props, `ResolveShared` to load shared props when no Inertia request context exists, and `Fallback` for statuses not handled as Inertia pages. If the application keeps its own Echo error handler, wrap it with `WrapHTTPErrorHandler` so Inertia redirect conversion and one-shot state finalization also run for error-handler responses.
+Errors that occur before the Inertia middleware runs have no Inertia context;
+fall back to Echo's default (or your own) handler in that case.
+
+:book: Related official document: [Error handling](https://inertiajs.com/docs/v3/advanced/error-handling)
 
 ### CSRF protection
 
