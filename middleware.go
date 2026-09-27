@@ -17,17 +17,17 @@ const (
 type MiddlewareConfig struct {
 	Skipper middleware.Skipper
 	// The root template that's loaded on the first page visit.
-	// see https://inertiajs.com/docs/v3/installation/server-side-setup
+	// Corresponding specification: https://inertiajs.com/docs/v3/installation/server-side-setup
 	RootView string
 	// Determines the current asset version.
-	// see https://inertiajs.com/docs/v3/advanced/asset-versioning
+	// Corresponding specification: https://inertiajs.com/docs/v3/advanced/asset-versioning
 	VersionFunc func() string
 	// Defines the props that are shared by default.
-	// see https://inertiajs.com/docs/v3/data-props/shared-data
+	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data
 	Share SharedDataFunc
 	// Defines once props shared on every request. Map values should be
 	// func() (any, error) or *OnceProp (same contract as Laravel's shareOnce).
-	// see https://inertiajs.com/docs/v3/data-props/shared-data#sharing-once-props
+	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data#sharing-once-props
 	ShareOnce SharedDataFunc
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer Renderer
@@ -156,7 +156,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 
 			// In the event that the assets change, initiate a
 			// client-side location visit to force an update.
-			// see https://inertiajs.com/docs/v3/core-concepts/the-protocol#asset-versioning
+			// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#asset-versioning
 			version := i.Version()
 			if req.Header.Get(HeaderXInertia) != "" && checkVersion(req, version) {
 				addVaryHeader(c.Response().Header(), HeaderXInertia)
@@ -213,7 +213,7 @@ func checkVersion(req *http.Request, version string) bool {
 
 // changeRedirectCode changes the status code during redirects, ensuring they are made as
 // GET requests, preventing "MethodNotAllowedHttpException" errors.
-// see https://inertiajs.com/docs/v3/the-basics/redirects
+// Corresponding specification: https://inertiajs.com/docs/v3/the-basics/redirects
 func changeRedirectCode(req *http.Request, w *ResponseWriterWrapper) {
 	if req.Header.Get(HeaderXInertia) != "" &&
 		inArray(req.Method, []string{http.MethodPut, http.MethodPatch, http.MethodDelete}) {
