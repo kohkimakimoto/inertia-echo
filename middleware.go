@@ -105,22 +105,12 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				return next(c)
 			}
 
-			var sharedProps map[string]any
-			if config.Share != nil {
-				ret, err := config.Share(c)
-				if err != nil {
-					return err
-				}
-				sharedProps = ret
-			}
-			if sharedProps == nil {
-				sharedProps = map[string]any{}
-			}
-
+			// Create the request-scoped Inertia instance,
+			req := c.Request()
 			i := &Inertia{
 				echoContext:               c,
 				rootView:                  config.RootView,
-				sharedProps:               sharedProps,
+				sharedProps:               map[string]any{},
 				version:                   config.VersionFunc,
 				renderer:                  config.Renderer,
 				clearHistoryCookieKey:     config.ClearHistoryCookieKey,
@@ -131,29 +121,38 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				rescueReporter:            config.RescueReporter,
 				now:                       config.Now,
 				isSsrDisabled:             config.IsSsrDisabled,
+				partialComponent:          req.Header.Get(HeaderXInertiaPartialComponent),
+				onlyProps:                 splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ","),
+				exceptProps:               splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ","),
+				resetProps:                splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ","),
 			}
-			req := c.Request()
-			i.partialComponent = req.Header.Get(HeaderXInertiaPartialComponent)
-			i.onlyProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
-			i.exceptProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ",")
-			i.resetProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ",")
+			c.Set(key, i)
+
+			if config.Share != nil {
+				shared, err := config.Share(c)
+				if err != nil {
+					return err
+				}
+				if shared != nil {
+					i.Share(shared)
+				}
+			}
 			if config.ShareOnce != nil {
 				onceShared, err := config.ShareOnce(c)
 				if err != nil {
 					return err
 				}
-				for key, value := range onceShared {
+				for propKey, value := range onceShared {
 					switch v := value.(type) {
 					case *OnceProp:
-						i.Share(map[string]any{key: v})
+						i.Share(map[string]any{propKey: v})
 					case func() (any, error):
-						i.ShareOnce(key, v)
+						i.ShareOnce(propKey, v)
 					default:
-						return fmt.Errorf("inertia-echo: ShareOnce %q: want func() (any, error) or *OnceProp, got %T", key, value)
+						return fmt.Errorf("inertia-echo: ShareOnce %q: want func() (any, error) or *OnceProp, got %T", propKey, value)
 					}
 				}
 			}
-			c.Set(key, i)
 
 			// In the event that the assets change, initiate a
 			// client-side location visit to force an update.
