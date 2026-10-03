@@ -41,13 +41,17 @@ func TestMiddleware_AssetVersionMismatchPreservesRequestURL(t *testing.T) {
 	req.Header.Set(HeaderXInertiaVersion, "stale-version")
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
+	handlerCalls := 0
 	h := testMiddlewareWithVersion()(func(c *echo.Context) error {
-		t.Fatal("expected asset version mismatch to skip the handler")
-		return nil
+		handlerCalls++
+		return c.String(http.StatusOK, `{"discarded":true}`)
 	})
 
 	if err := h(c); err != nil {
 		t.Fatal(err)
+	}
+	if handlerCalls != 1 {
+		t.Fatalf("handlerCalls=%d, want 1 (Laravel runs the handler before onVersionChange)", handlerCalls)
 	}
 	if rec.Code != http.StatusConflict {
 		t.Errorf("expected status code %d, got %d", http.StatusConflict, rec.Code)
@@ -72,7 +76,7 @@ func TestMiddlewareAssetVersionMismatchV3Headers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if handlerCalls != 0 || rec.Code != http.StatusConflict {
+	if handlerCalls != 1 || rec.Code != http.StatusConflict {
 		t.Fatalf("handlerCalls=%d status=%d", handlerCalls, rec.Code)
 	}
 	if got := rec.Header().Get(HeaderXInertiaLocation); got != "/users?page=2" {
@@ -98,7 +102,6 @@ func TestMiddlewareAssetVersionMismatchResolvesVersionOnce(t *testing.T) {
 		calls++
 		return "new"
 	}})(func(*echo.Context) error {
-		t.Fatal("handler must not run on a version mismatch")
 		return nil
 	})
 	if err := h(c); err != nil {
@@ -488,6 +491,30 @@ func TestMiddlewareShareOnce(t *testing.T) {
 	}
 	if meta, ok := page.OnceProps["feature-flags"]; !ok || meta.Prop != "features" {
 		t.Fatalf("onceProps=%v", page.OnceProps)
+	}
+}
+
+func TestMiddlewareEmptyInertiaResponseRedirectsBack(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/submit", nil)
+	req.Header.Set(HeaderXInertia, "true")
+	req.Header.Set(HeaderXInertiaVersion, "v3")
+	req.Header.Set("Referer", "/form")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	h := MiddlewareWithConfig(MiddlewareConfig{
+		VersionFunc: func(*echo.Context) string { return "v3" },
+	})(func(*echo.Context) error {
+		return nil
+	})
+	if err := h(c); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	if got := rec.Header().Get(echo.HeaderLocation); got != "/form" {
+		t.Fatalf("Location=%q", got)
 	}
 }
 
