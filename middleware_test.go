@@ -19,7 +19,7 @@ const testMiddlewareVersion = "test-version"
 
 func testMiddlewareWithVersion() echo.MiddlewareFunc {
 	return MiddlewareWithConfig(MiddlewareConfig{
-		VersionFunc: func() string {
+		VersionFunc: func(*echo.Context) string {
 			return testMiddlewareVersion
 		},
 	})
@@ -65,7 +65,7 @@ func TestMiddlewareAssetVersionMismatchV3Headers(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	handlerCalls := 0
-	err := MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func() string { return "new" }})(func(*echo.Context) error {
+	err := MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func(*echo.Context) string { return "new" }})(func(*echo.Context) error {
 		handlerCalls++
 		return nil
 	})(c)
@@ -94,7 +94,7 @@ func TestMiddlewareAssetVersionMismatchResolvesVersionOnce(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	calls := 0
-	h := MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func() string {
+	h := MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func(*echo.Context) string {
 		calls++
 		return "new"
 	}})(func(*echo.Context) error {
@@ -177,7 +177,7 @@ func TestMiddlewareFragmentRedirectContract(t *testing.T) {
 			req.Header.Set(HeaderXInertiaVersion, "v3")
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
-			h := MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func() string { return "v3" }})(func(c *echo.Context) error {
+			h := MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func(*echo.Context) string { return "v3" }})(func(c *echo.Context) error {
 				http.Redirect(c.Response(), c.Request(), "/target#details", status)
 				return nil
 			})
@@ -222,7 +222,7 @@ func TestMiddlewareFragmentRedirectExceptions(t *testing.T) {
 			}
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
-			h := MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func() string { return "v3" }})(func(c *echo.Context) error {
+			h := MiddlewareWithConfig(MiddlewareConfig{VersionFunc: func(*echo.Context) string { return "v3" }})(func(c *echo.Context) error {
 				return c.Redirect(http.StatusFound, "/target#details")
 			})
 			if err := h(c); err != nil {
@@ -247,7 +247,7 @@ func TestMiddlewareFinalizesOneShotStateBeforeRedirect(t *testing.T) {
 	c := e.NewContext(req, rec)
 	reflashCalls := 0
 	h := MiddlewareWithConfig(MiddlewareConfig{
-		VersionFunc: func() string { return "v3" },
+		VersionFunc: func(*echo.Context) string { return "v3" },
 		Reflash: func(*echo.Context) error {
 			reflashCalls++
 			return nil
@@ -443,7 +443,7 @@ func TestMiddlewareShareOnce(t *testing.T) {
 	var page *Page
 	countriesCalls := 0
 	e.Use(MiddlewareWithConfig(MiddlewareConfig{
-		VersionFunc: func() string { return "v3" },
+		VersionFunc: func(*echo.Context) string { return "v3" },
 		Share: func(*echo.Context) (map[string]any, error) {
 			return map[string]any{"appName": "Demo"}, nil
 		},

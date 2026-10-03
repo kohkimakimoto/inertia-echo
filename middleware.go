@@ -25,7 +25,8 @@ type MiddlewareConfig struct {
 	RootView string
 	// Determines the current asset version.
 	// Corresponding specification: https://inertiajs.com/docs/v3/advanced/asset-versioning
-	VersionFunc func() string
+	// Signature mirrors inertia-laravel's version(Request); the default ignores c.
+	VersionFunc VersionFunc
 	// Defines the props that are shared by default.
 	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data
 	Share SharedDataFunc
@@ -76,7 +77,7 @@ func defaultVersionFunc() VersionFunc {
 		}
 	}
 
-	return func() string {
+	return func(*echo.Context) string {
 		return v
 	}
 }

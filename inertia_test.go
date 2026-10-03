@@ -53,7 +53,7 @@ func TestRenderPreservesVaryHeader(t *testing.T) {
 			c := e.NewContext(req, rec)
 
 			m := MiddlewareWithConfig(MiddlewareConfig{
-				VersionFunc: func() string {
+				VersionFunc: func(*echo.Context) string {
 					return version
 				},
 				Renderer: testNewMockRenderer(t, func(ctx *RenderContext) error {

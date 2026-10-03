@@ -865,14 +865,14 @@ Configure asset version via middleware.
 
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-	VersionFunc: func() string { return version },
+	VersionFunc: func(c *echo.Context) string { return version },
 }))
 ```
 
 Configure asset version manually.
 
 ```go
-inertia.SetVersion(c, func() string { return version })
+inertia.SetVersion(c, func(c *echo.Context) string { return version })
 ```
 
 ### Server-side Rendering (SSR)

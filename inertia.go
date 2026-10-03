@@ -232,14 +232,15 @@ func (i *Inertia) FlushShared() {
 	i.sharedProps = map[string]any{}
 }
 
-type VersionFunc func() string
+// VersionFunc resolves the asset version.
+type VersionFunc func(c *echo.Context) string
 
 func (i *Inertia) SetVersion(version VersionFunc) {
 	i.version = version
 }
 
 func (i *Inertia) Version() string {
-	return i.version()
+	return i.version(i.echoContext)
 }
 
 // Location generates 409 response for external redirects
