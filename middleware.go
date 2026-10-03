@@ -29,9 +29,11 @@ type MiddlewareConfig struct {
 	// Corresponding specification: https://inertiajs.com/docs/v3/advanced/asset-versioning
 	// Signature mirrors inertia-laravel's version(Request); the default ignores c.
 	VersionFunc VersionFunc
-	// URLResolver customizes the Page object URL. nil uses req.URL.String().
+	// URLResolver resolves the Page object URL.
 	// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object
 	// Mirrors inertia-laravel's resolveUrlUsing / Middleware::urlResolver.
+	// Unlike Laravel (null means inline default at render), nil is replaced with
+	// defaultURLResolver at middleware setup — same pattern as VersionFunc.
 	URLResolver URLResolverFunc
 	// Defines the props that are shared by default.
 	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data
@@ -65,6 +67,7 @@ var DefaultMiddlewareConfig = MiddlewareConfig{
 	Skipper:                   middleware.DefaultSkipper,
 	RootView:                  "app.html",
 	VersionFunc:               defaultVersionFunc(),
+	URLResolver:               defaultURLResolver(),
 	Share:                     nil,
 	Renderer:                  nil,
 	ClearHistoryCookieKey:     "inertia.clear_history",
@@ -89,6 +92,12 @@ func defaultVersionFunc() VersionFunc {
 	}
 }
 
+func defaultURLResolver() URLResolverFunc {
+	return func(c *echo.Context) string {
+		return c.Request().URL.String()
+	}
+}
+
 // MiddlewareWithConfig returns an echo middleware that adds the Inertia instance to the context.
 func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	if config.Skipper == nil {
@@ -99,6 +108,9 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	}
 	if config.VersionFunc == nil {
 		config.VersionFunc = DefaultMiddlewareConfig.VersionFunc
+	}
+	if config.URLResolver == nil {
+		config.URLResolver = DefaultMiddlewareConfig.URLResolver
 	}
 	if config.ClearHistoryCookieKey == "" {
 		config.ClearHistoryCookieKey = DefaultMiddlewareConfig.ClearHistoryCookieKey

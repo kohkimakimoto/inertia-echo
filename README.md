@@ -880,7 +880,7 @@ inertia.SetVersion(c, func(c *echo.Context) string { return version })
 
 :book: The related official document: [The Page object](https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object)
 
-By default the Page `url` is `req.URL.String()` (path and query). Customize it when the request URL differs from the URL you want the client to see (for example behind a path prefix):
+By default the Page `url` is resolved with `req.URL.String()` (path and query), via the same middleware defaulting pattern as `VersionFunc`. Customize it when the request URL differs from the URL you want the client to see (for example behind a path prefix):
 
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{

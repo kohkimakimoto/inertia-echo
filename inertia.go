@@ -260,10 +260,7 @@ func (i *Inertia) SetURLResolver(resolver URLResolverFunc) {
 }
 
 func (i *Inertia) resolveURL() string {
-	if i.urlResolver != nil {
-		return i.urlResolver(i.echoContext)
-	}
-	return i.echoContext.Request().URL.String()
+	return i.urlResolver(i.echoContext)
 }
 
 // Location generates 409 response for external redirects
