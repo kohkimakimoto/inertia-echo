@@ -902,14 +902,31 @@ inertia.SetURLResolver(c, func(c *echo.Context) string {
 
 :book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/docs/v3/advanced/server-side-rendering)
 
-Inertia Echo supports SSR. See [SSR example](./examples/ssr).
+Inertia Echo supports SSR via an `SsrGateway` abstraction (mirroring inertia-laravel's `Ssr\Gateway`). See [SSR example](./examples/ssr).
 
-The HTTP gateway uses `URL + "/render"` for a standalone production SSR server. Set `Endpoint` when the complete SSR endpoint differs, including the Inertia Vite plugin's development endpoint:
+`SsrHTTPGateway` posts the Page JSON to a remote SSR server. Production uses `URL + "/render"`. For Vite hot mode set `UseHot` and `HotURL` (requests go to `HotURL + "/__inertia_ssr"`). `Endpoint` overrides both when you need a full URL:
 
 ```go
-gateway := inertia.NewSsrEngineHTTPGateway()
-gateway.Endpoint = "http://localhost:5173/__inertia_ssr"
-renderer.SsrEngine = gateway
+gateway := inertia.NewSsrHTTPGateway()
+gateway.UseHot = true
+gateway.HotURL = "http://localhost:5173"
+renderer.SsrGateway = gateway
+```
+
+Exclude paths from SSR (inertia-laravel `$withoutSsr` / `withoutSsr`):
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	WithoutSsr: []string{"admin/*"},
+	Renderer:   renderer,
+}))
+```
+
+Or per request:
+
+```go
+inertia.DisableSsr(c)
+inertia.WithoutSsr(c, "billing/*")
 ```
 
 For Vite development SSR, install `@inertiajs/vite`, configure the SSR entry explicitly, and let Inertia v3 provide React's default CSR/SSR setup:
@@ -939,25 +956,27 @@ The same `resources/js/app.tsx` entry is used for both the browser bundle and SS
 The default SSR HTTP client does not set a request timeout. The current Echo request context is propagated to the SSR request, so its cancellation and deadline are respected. Configure an overall timeout when required by your application:
 
 ```go
-gateway := inertia.NewSsrEngineHTTPGateway()
+gateway := inertia.NewSsrHTTPGateway()
 gateway.HttpClient.Timeout = 5 * time.Second
-renderer.SsrEngine = gateway
+renderer.SsrGateway = gateway
 ```
 
-The five-second timeout above is only an example, not a library default. SSR request errors are returned by default. Enable an explicit CSR fallback and register an error reporter when the application should remain available after an SSR failure:
+The five-second timeout above is only an example, not a library default. Unlike inertia-laravel (which falls back to CSR by default), SSR errors are returned by default. Enable CSR fallback on the gateway when the application should remain available after an SSR failure:
 
 ```go
-renderer.SsrFallbackOnError = true
-renderer.SsrErrorReporter = func(ctx *inertia.RenderContext, err error) {
+gateway := inertia.NewSsrHTTPGateway()
+gateway.FallbackOnError = true
+gateway.ErrorReporter = func(ctx *inertia.RenderContext, err error) {
 	logger.Error("SSR failed; falling back to CSR",
 		"component", ctx.Page.Component,
 		"url", ctx.Page.URL,
 		"error", err,
 	)
 }
+renderer.SsrGateway = gateway
 ```
 
-Request cancellation is always returned instead of being hidden by the fallback. An SSR engine response of `(nil, nil)`, including the Vite development endpoint's temporary JSON `null` response while warming up, is treated as an intentional skip and renders the normal CSR bootstrap.
+Request cancellation is always returned instead of being hidden by the fallback. A `Dispatch` result of `(nil, nil)`, including the Vite development endpoint's temporary JSON `null` response while warming up, is treated as an intentional skip and renders the normal CSR bootstrap.
 
 ### Embed
 

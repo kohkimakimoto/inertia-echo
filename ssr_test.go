@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"html/template"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -19,7 +22,7 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
-func TestSsrEngineHTTPGateway_Render(t *testing.T) {
+func TestSsrHTTPGateway_Dispatch(t *testing.T) {
 	tests := []struct {
 		name          string
 		responseBody  string
@@ -104,7 +107,8 @@ func TestSsrEngineHTTPGateway_Render(t *testing.T) {
 			}))
 			defer server.Close()
 
-			engine := &SsrEngineHTTPGateway{
+			gateway := &SsrHTTPGateway{
+				Enabled:    true,
 				URL:        server.URL,
 				HttpClient: &http.Client{},
 			}
@@ -118,7 +122,7 @@ func TestSsrEngineHTTPGateway_Render(t *testing.T) {
 				},
 			}
 
-			got, err := engine.Render(ctx)
+			got, err := gateway.Dispatch(ctx)
 			if tt.errorContains != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.errorContains) {
 					t.Fatalf("expected error containing %q, got %v", tt.errorContains, err)
@@ -147,7 +151,7 @@ func TestSsrEngineHTTPGateway_Render(t *testing.T) {
 	}
 }
 
-func TestSsrEngineHTTPGateway_Render_EndpointSelection(t *testing.T) {
+func TestSsrHTTPGateway_Dispatch_EndpointSelection(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `{"head":[],"body":"<div>SSR</div>"}`)
 	}))
@@ -156,18 +160,27 @@ func TestSsrEngineHTTPGateway_Render_EndpointSelection(t *testing.T) {
 	tests := []struct {
 		name     string
 		url      string
+		hotURL   string
+		useHot   bool
 		endpoint string
 		wantPath string
 	}{
 		{
-			name:     "legacy URL",
+			name:     "production URL",
 			url:      server.URL,
 			wantPath: "/render",
 		},
 		{
-			name:     "legacy URL with trailing slash",
+			name:     "production URL with trailing slash",
 			url:      server.URL + "/",
 			wantPath: "/render",
+		},
+		{
+			name:     "hot URL",
+			url:      "http://invalid.example",
+			hotURL:   server.URL,
+			useHot:   true,
+			wantPath: "/__inertia_ssr",
 		},
 		{
 			name:     "Endpoint takes precedence",
@@ -187,13 +200,16 @@ func TestSsrEngineHTTPGateway_Render_EndpointSelection(t *testing.T) {
 					return http.DefaultTransport.RoundTrip(req)
 				}),
 			}
-			engine := &SsrEngineHTTPGateway{
+			gateway := &SsrHTTPGateway{
+				Enabled:    true,
 				URL:        tt.url,
+				HotURL:     tt.hotURL,
+				UseHot:     tt.useHot,
 				Endpoint:   tt.endpoint,
 				HttpClient: client,
 			}
 
-			response, err := engine.Render(&RenderContext{Page: &Page{
+			response, err := gateway.Dispatch(&RenderContext{Page: &Page{
 				Component: "TestComponent",
 				Props:     map[string]any{},
 				URL:       "/test",
@@ -209,14 +225,14 @@ func TestSsrEngineHTTPGateway_Render_EndpointSelection(t *testing.T) {
 	}
 }
 
-func TestSsrEngineHTTPGateway_Render_UsesDefaultClientWhenNil(t *testing.T) {
+func TestSsrHTTPGateway_Dispatch_UsesDefaultClientWhenNil(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"head":[],"body":"<div>SSR</div>"}`)
 	}))
 	defer server.Close()
 
-	engine := &SsrEngineHTTPGateway{URL: server.URL}
-	response, err := engine.Render(&RenderContext{Page: &Page{Props: map[string]any{}}})
+	gateway := &SsrHTTPGateway{Enabled: true, URL: server.URL}
+	response, err := gateway.Dispatch(&RenderContext{Page: &Page{Props: map[string]any{}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,33 +271,36 @@ func TestSsrResponse_BodyHTML(t *testing.T) {
 	}
 }
 
-func TestNewSsrEngineHTTPGateway(t *testing.T) {
-	engine := NewSsrEngineHTTPGateway()
+func TestNewSsrHTTPGateway(t *testing.T) {
+	gateway := NewSsrHTTPGateway()
 
-	if engine == nil {
-		t.Error("Expected non-nil engine")
+	if gateway == nil {
+		t.Error("Expected non-nil gateway")
 		return
 	}
-
-	if engine.URL != "http://127.0.0.1:13714" {
-		t.Errorf("Expected default URL 'http://127.0.0.1:13714', got '%s'", engine.URL)
+	if !gateway.Enabled {
+		t.Error("Expected Enabled true by default")
 	}
-	if engine.Endpoint != "" {
-		t.Errorf("expected default Endpoint to be empty, got %q", engine.Endpoint)
+	if gateway.URL != "http://127.0.0.1:13714" {
+		t.Errorf("Expected default URL 'http://127.0.0.1:13714', got '%s'", gateway.URL)
 	}
-
-	if engine.HttpClient == nil {
+	if gateway.Endpoint != "" {
+		t.Errorf("expected default Endpoint to be empty, got %q", gateway.Endpoint)
+	}
+	if gateway.HttpClient == nil {
 		t.Error("Expected non-nil HTTP client")
 	}
-
-	if engine.HttpClient.Timeout != 0 {
-		t.Errorf("Expected default HTTP client timeout to be disabled, got %s", engine.HttpClient.Timeout)
+	if gateway.HttpClient.Timeout != 0 {
+		t.Errorf("Expected default HTTP client timeout to be disabled, got %s", gateway.HttpClient.Timeout)
+	}
+	if gateway.FallbackOnError {
+		t.Error("Expected FallbackOnError false by default")
 	}
 }
 
-func TestSsrEngineHTTPGateway_Render_NetworkError(t *testing.T) {
-	// Create SSR engine with invalid URL to simulate network error
-	engine := &SsrEngineHTTPGateway{
+func TestSsrHTTPGateway_Dispatch_NetworkError(t *testing.T) {
+	gateway := &SsrHTTPGateway{
+		Enabled:    true,
 		URL:        "http://invalid-host:99999",
 		HttpClient: &http.Client{},
 	}
@@ -295,21 +314,43 @@ func TestSsrEngineHTTPGateway_Render_NetworkError(t *testing.T) {
 		},
 	}
 
-	_, err := engine.Render(ctx)
+	_, err := gateway.Dispatch(ctx)
 	if err == nil {
 		t.Error("Expected network error but got none")
 	}
 }
 
-func TestSsrEngineHTTPGateway_Render_PropagatesRequestContext(t *testing.T) {
+func TestSsrHTTPGateway_Dispatch_FallbackOnError(t *testing.T) {
+	reported := false
+	gateway := &SsrHTTPGateway{
+		Enabled:         true,
+		URL:             "http://invalid-host:99999",
+		HttpClient:      &http.Client{},
+		FallbackOnError: true,
+		ErrorReporter:   func(*RenderContext, error) { reported = true },
+	}
+	got, err := gateway.Dispatch(&RenderContext{Page: &Page{Props: map[string]any{}}})
+	if err != nil {
+		t.Fatalf("expected soft fallback, got %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected nil response, got %#v", got)
+	}
+	if !reported {
+		t.Fatal("expected ErrorReporter to be called")
+	}
+}
+
+func TestSsrHTTPGateway_Dispatch_PropagatesRequestContext(t *testing.T) {
 	requestContext, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(requestContext)
 	c := e.NewContext(req, httptest.NewRecorder())
-	engine := &SsrEngineHTTPGateway{
-		URL: "http://ssr.test",
+	gateway := &SsrHTTPGateway{
+		Enabled: true,
+		URL:     "http://ssr.test",
 		HttpClient: &http.Client{
 			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				select {
@@ -325,6 +366,7 @@ func TestSsrEngineHTTPGateway_Render_PropagatesRequestContext(t *testing.T) {
 				}
 			}),
 		},
+		FallbackOnError: true,
 	}
 	renderContext := &RenderContext{
 		Inertia: &Inertia{echoContext: c},
@@ -336,43 +378,241 @@ func TestSsrEngineHTTPGateway_Render_PropagatesRequestContext(t *testing.T) {
 		},
 	}
 
-	_, err := engine.Render(renderContext)
+	_, err := gateway.Dispatch(renderContext)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation error, got %v", err)
 	}
 }
 
-func TestSsrEngineHTTPGateway_Render_InvalidPageJSON(t *testing.T) {
-	// Create mock server
+func TestSsrHTTPGateway_Dispatch_InvalidPageJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(SsrResponse{
+		_ = json.NewEncoder(w).Encode(SsrResponse{
 			Head: []string{"<title>Test</title>"},
 			Body: "<div>Test</div>",
 		})
 	}))
 	defer server.Close()
 
-	engine := &SsrEngineHTTPGateway{
+	gateway := &SsrHTTPGateway{
+		Enabled:    true,
 		URL:        server.URL,
 		HttpClient: &http.Client{},
 	}
 
-	// Create render context with page that contains unmarshalable data
 	ctx := &RenderContext{
 		Page: &Page{
 			Component: "TestComponent",
-			Props:     map[string]any{"invalid": make(chan int)}, // channels can't be marshaled to JSON
+			Props:     map[string]any{"invalid": make(chan int)},
 			URL:       "/test",
 			Version:   "1.0.0",
 		},
 	}
 
-	_, err := engine.Render(ctx)
+	_, err := gateway.Dispatch(ctx)
 	if err == nil {
 		t.Error("Expected JSON marshal error but got none")
 	}
 	if !strings.Contains(err.Error(), "failed to marshal page json") {
 		t.Errorf("Expected error about JSON marshal, got: %v", err)
 	}
+}
+
+func TestSsrHTTPGateway_ssrIsEnabledControls(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Fatal("SSR HTTP must not be called when disabled/skipped")
+	}))
+	defer server.Close()
+
+	newCtx := func(path string, mutate func(*Inertia)) *RenderContext {
+		e := echo.New()
+		c := e.NewContext(httptest.NewRequest(http.MethodGet, path, nil), httptest.NewRecorder())
+		i := &Inertia{echoContext: c}
+		if mutate != nil {
+			mutate(i)
+		}
+		return &RenderContext{Inertia: i, Page: &Page{Props: map[string]any{}}}
+	}
+
+	t.Run("Enabled false", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: false, URL: server.URL, HttpClient: &http.Client{}}
+		got, err := g.Dispatch(newCtx("/", nil))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("DisableSsr on Inertia", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: true, URL: server.URL, HttpClient: &http.Client{}}
+		got, err := g.Dispatch(newCtx("/", func(i *Inertia) { i.DisableSsr() }))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("DisableSsrWhen", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: true, URL: server.URL, HttpClient: &http.Client{}}
+		got, err := g.Dispatch(newCtx("/", func(i *Inertia) {
+			i.DisableSsrWhen(func(*echo.Context) bool { return true })
+		}))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("WithoutSsr path match", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: true, URL: server.URL, HttpClient: &http.Client{}}
+		got, err := g.Dispatch(newCtx("/admin/users", func(i *Inertia) {
+			i.WithoutSsr("admin/*")
+		}))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("base Except path match", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: true, URL: server.URL, HttpClient: &http.Client{}, Except: []string{"admin/*"}}
+		got, err := g.Dispatch(newCtx("/admin/users", nil))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("base Disable func", func(t *testing.T) {
+		g := &SsrHTTPGateway{
+			Enabled:    true,
+			URL:        server.URL,
+			HttpClient: &http.Client{},
+			Disable:    func(*echo.Context) bool { return true },
+		}
+		got, err := g.Dispatch(newCtx("/", nil))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+}
+
+func TestSsrHTTPGateway_EnsureBundleExists(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"head":[],"body":"<div>SSR</div>"}`)
+	}))
+	defer server.Close()
+
+	t.Run("missing bundle skips", func(t *testing.T) {
+		g := &SsrHTTPGateway{
+			Enabled:            true,
+			URL:                server.URL,
+			HttpClient:         &http.Client{},
+			EnsureBundleExists: true,
+			BundlePaths:        []string{filepath.Join(t.TempDir(), "missing.js")},
+		}
+		got, err := g.Dispatch(&RenderContext{Page: &Page{Props: map[string]any{}}})
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("existing bundle dispatches", func(t *testing.T) {
+		dir := t.TempDir()
+		bundle := filepath.Join(dir, "ssr.js")
+		if err := os.WriteFile(bundle, []byte("// ssr"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		g := &SsrHTTPGateway{
+			Enabled:            true,
+			URL:                server.URL,
+			HttpClient:         &http.Client{},
+			EnsureBundleExists: true,
+			BundlePaths:        []string{bundle},
+		}
+		got, err := g.Dispatch(&RenderContext{Page: &Page{Props: map[string]any{}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got == nil || got.Body != "<div>SSR</div>" {
+			t.Fatalf("got=%#v", got)
+		}
+	})
+}
+
+func TestSsrHTTPGateway_IsHealthy(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/health" {
+			t.Fatalf("path=%q", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	g := &SsrHTTPGateway{URL: server.URL, HttpClient: &http.Client{}}
+	if !g.IsHealthy(context.Background()) {
+		t.Fatal("expected healthy")
+	}
+
+	g.URL = "http://invalid-host:99999"
+	if g.IsHealthy(context.Background()) {
+		t.Fatal("expected unhealthy")
+	}
+}
+
+func TestSsrHTTPGateway_ExceptPaths(t *testing.T) {
+	g := NewSsrHTTPGateway()
+	g.ExceptPaths("admin/*", "internal")
+	if len(g.Except) != 2 || g.Except[0] != "admin/*" || g.Except[1] != "internal" {
+		t.Fatalf("Except=%v", g.Except)
+	}
+}
+
+func TestMatchSSRPath(t *testing.T) {
+	tests := []struct {
+		path, pattern string
+		want          bool
+	}{
+		{"/admin/users", "admin/*", true},
+		{"/admin/users", "/admin/*", true},
+		{"/users", "admin/*", false},
+		{"/", "/", true},
+		{"/exact", "exact", true},
+	}
+	for _, tt := range tests {
+		if got := matchSSRPath(tt.path, tt.pattern); got != tt.want {
+			t.Fatalf("matchSSRPath(%q, %q)=%v, want %v", tt.path, tt.pattern, got, tt.want)
+		}
+	}
+}
+
+func TestMiddlewareWithoutSsr(t *testing.T) {
+	e := echo.New()
+	var gotPaths []string
+	gateway := gatewayFunc(func(ctx *RenderContext) (*SsrResponse, error) {
+		gotPaths = append([]string(nil), ctx.Inertia.withoutSsr...)
+		return nil, nil
+	})
+	r := NewHTMLRenderer()
+	r.SsrGateway = gateway
+	r.Templates = mustParseRendererTemplate(t, r, `{{ define "app.html" }}ok{{ end }}`)
+
+	e.Use(MiddlewareWithConfig(MiddlewareConfig{
+		VersionFunc: func(*echo.Context) string { return "v3" },
+		WithoutSsr:  []string{"admin/*"},
+		Renderer:    r,
+	}))
+	e.GET("/admin/users", func(c *echo.Context) error {
+		return Render(c, "Home", nil)
+	})
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin/users", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	if len(gotPaths) != 1 || gotPaths[0] != "admin/*" {
+		t.Fatalf("withoutSsr=%v", gotPaths)
+	}
+}
+
+type gatewayFunc func(*RenderContext) (*SsrResponse, error)
+
+func (f gatewayFunc) Dispatch(ctx *RenderContext) (*SsrResponse, error) { return f(ctx) }
+
+func mustParseRendererTemplate(t *testing.T, r *HTMLRenderer, body string) *template.Template {
+	t.Helper()
+	tmpl, err := template.New("").Funcs(r.FuncMap()).Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tmpl
 }

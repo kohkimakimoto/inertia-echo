@@ -39,26 +39,19 @@ type HTMLRenderer struct {
 	// Build it with ParseViteManifest* helpers (or your own loader) and assign it here.
 	ViteManifest ViteManifest
 
-	// SsrEngine renders the page on the server when SSR is enabled for the request.
-	// If nil, SSR is skipped and the CSR bootstrap is used.
-	SsrEngine SsrEngine
-	// SsrFallbackOnError falls back to the CSR bootstrap when SsrEngine returns an error.
-	// Request cancellation is never hidden by this fallback.
-	SsrFallbackOnError bool
-	// SsrErrorReporter is called when SsrEngine returns an error, before fallback or return.
-	SsrErrorReporter func(ctx *RenderContext, err error)
+	// SsrGateway dispatches SSR for HTML responses. If nil, the CSR bootstrap is used.
+	// Mirrors inertia-laravel's Ssr\Gateway; configure SsrHTTPGateway for the HTTP backend.
+	SsrGateway SsrGateway
 }
 
 func NewHTMLRenderer() *HTMLRenderer {
 	return &HTMLRenderer{
-		Debug:              false,
-		ContainerId:        "app",
-		ViteDevServerURL:   "http://localhost:5173",
-		ViteBasePath:       "/",
-		ViteManifest:       nil,
-		SsrEngine:          nil,
-		SsrFallbackOnError: false,
-		SsrErrorReporter:   nil,
+		Debug:            false,
+		ContainerId:      "app",
+		ViteDevServerURL: "http://localhost:5173",
+		ViteBasePath:     "/",
+		ViteManifest:     nil,
+		SsrGateway:       nil,
 	}
 }
 
@@ -149,16 +142,12 @@ func (r *HTMLRenderer) Render(ctx *RenderContext) error {
 	}
 	data["page"] = ctx.Page
 
-	if ctx.Inertia.IsSsrEnabled() && r.SsrEngine != nil {
-		ssr, err := r.SsrEngine.Render(ctx)
+	if r.SsrGateway != nil {
+		ssr, err := r.SsrGateway.Dispatch(ctx)
 		if err != nil {
-			if r.SsrErrorReporter != nil {
-				r.SsrErrorReporter(ctx, err)
-			}
-			if !r.SsrFallbackOnError || ctx.Inertia.EchoContext().Request().Context().Err() != nil {
-				return err
-			}
-		} else if ssr != nil {
+			return err
+		}
+		if ssr != nil {
 			data["inertia"] = ssr.BodyHTML()
 			data["inertiaHead"] = ssr.HeadHTML()
 			return r.Templates.ExecuteTemplate(ctx.Writer, ctx.ViewName, data)

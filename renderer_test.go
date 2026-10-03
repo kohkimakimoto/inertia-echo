@@ -1,7 +1,6 @@
 package inertia
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"html"
@@ -74,9 +73,9 @@ func TestHTMLRendererEscapesContainerID(t *testing.T) {
 	}
 }
 
-type rendererEngineFunc func(*RenderContext) (*SsrResponse, error)
+type rendererGatewayFunc func(*RenderContext) (*SsrResponse, error)
 
-func (f rendererEngineFunc) Render(ctx *RenderContext) (*SsrResponse, error) { return f(ctx) }
+func (f rendererGatewayFunc) Dispatch(ctx *RenderContext) (*SsrResponse, error) { return f(ctx) }
 
 func newRendererTestInertia(t *testing.T) *Inertia {
 	t.Helper()
@@ -85,45 +84,37 @@ func newRendererTestInertia(t *testing.T) *Inertia {
 	return &Inertia{echoContext: c}
 }
 
-func TestHTMLRendererSSRSkipAndFallback(t *testing.T) {
+func TestHTMLRendererSSRDispatch(t *testing.T) {
 	tests := []struct {
-		name       string
-		engine     SsrEngine
-		fallback   bool
-		wantErr    bool
-		wantReport bool
-		cancel     bool
+		name    string
+		gateway SsrGateway
+		wantErr bool
+		wantCSR bool
+		wantSSR bool
 	}{
-		{name: "null skip", engine: rendererEngineFunc(func(*RenderContext) (*SsrResponse, error) { return nil, nil })},
-		{name: "strict error", engine: rendererEngineFunc(func(*RenderContext) (*SsrResponse, error) { return nil, errors.New("ssr failed") }), wantErr: true, wantReport: true},
-		{name: "explicit fallback", engine: rendererEngineFunc(func(*RenderContext) (*SsrResponse, error) { return nil, errors.New("ssr failed") }), fallback: true, wantReport: true},
-		{name: "request cancellation is not hidden", engine: rendererEngineFunc(func(*RenderContext) (*SsrResponse, error) { return nil, context.Canceled }), fallback: true, wantErr: true, wantReport: true, cancel: true},
+		{name: "nil skip uses CSR", gateway: rendererGatewayFunc(func(*RenderContext) (*SsrResponse, error) { return nil, nil }), wantCSR: true},
+		{name: "strict error", gateway: rendererGatewayFunc(func(*RenderContext) (*SsrResponse, error) { return nil, errors.New("ssr failed") }), wantErr: true},
+		{name: "ssr body", gateway: rendererGatewayFunc(func(*RenderContext) (*SsrResponse, error) {
+			return &SsrResponse{Head: []string{"<title>x</title>"}, Body: "<div>ssr</div>"}, nil
+		}), wantSSR: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := newRendererTestInertia(t)
-			if tt.cancel {
-				requestContext, cancel := context.WithCancel(i.EchoContext().Request().Context())
-				cancel()
-				i.EchoContext().SetRequest(i.EchoContext().Request().WithContext(requestContext))
-			}
 			r := NewHTMLRenderer()
-			r.SsrEngine = tt.engine
-			r.SsrFallbackOnError = tt.fallback
-			reported := false
-			r.SsrErrorReporter = func(*RenderContext, error) { reported = true }
+			r.SsrGateway = tt.gateway
 			r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).Parse(`{{ define "app.html" }}{{ .inertia }}{{ end }}`))
 			var out strings.Builder
 			err := r.Render(&RenderContext{Inertia: i, Page: &Page{Props: map[string]any{}}, ViewName: "app.html", Writer: &out})
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if reported != tt.wantReport {
-				t.Fatalf("reported=%v, want %v", reported, tt.wantReport)
+			if tt.wantCSR && !strings.Contains(out.String(), `type="application/json"`) {
+				t.Fatalf("expected CSR bootstrap, got %s", out.String())
 			}
-			if !tt.wantErr && !strings.Contains(out.String(), `type="application/json"`) {
-				t.Fatalf("expected CSR bootstrap fallback, got %s", out.String())
+			if tt.wantSSR && !strings.Contains(out.String(), "<div>ssr</div>") {
+				t.Fatalf("expected SSR body, got %s", out.String())
 			}
 		})
 	}

@@ -54,9 +54,11 @@ type MiddlewareConfig struct {
 	RescueReporter RescueReporter
 	// Now supplies request-time timestamps for once-prop expiration metadata.
 	Now func() time.Time
-	// IsSsrDisabled is a flag that determines whether server-side rendering is disabled.
-	// If this is true, server-side rendering is disabled even if the renderer supports and is configured for it.
-	IsSsrDisabled bool
+	// WithoutSsr excludes matching paths from SSR for each request.
+	// Mirrors inertia-laravel Middleware::$withoutSsr.
+	// Patterns support * wildcards (Laravel Request::is / ExcludesPaths style).
+	// Stored on the request-scoped Inertia (not mutated on a shared SsrGateway) for Go concurrency safety.
+	WithoutSsr []string
 }
 
 var DefaultMiddlewareConfig = MiddlewareConfig{
@@ -67,7 +69,6 @@ var DefaultMiddlewareConfig = MiddlewareConfig{
 	Renderer:                  nil,
 	ClearHistoryCookieKey:     "inertia.clear_history",
 	PreserveFragmentCookieKey: "inertia.preserve_fragment",
-	IsSsrDisabled:             false,
 }
 
 func defaultVersionFunc() VersionFunc {
@@ -128,11 +129,15 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				reflash:                   config.Reflash,
 				rescueReporter:            config.RescueReporter,
 				now:                       config.Now,
-				isSsrDisabled:             config.IsSsrDisabled,
 				partialComponent:          req.Header.Get(HeaderXInertiaPartialComponent),
 				onlyProps:                 splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ","),
 				exceptProps:               splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ","),
 				resetProps:                splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ","),
+			}
+			// Mirrors inertia-laravel Middleware wiring of $withoutSsr onto the SSR gateway.
+			// Applied to request-scoped Inertia instead of mutating a shared SsrGateway.
+			if len(config.WithoutSsr) > 0 {
+				i.withoutSsr = append([]string(nil), config.WithoutSsr...)
 			}
 			c.Set(key, i)
 

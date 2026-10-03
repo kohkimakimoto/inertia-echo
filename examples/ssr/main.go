@@ -46,20 +46,20 @@ func main() {
 		r.ViteManifest = inertia.MustParseViteManifestFS(resources.Public(), "build/manifest.json")
 	}
 	r.MustParseFS(resources.Views(), "*.html")
-	r.SsrFallbackOnError = true
-	r.SsrErrorReporter = func(ctx *inertia.RenderContext, err error) {
+	gateway := inertia.NewSsrHTTPGateway()
+	gateway.FallbackOnError = true
+	gateway.ErrorReporter = func(ctx *inertia.RenderContext, err error) {
 		slog.Error("SSR failed; falling back to CSR",
 			"component", ctx.Page.Component,
 			"url", ctx.Page.URL,
 			"error", err,
 		)
 	}
-	// Use SSR engine for server-side rendering
-	ssrGateway := inertia.NewSsrEngineHTTPGateway()
 	if isDebug {
-		ssrGateway.Endpoint = r.ViteDevServerURL + "/__inertia_ssr"
+		gateway.UseHot = true
+		gateway.HotURL = r.ViteDevServerURL
 	}
-	r.SsrEngine = ssrGateway
+	r.SsrGateway = gateway
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 		Renderer: r,

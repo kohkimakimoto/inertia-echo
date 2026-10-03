@@ -45,11 +45,15 @@ type Inertia struct {
 	reflash                   ReflashFunc
 	rescueReporter            RescueReporter
 	now                       func() time.Time
-	isSsrDisabled             bool
-	partialComponent          string
-	onlyProps                 []string
-	exceptProps               []string
-	resetProps                []string
+	// Per-request SSR controls. Read by SsrHTTPGateway.Dispatch (not mutated on the shared gateway).
+	// Mirrors inertia-laravel withoutSsr / disableSsr; stored here for Go concurrency safety.
+	withoutSsr       []string
+	ssrDisabled      bool
+	ssrDisableWhen   func(c *echo.Context) bool
+	partialComponent string
+	onlyProps        []string
+	exceptProps      []string
+	resetProps       []string
 }
 
 func (i *Inertia) EchoContext() *echo.Context {
@@ -133,20 +137,22 @@ func (i *Inertia) sendBooleanFlag(cookieKey string, value bool) {
 	})
 }
 
-func (i *Inertia) IsSsrDisabled() bool {
-	return i.isSsrDisabled
+// WithoutSsr excludes matching paths from SSR for this request.
+// Mirrors inertia-laravel Inertia::withoutSsr / Middleware::$withoutSsr.
+func (i *Inertia) WithoutSsr(paths ...string) {
+	i.withoutSsr = append(i.withoutSsr, paths...)
 }
 
-func (i *Inertia) IsSsrEnabled() bool {
-	return !i.isSsrDisabled
-}
-
-func (i *Inertia) EnableSsr() {
-	i.isSsrDisabled = false
-}
-
+// DisableSsr disables SSR for this request.
+// Mirrors inertia-laravel Inertia::disableSsr(true).
 func (i *Inertia) DisableSsr() {
-	i.isSsrDisabled = true
+	i.ssrDisabled = true
+}
+
+// DisableSsrWhen disables SSR for this request when fn returns true at dispatch time.
+// Mirrors inertia-laravel Inertia::disableSsr(Closure).
+func (i *Inertia) DisableSsrWhen(fn func(c *echo.Context) bool) {
+	i.ssrDisableWhen = fn
 }
 
 func (i *Inertia) SetRootView(name string) {
@@ -428,6 +434,18 @@ func Version(c *echo.Context) string {
 
 func SetURLResolver(c *echo.Context, resolver URLResolverFunc) {
 	MustGet(c).SetURLResolver(resolver)
+}
+
+func WithoutSsr(c *echo.Context, paths ...string) {
+	MustGet(c).WithoutSsr(paths...)
+}
+
+func DisableSsr(c *echo.Context) {
+	MustGet(c).DisableSsr()
+}
+
+func DisableSsrWhen(c *echo.Context, fn func(c *echo.Context) bool) {
+	MustGet(c).DisableSsrWhen(fn)
 }
 
 func Location(c *echo.Context, url string) error {
