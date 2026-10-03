@@ -14,6 +14,10 @@ const (
 	key = "__inertia__"
 )
 
+type SharedDataFunc func(c *echo.Context) (map[string]any, error)
+type FlashDataFunc func(c *echo.Context) (map[string]any, error)
+type ReflashFunc func(c *echo.Context) error
+
 type MiddlewareConfig struct {
 	Skipper middleware.Skipper
 	// The root template that's loaded on the first page visit.
@@ -47,10 +51,6 @@ type MiddlewareConfig struct {
 	// If this is true, server-side rendering is disabled even if the renderer supports and is configured for it.
 	IsSsrDisabled bool
 }
-
-type SharedDataFunc func(c *echo.Context) (map[string]any, error)
-type FlashDataFunc func(c *echo.Context) (map[string]any, error)
-type ReflashFunc func(c *echo.Context) error
 
 var DefaultMiddlewareConfig = MiddlewareConfig{
 	Skipper:                   middleware.DefaultSkipper,
