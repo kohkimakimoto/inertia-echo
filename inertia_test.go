@@ -79,6 +79,79 @@ func TestRenderPreservesVaryHeader(t *testing.T) {
 	}
 }
 
+func TestRenderPageURLDefaultAndResolver(t *testing.T) {
+	tests := []struct {
+		name        string
+		path        string
+		urlResolver URLResolverFunc
+		wantURL     string
+	}{
+		{
+			name:    "default uses request URL string",
+			path:    "/users?page=2",
+			wantURL: "/users?page=2",
+		},
+		{
+			name: "custom resolver",
+			path: "/users?page=2",
+			urlResolver: func(c *echo.Context) string {
+				return "/app" + c.Request().URL.String()
+			},
+			wantURL: "/app/users?page=2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			var page *Page
+			e.Use(MiddlewareWithConfig(MiddlewareConfig{
+				VersionFunc: func(*echo.Context) string { return "v3" },
+				URLResolver: tt.urlResolver,
+				Renderer: testNewMockRenderer(t, func(ctx *RenderContext) error {
+					page = ctx.Page
+					return nil
+				}),
+			}))
+			e.GET("/users", func(c *echo.Context) error {
+				return Render(c, "Users", nil)
+			})
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			if rec.Code != http.StatusOK || page == nil {
+				t.Fatalf("status=%d page=%#v", rec.Code, page)
+			}
+			if page.URL != tt.wantURL {
+				t.Fatalf("URL=%q, want %q", page.URL, tt.wantURL)
+			}
+		})
+	}
+}
+
+func TestSetURLResolver(t *testing.T) {
+	e := echo.New()
+	var page *Page
+	e.Use(MiddlewareWithConfig(MiddlewareConfig{
+		VersionFunc: func(*echo.Context) string { return "v3" },
+		Renderer: testNewMockRenderer(t, func(ctx *RenderContext) error {
+			page = ctx.Page
+			return nil
+		}),
+	}))
+	e.GET("/", func(c *echo.Context) error {
+		SetURLResolver(c, func(*echo.Context) string { return "/custom" })
+		return Render(c, "Home", nil)
+	})
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusOK || page == nil {
+		t.Fatalf("status=%d page=%#v", rec.Code, page)
+	}
+	if page.URL != "/custom" {
+		t.Fatalf("URL=%q, want /custom", page.URL)
+	}
+}
+
 func testVaryHeaderTokens(header http.Header) []string {
 	var tokens []string
 	for _, value := range header.Values(echo.HeaderVary) {

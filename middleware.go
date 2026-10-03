@@ -29,6 +29,10 @@ type MiddlewareConfig struct {
 	// Corresponding specification: https://inertiajs.com/docs/v3/advanced/asset-versioning
 	// Signature mirrors inertia-laravel's version(Request); the default ignores c.
 	VersionFunc VersionFunc
+	// URLResolver customizes the Page object URL. nil uses req.URL.String().
+	// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object
+	// Mirrors inertia-laravel's resolveUrlUsing / Middleware::urlResolver.
+	URLResolver URLResolverFunc
 	// Defines the props that are shared by default.
 	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data
 	Share SharedDataFunc
@@ -115,6 +119,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				rootView:                  config.RootView,
 				sharedProps:               map[string]any{},
 				version:                   config.VersionFunc,
+				urlResolver:               config.URLResolver,
 				renderer:                  config.Renderer,
 				clearHistoryCookieKey:     config.ClearHistoryCookieKey,
 				preserveFragmentCookieKey: config.PreserveFragmentCookieKey,

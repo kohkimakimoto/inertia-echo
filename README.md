@@ -50,6 +50,7 @@ Table of Contents
   - [CSRF protection](#csrf-protection)
   - [History encryption](#history-encryption)
   - [Asset versioning](#asset-versioning)
+  - [Page URL](#page-url)
   - [Server-side Rendering (SSR)](#server-side-rendering-ssr)
   - [Embed](#embed)
 - [Compatibility](#compatibility)
@@ -873,6 +874,28 @@ Configure asset version manually.
 
 ```go
 inertia.SetVersion(c, func(c *echo.Context) string { return version })
+```
+
+### Page URL
+
+:book: The related official document: [The Page object](https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object)
+
+By default the Page `url` is `req.URL.String()` (path and query). Customize it when the request URL differs from the URL you want the client to see (for example behind a path prefix):
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	URLResolver: func(c *echo.Context) string {
+		return "/app" + c.Request().URL.String()
+	},
+}))
+```
+
+Or set it per request:
+
+```go
+inertia.SetURLResolver(c, func(c *echo.Context) string {
+	return "/app" + c.Request().URL.String()
+})
 ```
 
 ### Server-side Rendering (SSR)

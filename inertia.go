@@ -32,6 +32,7 @@ type Inertia struct {
 	sharedProps               map[string]any
 	sharedPropsMutex          sync.RWMutex
 	version                   VersionFunc
+	urlResolver               URLResolverFunc
 	renderer                  Renderer
 	encryptHistory            bool
 	clearHistoryCookieKey     string
@@ -243,6 +244,22 @@ func (i *Inertia) Version() string {
 	return i.version(i.echoContext)
 }
 
+// URLResolverFunc resolves the Page object URL.
+// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object
+// Mirrors inertia-laravel's resolveUrlUsing / Middleware::urlResolver.
+type URLResolverFunc func(c *echo.Context) string
+
+func (i *Inertia) SetURLResolver(resolver URLResolverFunc) {
+	i.urlResolver = resolver
+}
+
+func (i *Inertia) resolveURL() string {
+	if i.urlResolver != nil {
+		return i.urlResolver(i.echoContext)
+	}
+	return i.echoContext.Request().URL.String()
+}
+
 // Location generates 409 response for external redirects
 // see https://inertiajs.com/redirects#external-redirects
 func (i *Inertia) Location(url string) error {
@@ -332,7 +349,7 @@ func (i *Inertia) render(status int, component string, props map[string]any, vie
 	}
 
 	page := &Page{
-		Component: component, Props: validProps, URL: req.URL.String(), Version: i.Version(),
+		Component: component, Props: validProps, URL: i.resolveURL(), Version: i.Version(),
 		EncryptHistory: i.encryptHistory, ClearHistory: i.pullClearHistory(),
 		PreserveFragment: i.pullPreserveFragment(), Flash: flash,
 		SharedProps: metadata.sharedProps, DeferredProps: emptyMapAsNil(metadata.deferredProps),
@@ -407,6 +424,10 @@ func SetVersion(c *echo.Context, version VersionFunc) {
 
 func Version(c *echo.Context) string {
 	return MustGet(c).Version()
+}
+
+func SetURLResolver(c *echo.Context, resolver URLResolverFunc) {
+	MustGet(c).SetURLResolver(resolver)
 }
 
 func Location(c *echo.Context, url string) error {
