@@ -22,6 +22,8 @@ type MiddlewareConfig struct {
 	Skipper middleware.Skipper
 	// The root template that's loaded on the first page visit.
 	// Corresponding specification: https://inertiajs.com/docs/v3/installation/server-side-setup
+	// Unlike inertia-laravel's rootView(Request), this stays a static string: in practice
+	// a fixed template name is enough. Override per request with SetRootView if needed.
 	RootView string
 	// Determines the current asset version.
 	// Corresponding specification: https://inertiajs.com/docs/v3/advanced/asset-versioning
