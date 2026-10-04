@@ -11,12 +11,10 @@ import (
 )
 
 // ResponseWriterWrapper is a wrapper of http.ResponseWriter for buffering a response
-// so middleware can rewrite status/body after the handler returns (Laravel-style).
-// By default only redirects / Inertia 409s are buffered. With bufferAll (Inertia
-// requests), the full response is held until flush so version/empty/transform can run.
+// so middleware can rewrite redirect status/headers after the handler returns.
+// Only redirects and Inertia 409 responses are buffered; other responses flush through.
 type ResponseWriterWrapper struct {
 	http.ResponseWriter
-	bufferAll   bool
 	buffered    bool
 	wroteHeader bool
 	statusCode  int
@@ -24,15 +22,8 @@ type ResponseWriterWrapper struct {
 }
 
 func NewResponseWriterWrapper(w http.ResponseWriter) *ResponseWriterWrapper {
-	return NewResponseWriterWrapperWithOptions(w, false)
-}
-
-// NewResponseWriterWrapperWithOptions creates a wrapper. When bufferAll is true,
-// every response is buffered (used for X-Inertia requests).
-func NewResponseWriterWrapperWithOptions(w http.ResponseWriter, bufferAll bool) *ResponseWriterWrapper {
 	return &ResponseWriterWrapper{
 		ResponseWriter: w,
-		bufferAll:      bufferAll,
 		buffered:       false,
 		wroteHeader:    false,
 		statusCode:     http.StatusOK,
@@ -48,7 +39,7 @@ func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
 	w.wroteHeader = true
 	w.statusCode = statusCode
 
-	if w.bufferAll || isRedirectStatus(statusCode) || (statusCode == http.StatusConflict &&
+	if isRedirectStatus(statusCode) || (statusCode == http.StatusConflict &&
 		(w.Header().Get(HeaderXInertiaLocation) != "" || w.Header().Get(HeaderXInertiaRedirect) != "")) {
 		w.buffered = true
 		return
@@ -93,29 +84,6 @@ func (w *ResponseWriterWrapper) hasFragmentRedirect() bool {
 
 func (w *ResponseWriterWrapper) isRedirectResponse() bool {
 	return w.wroteHeader && isRedirectStatus(w.statusCode)
-}
-
-func (w *ResponseWriterWrapper) isEmptyOKResponse() bool {
-	if w.isRedirectResponse() {
-		return false
-	}
-	if w.statusCode != http.StatusOK {
-		return false
-	}
-	if !w.wroteHeader {
-		return true
-	}
-	if w.buffered {
-		return w.body.Len() == 0
-	}
-	return false
-}
-
-func (w *ResponseWriterWrapper) resetBufferedResponse() {
-	w.wroteHeader = false
-	w.buffered = false
-	w.statusCode = http.StatusOK
-	w.body.Reset()
 }
 
 func isRedirectStatus(statusCode int) bool {

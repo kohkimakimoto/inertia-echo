@@ -154,6 +154,24 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			}
 			c.Set(key, i)
 
+			// Asset versioning runs before Share and next (unlike inertia-laravel,
+			// which replaces the response after $next). Location does not use
+			// shared props or the handler result, so resolve version first.
+			// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#asset-versioning
+			version := i.Version()
+			if checkVersion(req, version) {
+				addVaryHeader(c.Response().Header(), HeaderXInertia)
+				if i.reflash != nil {
+					if err := i.reflash(c); err != nil {
+						return err
+					}
+				}
+				i.sendClearHistoryCookieIfNeeded()
+				i.sendPreserveFragmentCookieIfNeeded()
+				c.Response().Header().Set(HeaderXInertiaVersion, version)
+				return i.Location(req.URL.String())
+			}
+
 			if config.Share != nil {
 				shared, err := config.Share(c)
 				if err != nil {
@@ -180,12 +198,10 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				}
 			}
 
-			// Buffer the full response for Inertia requests so post-next rewrites
-			// (version change, empty response, 303, fragment 409) can replace it,
-			// matching inertia-laravel Middleware::handle after $next($request).
-			isInertia := req.Header.Get(HeaderXInertia) != ""
+			// Wrap the writer so post-next rewrites (302→303, fragment→409) can
+			// adjust redirect responses before they are flushed.
 			originalWriter := c.Response()
-			w := NewResponseWriterWrapperWithOptions(originalWriter, isInertia)
+			w := NewResponseWriterWrapper(originalWriter)
 			c.SetResponse(w)
 			defer c.SetResponse(originalWriter)
 
@@ -198,33 +214,10 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				return err
 			}
 
-			// Post-handler pipeline mirrors inertia-laravel Middleware::handle after $next.
 			addVaryHeader(w.Header(), HeaderXInertia)
 
 			if w.isRedirectResponse() && i.reflash != nil {
 				if err := i.reflash(c); err != nil {
-					return err
-				}
-			}
-
-			if !isInertia {
-				i.sendClearHistoryCookieIfNeeded()
-				i.sendPreserveFragmentCookieIfNeeded()
-				return w.flushBufferedResponse()
-			}
-
-			// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#asset-versioning
-			version := i.Version()
-			if checkVersion(req, version) {
-				if err := onVersionChange(c, i, w, version); err != nil {
-					return err
-				}
-				return w.flushBufferedResponse()
-			}
-
-			// Mirrors inertia-laravel onEmptyResponse: empty 200 → redirect back.
-			if w.isEmptyOKResponse() {
-				if err := onEmptyResponse(c, w); err != nil {
 					return err
 				}
 			}
@@ -242,35 +235,6 @@ func checkVersion(req *http.Request, version string) bool {
 	return req.Header.Get(HeaderXInertia) != "" &&
 		req.Method == http.MethodGet &&
 		req.Header.Get(HeaderXInertiaVersion) != version
-}
-
-// onVersionChange replaces the handler response with an Inertia location visit.
-// Mirrors inertia-laravel Middleware::onVersionChange.
-func onVersionChange(c *echo.Context, i *Inertia, w *ResponseWriterWrapper, version string) error {
-	if i.reflash != nil {
-		if err := i.reflash(c); err != nil {
-			return err
-		}
-	}
-	i.sendClearHistoryCookieIfNeeded()
-	i.sendPreserveFragmentCookieIfNeeded()
-
-	w.Header().Del(echo.HeaderContentType)
-	w.Header().Del(echo.HeaderContentLength)
-	w.resetBufferedResponse()
-	w.Header().Set(HeaderXInertiaVersion, version)
-	return i.Location(c.Request().URL.String())
-}
-
-// onEmptyResponse redirects back when an Inertia handler returns an empty 200.
-// Mirrors inertia-laravel Middleware::onEmptyResponse (Redirect::back).
-func onEmptyResponse(c *echo.Context, w *ResponseWriterWrapper) error {
-	target := c.Request().Referer()
-	if target == "" {
-		target = "/"
-	}
-	w.resetBufferedResponse()
-	return c.Redirect(http.StatusFound, target)
 }
 
 // changeRedirectCode changes the status code during redirects, ensuring they are made as
