@@ -929,6 +929,8 @@ inertia.DisableSsr(c)
 inertia.WithoutSsr(c, "billing/*")
 ```
 
+Custom Renderers should call `inertia.SsrEnabled(c)` (or `MustGet(c).SsrEnabled()`) instead of reading Inertia internals. Shared `SsrGateway` remains request-stateless; request skip state lives on Inertia.
+
 For Vite development SSR, install `@inertiajs/vite`, configure the SSR entry explicitly, and let Inertia v3 provide React's default CSR/SSR setup:
 
 ```ts

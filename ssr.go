@@ -45,8 +45,8 @@ func (r *SsrResponse) BodyHTML() template.HTML {
 // Mirrors inertia-laravel's Inertia\Ssr\HttpGateway.
 //
 // Intentional differences from inertia-laravel:
-//   - Base settings live on this shared struct; per-request withoutSsr / disableSsr
-//     are stored on the request-scoped Inertia and read in Dispatch (Go concurrency).
+//   - This type is shared and holds only startup settings (Enabled, Except, Disable, URLs).
+//     Per-request control lives on Inertia; Dispatch consults Inertia.SsrEnabled().
 //   - Failed SSR returns an error by default; set FallbackOnError for Laravel-like CSR fallback.
 //   - No SsrState: HTMLRenderer calls Dispatch once for both head and body.
 type SsrHTTPGateway struct {
@@ -138,22 +138,16 @@ func (g *SsrHTTPGateway) ssrIsEnabled(ctx *RenderContext) bool {
 	if !g.Enabled {
 		return false
 	}
+	if ctx != nil && ctx.Inertia != nil && !ctx.Inertia.SsrEnabled() {
+		return false
+	}
 
 	var c *echo.Context
 	var path string
 	if ctx != nil && ctx.Inertia != nil {
 		c = ctx.Inertia.EchoContext()
-		if ctx.Inertia.ssrDisabled {
-			return false
-		}
-		if ctx.Inertia.ssrDisableWhen != nil && c != nil && ctx.Inertia.ssrDisableWhen(c) {
-			return false
-		}
 		if c != nil && c.Request() != nil {
 			path = c.Request().URL.Path
-		}
-		if matchSSRPaths(path, ctx.Inertia.withoutSsr) {
-			return false
 		}
 	}
 

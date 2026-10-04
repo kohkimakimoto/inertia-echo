@@ -577,14 +577,14 @@ func TestMatchSSRPath(t *testing.T) {
 
 func TestMiddlewareWithoutSsr(t *testing.T) {
 	e := echo.New()
-	var gotPaths []string
+	dispatched := false
 	gateway := gatewayFunc(func(ctx *RenderContext) (*SsrResponse, error) {
-		gotPaths = append([]string(nil), ctx.Inertia.withoutSsr...)
-		return nil, nil
+		dispatched = true
+		return &SsrResponse{Body: "<div>ssr</div>"}, nil
 	})
 	r := NewHTMLRenderer()
 	r.SsrGateway = gateway
-	r.Templates = mustParseRendererTemplate(t, r, `{{ define "app.html" }}ok{{ end }}`)
+	r.Templates = mustParseRendererTemplate(t, r, `{{ define "app.html" }}{{ .inertia }}{{ end }}`)
 
 	e.Use(MiddlewareWithConfig(MiddlewareConfig{
 		VersionFunc: func(*echo.Context) string { return "v3" },
@@ -592,6 +592,9 @@ func TestMiddlewareWithoutSsr(t *testing.T) {
 		Renderer:    r,
 	}))
 	e.GET("/admin/users", func(c *echo.Context) error {
+		if SsrEnabled(c) {
+			t.Fatal("SsrEnabled should be false for WithoutSsr match")
+		}
 		return Render(c, "Home", nil)
 	})
 	rec := httptest.NewRecorder()
@@ -599,8 +602,34 @@ func TestMiddlewareWithoutSsr(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d", rec.Code)
 	}
-	if len(gotPaths) != 1 || gotPaths[0] != "admin/*" {
-		t.Fatalf("withoutSsr=%v", gotPaths)
+	if dispatched {
+		t.Fatal("SsrGateway.Dispatch must not run when Inertia.SsrEnabled is false")
+	}
+	if !strings.Contains(rec.Body.String(), `type="application/json"`) {
+		t.Fatalf("expected CSR bootstrap, got %s", rec.Body.String())
+	}
+}
+
+func TestInertiaSsrEnabled(t *testing.T) {
+	e := echo.New()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/admin/users", nil), httptest.NewRecorder())
+	i := &Inertia{echoContext: c}
+	if !i.SsrEnabled() {
+		t.Fatal("default should allow SSR")
+	}
+	i.DisableSsr()
+	if i.SsrEnabled() {
+		t.Fatal("DisableSsr")
+	}
+	i.ssrDisabled = false
+	i.WithoutSsr("admin/*")
+	if i.SsrEnabled() {
+		t.Fatal("WithoutSsr path match")
+	}
+	i.withoutSsr = nil
+	i.DisableSsrWhen(func(*echo.Context) bool { return true })
+	if i.SsrEnabled() {
+		t.Fatal("DisableSsrWhen")
 	}
 }
 

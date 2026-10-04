@@ -45,11 +45,12 @@ type Inertia struct {
 	reflash                   ReflashFunc
 	rescueReporter            RescueReporter
 	now                       func() time.Time
-	// Per-request SSR controls. Read by SsrHTTPGateway.Dispatch (not mutated on the shared gateway).
-	// Mirrors inertia-laravel withoutSsr / disableSsr; stored here for Go concurrency safety.
-	withoutSsr       []string
-	ssrDisabled      bool
-	ssrDisableWhen   func(c *echo.Context) bool
+	// Per-request SSR controls (Share-like render parameters). Private; callers use
+	// WithoutSsr / DisableSsr* / SsrEnabled. SsrHTTPGateway stays shared and stateless —
+	// it consults SsrEnabled() instead of reading these fields.
+	withoutSsr     []string
+	ssrDisabled    bool
+	ssrDisableWhen func(c *echo.Context) bool
 	partialComponent string
 	onlyProps        []string
 	exceptProps      []string
@@ -153,6 +154,24 @@ func (i *Inertia) DisableSsr() {
 // Mirrors inertia-laravel Inertia::disableSsr(Closure).
 func (i *Inertia) DisableSsrWhen(fn func(c *echo.Context) bool) {
 	i.ssrDisableWhen = fn
+}
+
+// SsrEnabled reports whether this request may attempt SSR from Inertia's point of view.
+// Evaluates DisableSsr / DisableSsrWhen / WithoutSsr. Shared SsrGateway may still skip
+// for its own Enabled / Except / Disable. Custom Renderers should call this instead of
+// reading Inertia internals.
+func (i *Inertia) SsrEnabled() bool {
+	if i.ssrDisabled {
+		return false
+	}
+	if i.ssrDisableWhen != nil && i.ssrDisableWhen(i.echoContext) {
+		return false
+	}
+	path := ""
+	if i.echoContext != nil && i.echoContext.Request() != nil {
+		path = i.echoContext.Request().URL.Path
+	}
+	return !matchSSRPaths(path, i.withoutSsr)
 }
 
 func (i *Inertia) SetRootView(name string) {
@@ -443,6 +462,10 @@ func DisableSsr(c *echo.Context) {
 
 func DisableSsrWhen(c *echo.Context, fn func(c *echo.Context) bool) {
 	MustGet(c).DisableSsrWhen(fn)
+}
+
+func SsrEnabled(c *echo.Context) bool {
+	return MustGet(c).SsrEnabled()
 }
 
 func Location(c *echo.Context, url string) error {

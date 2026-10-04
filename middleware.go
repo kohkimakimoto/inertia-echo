@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -57,9 +58,10 @@ type MiddlewareConfig struct {
 	// Now supplies request-time timestamps for once-prop expiration metadata.
 	Now func() time.Time
 	// WithoutSsr excludes matching paths from SSR for each request.
-	// Mirrors inertia-laravel Middleware::$withoutSsr.
-	// Patterns support * wildcards (Laravel Request::is / ExcludesPaths style).
-	// Stored on the request-scoped Inertia (not mutated on a shared SsrGateway) for Go concurrency safety.
+	// Mirrors inertia-laravel Middleware::$withoutSsr (patterns: * wildcards like Request::is).
+	// Design difference: Laravel applies this to the (container) Gateway via except().
+	// Here SsrGateway is an application-wide shared instance, not request-scoped, so the
+	// paths are copied onto the request-scoped Inertia instead (see Inertia.SsrEnabled).
 	WithoutSsr []string
 }
 
@@ -125,7 +127,10 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				return next(c)
 			}
 
-			// Create the request-scoped Inertia instance,
+			// Create the request-scoped Inertia instance.
+			// WithoutSsr is copied here (not applied to SsrGateway): Laravel mutates a
+			// request-associated Gateway via except(); our SsrGateway is app-scoped and
+			// shared across requests, so exclusion paths live on Inertia for SsrEnabled().
 			req := c.Request()
 			i := &Inertia{
 				echoContext:               c,
@@ -141,6 +146,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				reflash:                   config.Reflash,
 				rescueReporter:            config.RescueReporter,
 				now:                       config.Now,
+				withoutSsr:                slices.Clone(config.WithoutSsr),
 				partialComponent:          req.Header.Get(HeaderXInertiaPartialComponent),
 				onlyProps:                 splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ","),
 				exceptProps:               splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ","),
@@ -172,14 +178,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 						return fmt.Errorf("inertia-echo: ShareOnce %q: want func() (any, error) or *OnceProp, got %T", propKey, value)
 					}
 				}
-			}
-
-			// Mirrors inertia-laravel Middleware::handle: withoutSsr is applied after
-			// share/shareOnce (and rootView/urlResolver, set on Inertia at construction)
-			// and immediately before $next. Stored on request-scoped Inertia instead of
-			// mutating a shared SsrGateway (Go concurrency).
-			if len(config.WithoutSsr) > 0 {
-				i.withoutSsr = append([]string(nil), config.WithoutSsr...)
 			}
 
 			// Buffer the full response for Inertia requests so post-next rewrites

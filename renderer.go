@@ -40,7 +40,7 @@ type HTMLRenderer struct {
 	ViteManifest ViteManifest
 
 	// SsrGateway dispatches SSR for HTML responses. If nil, the CSR bootstrap is used.
-	// Mirrors inertia-laravel's Ssr\Gateway; configure SsrHTTPGateway for the HTTP backend.
+	// Shared and request-stateless; per-request skip uses Inertia.SsrEnabled().
 	SsrGateway SsrGateway
 }
 
@@ -142,7 +142,7 @@ func (r *HTMLRenderer) Render(ctx *RenderContext) error {
 	}
 	data["page"] = ctx.Page
 
-	if r.SsrGateway != nil {
+	if r.SsrGateway != nil && (ctx.Inertia == nil || ctx.Inertia.SsrEnabled()) {
 		ssr, err := r.SsrGateway.Dispatch(ctx)
 		if err != nil {
 			return err
