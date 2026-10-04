@@ -371,14 +371,23 @@ func (i *Inertia) render(status int, component string, props map[string]any, vie
 	}
 
 	page := &Page{
-		Component: component, Props: validProps, URL: i.resolveURL(), Version: i.Version(),
-		EncryptHistory: i.encryptHistory, ClearHistory: i.pullClearHistory(),
-		PreserveFragment: i.pullPreserveFragment(), Flash: flash,
-		SharedProps: metadata.sharedProps, DeferredProps: emptyMapAsNil(metadata.deferredProps),
-		MergeProps: metadata.mergeProps, PrependProps: metadata.prependProps,
-		DeepMergeProps: metadata.deepMergeProps, MatchPropsOn: metadata.matchPropsOn,
-		ScrollProps: emptyScrollMapAsNil(metadata.scrollProps), OnceProps: emptyOnceMapAsNil(metadata.onceProps),
-		RescuedProps: metadata.rescuedProps,
+		Component:        component,
+		Props:            validProps,
+		URL:              i.resolveURL(),
+		Version:          i.Version(),
+		EncryptHistory:   i.encryptHistory,
+		ClearHistory:     i.pullClearHistory(),
+		PreserveFragment: i.pullPreserveFragment(),
+		Flash:            flash,
+		SharedProps:      metadata.sharedProps,
+		DeferredProps:    emptyMapAsNil(metadata.deferredProps),
+		MergeProps:       metadata.mergeProps,
+		PrependProps:     metadata.prependProps,
+		DeepMergeProps:   metadata.deepMergeProps,
+		MatchPropsOn:     metadata.matchPropsOn,
+		ScrollProps:      emptyScrollMapAsNil(metadata.scrollProps),
+		OnceProps:        emptyOnceMapAsNil(metadata.onceProps),
+		RescuedProps:     metadata.rescuedProps,
 	}
 
 	addVaryHeader(res.Header(), HeaderXInertia)
