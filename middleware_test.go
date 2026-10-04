@@ -282,13 +282,8 @@ func TestMiddlewareFinalizesOneShotStateBeforeRedirect(t *testing.T) {
 	req.Header.Set(HeaderXInertiaVersion, "v3")
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	reflashCalls := 0
 	h := MiddlewareWithConfig(MiddlewareConfig{
 		VersionFunc: func(*echo.Context) string { return "v3" },
-		Reflash: func(*echo.Context) error {
-			reflashCalls++
-			return nil
-		},
 	})(func(c *echo.Context) error {
 		i := MustGet(c)
 		i.ClearHistory()
@@ -298,16 +293,22 @@ func TestMiddlewareFinalizesOneShotStateBeforeRedirect(t *testing.T) {
 	if err := h(c); err != nil {
 		t.Fatal(err)
 	}
-	if reflashCalls != 1 {
-		t.Fatalf("reflashCalls=%d", reflashCalls)
+	var bagCookie *http.Cookie
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == CarryCookieName {
+			bagCookie = cookie
+			break
+		}
 	}
-	cookies := rec.Result().Cookies()
-	var names []string
-	for _, cookie := range cookies {
-		names = append(names, cookie.Name)
+	if bagCookie == nil {
+		t.Fatalf("expected %s cookie, got %v", CarryCookieName, rec.Result().Cookies())
 	}
-	if !slices.Contains(names, "inertia.clear_history") || !slices.Contains(names, "inertia.preserve_fragment") {
-		t.Fatalf("one-shot cookies=%v", names)
+	bag, err := decodeCarryBag(bagCookie.Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bag[CarryKeyClearHistory] != "true" || bag[CarryKeyPreserveFragment] != "true" {
+		t.Fatalf("bag=%v", bag)
 	}
 }
 
@@ -448,6 +449,11 @@ func TestMiddleware_ComposesWithGzipMiddleware(t *testing.T) {
 func TestFlashAndRenderWithStatus(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/missing", nil)
+	encoded, err := encodeFlashCarry(map[string]any{"message": "stored", "old": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(testCarryBagCookie(t, map[string]string{CarryKeyFlashData: encoded}))
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	var page *Page
@@ -457,9 +463,6 @@ func TestFlashAndRenderWithStatus(t *testing.T) {
 	})
 	h := MiddlewareWithConfig(MiddlewareConfig{
 		Renderer: renderer,
-		FlashData: func(*echo.Context) (map[string]any, error) {
-			return map[string]any{"message": "stored", "old": true}, nil
-		},
 	})(func(c *echo.Context) error {
 		Flash(c, map[string]any{"message": "local"})
 		return RenderWithStatus(c, http.StatusNotFound, "ErrorPage", nil)
@@ -472,6 +475,72 @@ func TestFlashAndRenderWithStatus(t *testing.T) {
 	}
 	if page.Flash["message"] != "local" || page.Flash["old"] != true {
 		t.Fatalf("flash=%v", page.Flash)
+	}
+}
+
+func TestFlashSurvivesRedirectViaCarryStore(t *testing.T) {
+	e := echo.New()
+	postReq := httptest.NewRequest(http.MethodPost, "/submit", nil)
+	postReq.Header.Set(HeaderXInertia, "true")
+	postReq.Header.Set(HeaderXInertiaVersion, "v3")
+	postRec := httptest.NewRecorder()
+	postC := e.NewContext(postReq, postRec)
+	h := MiddlewareWithConfig(MiddlewareConfig{
+		VersionFunc: func(*echo.Context) string { return "v3" },
+	})(func(c *echo.Context) error {
+		Flash(c, map[string]any{"message": "saved"})
+		return c.Redirect(http.StatusFound, "/next")
+	})
+	if err := h(postC); err != nil {
+		t.Fatal(err)
+	}
+	var bagCookie *http.Cookie
+	for _, cookie := range postRec.Result().Cookies() {
+		if cookie.Name == CarryCookieName {
+			bagCookie = cookie
+			break
+		}
+	}
+	if bagCookie == nil || bagCookie.Value == "" {
+		t.Fatalf("expected %s cookie, got %v", CarryCookieName, postRec.Result().Cookies())
+	}
+	bag, err := decodeCarryBag(bagCookie.Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bag[CarryKeyFlashData] == "" {
+		t.Fatalf("bag missing flash: %v", bag)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/next", nil)
+	getReq.Header.Set(HeaderXInertia, "true")
+	getReq.Header.Set(HeaderXInertiaVersion, "v3")
+	getReq.AddCookie(bagCookie)
+	getRec := httptest.NewRecorder()
+	getC := e.NewContext(getReq, getRec)
+	getH := MiddlewareWithConfig(MiddlewareConfig{
+		VersionFunc: func(*echo.Context) string { return "v3" },
+		Renderer:    testNewMockRenderer(t, func(*RenderContext) error { return nil }),
+	})(func(c *echo.Context) error {
+		return Render(c, "Next", nil)
+	})
+	if err := getH(getC); err != nil {
+		t.Fatal(err)
+	}
+	var page Page
+	if err := json.NewDecoder(getRec.Body).Decode(&page); err != nil {
+		t.Fatal(err)
+	}
+	if page.Flash["message"] != "saved" {
+		t.Fatalf("flash=%v", page.Flash)
+	}
+	for _, cookie := range getRec.Result().Cookies() {
+		if cookie.Name == CarryCookieName && cookie.MaxAge != -1 && cookie.Value != "" {
+			remaining, err := decodeCarryBag(cookie.Value)
+			if err == nil && remaining[CarryKeyFlashData] != "" {
+				t.Fatalf("flash should be cleared from bag, got %v", remaining)
+			}
+		}
 	}
 }
 

@@ -2,7 +2,8 @@ package inertia
 
 import (
 	"bytes"
-	"errors"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"sync"
@@ -34,23 +35,20 @@ type Inertia struct {
 	version                   VersionFunc
 	urlResolver               URLResolverFunc
 	renderer                  Renderer
-	encryptHistory            bool
-	clearHistoryCookieKey     string
-	clearHistory              bool
-	preserveFragmentCookieKey string
-	preserveFragment          bool
-	flash                     map[string]any
-	flashLoaded               bool
-	flashData                 FlashDataFunc
-	reflash                   ReflashFunc
+	encryptHistory   bool
+	carryStore       CarryStore
+	clearHistory     bool
+	preserveFragment bool
+	flash            map[string]any
+	flashLoaded      bool
 	rescueReporter            RescueReporter
 	now                       func() time.Time
 	// Per-request SSR controls (Share-like render parameters). Private; callers use
 	// WithoutSsr / DisableSsr* / SsrEnabled. SsrHTTPGateway stays shared and stateless —
 	// it consults SsrEnabled() instead of reading these fields.
-	withoutSsr     []string
-	ssrDisabled    bool
-	ssrDisableWhen func(c *echo.Context) bool
+	withoutSsr       []string
+	ssrDisabled      bool
+	ssrDisableWhen   func(c *echo.Context) bool
 	partialComponent string
 	onlyProps        []string
 	exceptProps      []string
@@ -79,63 +77,50 @@ func (i *Inertia) ClearHistory() {
 	i.clearHistory = true
 }
 
-// pullClearHistory pulls the clear history flag from the cookie or the current state.
-// Note:
-// The design of the inertia-echo package used a dedicated cookie to store the clear history flag.
-// While the official inertia-laravel adapter uses a session for this purpose,
-// the Echo framework lacks a built-in session store, so we use a cookie as an alternative.
+// pullClearHistory pulls the clear-history flag from CarryStore or the current state.
+// Laravel uses session for this; Echo has no built-in session, so the default
+// CarryStore uses an unsigned cookie (see CarryStore security notes).
 func (i *Inertia) pullClearHistory() bool {
-	return i.pullBooleanFlag(i.clearHistoryCookieKey, &i.clearHistory)
-}
-
-func (i *Inertia) sendClearHistoryCookieIfNeeded() {
-	i.sendBooleanFlag(i.clearHistoryCookieKey, i.clearHistory)
+	return i.pullBooleanFlag(CarryKeyClearHistory, &i.clearHistory)
 }
 
 // PreserveFragment asks the client to carry the source URL fragment through
-// the next rendered page. The flag survives redirects in a boolean cookie.
+// the next rendered page. The flag survives redirects via CarryStore.
 func (i *Inertia) PreserveFragment() {
 	i.preserveFragment = true
 }
 
 func (i *Inertia) pullPreserveFragment() bool {
-	return i.pullBooleanFlag(i.preserveFragmentCookieKey, &i.preserveFragment)
+	return i.pullBooleanFlag(CarryKeyPreserveFragment, &i.preserveFragment)
 }
 
-func (i *Inertia) sendPreserveFragmentCookieIfNeeded() {
-	i.sendBooleanFlag(i.preserveFragmentCookieKey, i.preserveFragment)
-}
-
-func (i *Inertia) pullBooleanFlag(cookieKey string, current *bool) bool {
+func (i *Inertia) pullBooleanFlag(key string, current *bool) bool {
 	value := *current
 	*current = false
-	cookie, err := i.echoContext.Request().Cookie(cookieKey)
-	if err != nil {
-		if errors.Is(err, http.ErrNoCookie) {
-			return value
-		}
+	pulled, ok, err := i.carryStore.Pull(i.echoContext, key)
+	if err != nil || !ok {
 		return value
 	}
-	http.SetCookie(i.echoContext.Response(), &http.Cookie{
-		Name:     cookieKey,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,
-	})
-	return cookie.Value == "true" || value
+	return pulled == "true" || value
 }
 
-func (i *Inertia) sendBooleanFlag(cookieKey string, value bool) {
+func (i *Inertia) saveBooleanFlag(key string, value bool) error {
 	if !value {
-		return
+		return nil
 	}
-	http.SetCookie(i.echoContext.Response(), &http.Cookie{
-		Name:     cookieKey,
-		Value:    "true",
-		Path:     "/",
-		HttpOnly: true,
-	})
+	return i.carryStore.Save(i.echoContext, key, "true")
+}
+
+// persistCarry writes unconsumed one-shot values (clear history, preserve
+// fragment, flash) to CarryStore so they survive redirects / location visits.
+func (i *Inertia) persistCarry() error {
+	if err := i.saveBooleanFlag(CarryKeyClearHistory, i.clearHistory); err != nil {
+		return err
+	}
+	if err := i.saveBooleanFlag(CarryKeyPreserveFragment, i.preserveFragment); err != nil {
+		return err
+	}
+	return i.persistFlash()
 }
 
 // WithoutSsr excludes matching paths from SSR for this request.
@@ -214,6 +199,8 @@ func (i *Inertia) Shared() map[string]any {
 }
 
 // Flash adds data to the top-level Page flash object for the current render.
+// For POST-redirect-GET, unconsumed flash is persisted via CarryStore (default:
+// unsigned cookie). Treat carried flash like untrusted request input.
 func (i *Inertia) Flash(data map[string]any) {
 	if i.flash == nil {
 		i.flash = map[string]any{}
@@ -227,14 +214,17 @@ func (i *Inertia) resolveFlash() (map[string]any, error) {
 	if !i.flashLoaded {
 		local := i.flash
 		i.flash = map[string]any{}
-		if i.flashData != nil {
-			stored, err := i.flashData(i.echoContext)
-			if err != nil {
-				return nil, err
+		raw, ok, err := i.carryStore.Pull(i.echoContext, CarryKeyFlashData)
+		if err != nil {
+			return nil, err
+		}
+		if ok && raw != "" {
+			if stored, err := decodeFlashCarry(raw); err == nil {
+				for key, value := range stored {
+					i.flash[key] = value
+				}
 			}
-			for key, value := range stored {
-				i.flash[key] = value
-			}
+			// Broken payloads are ignored after Pull already removed them.
 		}
 		for key, value := range local {
 			i.flash[key] = value
@@ -249,6 +239,41 @@ func (i *Inertia) resolveFlash() (map[string]any, error) {
 		result[key] = value
 	}
 	return result, nil
+}
+
+func (i *Inertia) persistFlash() error {
+	if i.flashLoaded || len(i.flash) == 0 {
+		return nil
+	}
+	encoded, err := encodeFlashCarry(i.flash)
+	if err != nil {
+		return err
+	}
+	if err := i.carryStore.Save(i.echoContext, CarryKeyFlashData, encoded); err != nil {
+		return err
+	}
+	i.flash = map[string]any{}
+	return nil
+}
+
+func encodeFlashCarry(data map[string]any) (string, error) {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func decodeFlashCarry(raw string) (map[string]any, error) {
+	b, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return nil, err
+	}
+	var data map[string]any
+	if err := json.Unmarshal(b, &data); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (i *Inertia) FlushShared() {

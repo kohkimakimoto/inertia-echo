@@ -16,8 +16,6 @@ const (
 )
 
 type SharedDataFunc func(c *echo.Context) (map[string]any, error)
-type FlashDataFunc func(c *echo.Context) (map[string]any, error)
-type ReflashFunc func(c *echo.Context) error
 
 type MiddlewareConfig struct {
 	Skipper middleware.Skipper
@@ -45,14 +43,11 @@ type MiddlewareConfig struct {
 	ShareOnce SharedDataFunc
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer Renderer
-	// ClearHistoryCookieKey is a key for the cookie that is used to clear the history state.
-	ClearHistoryCookieKey string
-	// PreserveFragmentCookieKey stores the one-shot preserve-fragment flag.
-	PreserveFragmentCookieKey string
-	// FlashData loads application-owned flash data when a Page is rendered.
-	FlashData FlashDataFunc
-	// Reflash keeps application-owned flash data across redirects and 409 visits.
-	Reflash ReflashFunc
+	// CarryStore persists one-shot Inertia values across redirects (flash,
+	// clear history, preserve fragment). Nil uses CookieCarryStore.
+	// Keys are fixed (CarryKey*); not configurable, matching inertia-laravel SessionKey.
+	// Not a secure session — see CarryStore docs.
+	CarryStore CarryStore
 	// RescueReporter receives errors from deferred props with Rescue enabled.
 	RescueReporter RescueReporter
 	// Now supplies request-time timestamps for once-prop expiration metadata.
@@ -66,14 +61,13 @@ type MiddlewareConfig struct {
 }
 
 var DefaultMiddlewareConfig = MiddlewareConfig{
-	Skipper:                   middleware.DefaultSkipper,
-	RootView:                  "app.html",
-	VersionFunc:               defaultVersionFunc(),
-	URLResolver:               defaultURLResolver(),
-	Share:                     nil,
-	Renderer:                  nil,
-	ClearHistoryCookieKey:     "inertia.clear_history",
-	PreserveFragmentCookieKey: "inertia.preserve_fragment",
+	Skipper:     middleware.DefaultSkipper,
+	RootView:    "app.html",
+	VersionFunc: defaultVersionFunc(),
+	URLResolver: defaultURLResolver(),
+	Share:       nil,
+	Renderer:    nil,
+	CarryStore:  NewCookieCarryStore(),
 }
 
 func defaultVersionFunc() VersionFunc {
@@ -114,11 +108,8 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	if config.URLResolver == nil {
 		config.URLResolver = DefaultMiddlewareConfig.URLResolver
 	}
-	if config.ClearHistoryCookieKey == "" {
-		config.ClearHistoryCookieKey = DefaultMiddlewareConfig.ClearHistoryCookieKey
-	}
-	if config.PreserveFragmentCookieKey == "" {
-		config.PreserveFragmentCookieKey = DefaultMiddlewareConfig.PreserveFragmentCookieKey
+	if config.CarryStore == nil {
+		config.CarryStore = DefaultMiddlewareConfig.CarryStore
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -133,24 +124,21 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			// shared across requests, so exclusion paths live on Inertia for SsrEnabled().
 			req := c.Request()
 			i := &Inertia{
-				echoContext:               c,
-				rootView:                  config.RootView,
-				sharedProps:               map[string]any{},
-				version:                   config.VersionFunc,
-				urlResolver:               config.URLResolver,
-				renderer:                  config.Renderer,
-				clearHistoryCookieKey:     config.ClearHistoryCookieKey,
-				preserveFragmentCookieKey: config.PreserveFragmentCookieKey,
-				flash:                     map[string]any{},
-				flashData:                 config.FlashData,
-				reflash:                   config.Reflash,
-				rescueReporter:            config.RescueReporter,
-				now:                       config.Now,
-				withoutSsr:                slices.Clone(config.WithoutSsr),
-				partialComponent:          req.Header.Get(HeaderXInertiaPartialComponent),
-				onlyProps:                 splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ","),
-				exceptProps:               splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ","),
-				resetProps:                splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ","),
+				echoContext:      c,
+				rootView:         config.RootView,
+				sharedProps:      map[string]any{},
+				version:          config.VersionFunc,
+				urlResolver:      config.URLResolver,
+				renderer:         config.Renderer,
+				carryStore:       config.CarryStore,
+				flash:            map[string]any{},
+				rescueReporter:   config.RescueReporter,
+				now:              config.Now,
+				withoutSsr:       slices.Clone(config.WithoutSsr),
+				partialComponent: req.Header.Get(HeaderXInertiaPartialComponent),
+				onlyProps:        splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ","),
+				exceptProps:      splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ","),
+				resetProps:       splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ","),
 			}
 			c.Set(key, i)
 
@@ -161,13 +149,9 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			version := i.Version()
 			if checkVersion(req, version) {
 				addVaryHeader(c.Response().Header(), HeaderXInertia)
-				if i.reflash != nil {
-					if err := i.reflash(c); err != nil {
-						return err
-					}
+				if err := i.persistCarry(); err != nil {
+					return err
 				}
-				i.sendClearHistoryCookieIfNeeded()
-				i.sendPreserveFragmentCookieIfNeeded()
 				c.Response().Header().Set(HeaderXInertiaVersion, version)
 				return i.Location(req.URL.String())
 			}
@@ -216,15 +200,10 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 
 			addVaryHeader(w.Header(), HeaderXInertia)
 
-			if w.isRedirectResponse() && i.reflash != nil {
-				if err := i.reflash(c); err != nil {
-					return err
-				}
-			}
-
 			transformResponse(req, w)
-			i.sendClearHistoryCookieIfNeeded()
-			i.sendPreserveFragmentCookieIfNeeded()
+			if err := i.persistCarry(); err != nil {
+				return err
+			}
 			return w.flushBufferedResponse()
 		}
 	}

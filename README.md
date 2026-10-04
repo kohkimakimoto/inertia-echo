@@ -738,19 +738,21 @@ The default data path is `data`. Use `WithDataPath` to change it and `Defer` to 
 inertia.Flash(c, map[string]any{
 	"message": "Profile updated.",
 })
+return c.Redirect(http.StatusFound, "/profile")
 ```
 
-The adapter does not persist arbitrary flash values in cookies. For POST-redirect-GET flows, store the data in the application's session implementation and connect it with the middleware's `FlashData` and `Reflash` callbacks:
+For POST-redirect-GET, unconsumed flash (and ClearHistory / PreserveFragment flags) are carried by `CarryStore`. The default stores them in one unsigned HttpOnly cookie (`inertia.carry`) as a small bag keyed like inertia-laravel's `SessionKey` (`inertia.flash_data`, etc.). Keep flash payloads small (cookie size limits).
+
+**Not a secure session.** Default `CarryStore` values are client-controlled. Treat pulled flash like any other untrusted request input. Do not use it for authorization, identity, or secrets.
+
+To replace the storage backend:
 
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-	Renderer:  r,
-	FlashData: loadFlashFromSession,
-	Reflash:   reflashSessionData,
+	Renderer:   r,
+	CarryStore: myCarryStore, // implements inertia.CarryStore
 }))
 ```
-
-`FlashData` has the signature `func(*echo.Context) (map[string]any, error)`. `Reflash` has the signature `func(*echo.Context) error`.
 
 :book: The related official document: [Flash data](https://inertiajs.com/docs/v3/data-props/flash-data)
 
