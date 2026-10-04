@@ -47,14 +47,6 @@ func main() {
 	}
 	r.MustParseFS(resources.Views(), "*.html")
 	gateway := inertia.NewSsrHTTPGateway()
-	gateway.FallbackOnError = true
-	gateway.ErrorReporter = func(ctx *inertia.RenderContext, err error) {
-		slog.Error("SSR failed; falling back to CSR",
-			"component", ctx.Page.Component,
-			"url", ctx.Page.URL,
-			"error", err,
-		)
-	}
 	if isDebug {
 		gateway.UseHot = true
 		gateway.HotURL = r.ViteDevServerURL

@@ -963,22 +963,26 @@ gateway.HttpClient.Timeout = 5 * time.Second
 renderer.SsrGateway = gateway
 ```
 
-The five-second timeout above is only an example, not a library default. Unlike inertia-laravel (which falls back to CSR by default), SSR errors are returned by default. Enable CSR fallback on the gateway when the application should remain available after an SSR failure:
+The five-second timeout above is only an example, not a library default.
+
+Unlike inertia-laravel (which falls back to CSR and optionally fires `SsrRenderFailed`), `SsrHTTPGateway` returns errors to the caller — Go style, no built-in fallback or error callback. Handle failures in your `HTTPErrorHandler`, or wrap `SsrGateway` / use a custom `Renderer` if you want CSR-on-failure:
 
 ```go
-gateway := inertia.NewSsrHTTPGateway()
-gateway.FallbackOnError = true
-gateway.ErrorReporter = func(ctx *inertia.RenderContext, err error) {
-	logger.Error("SSR failed; falling back to CSR",
-		"component", ctx.Page.Component,
-		"url", ctx.Page.URL,
-		"error", err,
-	)
+type fallbackGateway struct{ inner inertia.SsrGateway }
+
+func (g fallbackGateway) Dispatch(ctx *inertia.RenderContext) (*inertia.SsrResponse, error) {
+	ssr, err := g.inner.Dispatch(ctx)
+	if err != nil {
+		slog.Error("SSR failed; falling back to CSR", "error", err)
+		return nil, nil
+	}
+	return ssr, nil
 }
-renderer.SsrGateway = gateway
+
+renderer.SsrGateway = fallbackGateway{inner: inertia.NewSsrHTTPGateway()}
 ```
 
-Request cancellation is always returned instead of being hidden by the fallback. A `Dispatch` result of `(nil, nil)`, including the Vite development endpoint's temporary JSON `null` response while warming up, is treated as an intentional skip and renders the normal CSR bootstrap.
+A `Dispatch` result of `(nil, nil)`, including the Vite development endpoint's temporary JSON `null` response while warming up, is treated as an intentional skip and renders the normal CSR bootstrap.
 
 ### Embed
 

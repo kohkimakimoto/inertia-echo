@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -12,15 +11,15 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"sync"
-
-	"github.com/labstack/echo/v5"
 )
 
 // SsrGateway dispatches a Page to an SSR backend.
-// Mirrors inertia-laravel's Inertia\Ssr\Gateway (named SsrGateway because this
-// package has no Ssr subpackage / namespace).
-// A nil response with a nil error means SSR was skipped (use CSR).
+// Named SsrGateway because this package has no Ssr subpackage (cf. Inertia\Ssr\Gateway).
+//
+// Contract:
+//   - (resp, nil)  — SSR HTML
+//   - (nil, nil)   — intentional skip (caller uses CSR); not an error
+//   - (nil, err)   — failure; caller handles (no built-in CSR fallback)
 type SsrGateway interface {
 	Dispatch(ctx *RenderContext) (*SsrResponse, error)
 }
@@ -41,16 +40,18 @@ func (r *SsrResponse) BodyHTML() template.HTML {
 	return template.HTML(r.Body)
 }
 
-// SsrHTTPGateway is the HTTP implementation of SsrGateway.
-// Mirrors inertia-laravel's Inertia\Ssr\HttpGateway.
+// SsrHTTPGateway is a shared HTTP client for an SSR server (usually Node).
+// It is the transport + process-level switches only — not a request policy object.
 //
-// Intentional differences from inertia-laravel:
-//   - This type is shared and holds only startup settings (Enabled, Except, Disable, URLs).
-//     Per-request control lives on Inertia; Dispatch consults Inertia.SsrEnabled().
-//   - Failed SSR returns an error by default; set FallbackOnError for Laravel-like CSR fallback.
-//   - No SsrState: HTMLRenderer calls Dispatch once for both head and body.
+// Compared with inertia-laravel HttpGateway:
+//   - Request skip policy (withoutSsr / disableSsr) lives on Inertia; see SsrEnabled().
+//     Laravel mutates a container Gateway; this type must stay safe to share across requests.
+//   - Failures return error (Go). Laravel defaults to null CSR + optional SsrRenderFailed /
+//     throw_on_error. Wrap SsrGateway or use a custom Renderer for CSR-on-failure.
+//   - No SsrState: HTMLRenderer calls Dispatch once for head and body.
 type SsrHTTPGateway struct {
-	// Enabled controls whether SSR is on. Default true (config inertia.ssr.enabled).
+	// Enabled is the process-level SSR switch (config inertia.ssr.enabled). Default true.
+	// Request-level off switches use Inertia.DisableSsr / WithoutSsr, not this field.
 	Enabled bool
 	// URL is the production SSR server base. When Endpoint is empty and UseHot is false,
 	// requests go to URL + "/render".
@@ -61,27 +62,16 @@ type SsrHTTPGateway struct {
 	UseHot bool
 	// Endpoint is the complete SSR endpoint URL. When set, it takes precedence over URL/HotURL.
 	Endpoint string
-	// Except is the startup-time path exclusion list (immutable during requests).
-	// Per-request exclusions go on Inertia via WithoutSsr (see MiddlewareConfig.WithoutSsr).
-	Except []string
-	// Disable disables SSR when the function returns true (base condition).
-	Disable func(c *echo.Context) bool
-	// EnsureBundleExists skips SSR when none of BundlePaths exist on disk.
+	// EnsureBundleExists skips Dispatch with (nil, nil) when no BundlePaths entry exists.
+	// Mirrors config inertia.ssr.ensure_bundle_exists (soft skip, not an error).
 	EnsureBundleExists bool
-	// BundlePaths are candidate SSR bundle file paths checked when EnsureBundleExists is true.
+	// BundlePaths are candidate SSR bundle file paths for EnsureBundleExists.
 	BundlePaths []string
-	// FallbackOnError falls back to CSR (nil, nil) on SSR failure. Default false.
-	// Unlike inertia-laravel (graceful CSR by default), errors propagate unless this is set.
-	FallbackOnError bool
-	// ErrorReporter is called when an SSR request fails, before fallback or return.
-	ErrorReporter func(ctx *RenderContext, err error)
 	// HttpClient communicates with the SSR server. Timeout is disabled by default.
 	HttpClient *http.Client
-
-	exceptMu sync.Mutex
 }
 
-// NewSsrHTTPGateway returns an SsrHTTPGateway with Laravel-compatible defaults.
+// NewSsrHTTPGateway returns an SsrHTTPGateway with defaults aligned to Laravel's SSR URL.
 func NewSsrHTTPGateway() *SsrHTTPGateway {
 	return &SsrHTTPGateway{
 		Enabled:    true,
@@ -90,38 +80,25 @@ func NewSsrHTTPGateway() *SsrHTTPGateway {
 	}
 }
 
-// ExceptPaths appends paths to the base Except list (startup configuration).
-// Mirrors inertia-laravel ExcludesSsrPaths::except for shared gateway config.
-// Do not call this per request; use WithoutSsr on Inertia instead.
-func (g *SsrHTTPGateway) ExceptPaths(paths ...string) {
-	g.exceptMu.Lock()
-	defer g.exceptMu.Unlock()
-	g.Except = append(g.Except, paths...)
-}
-
-// Dispatch sends the page to the SSR server, or returns (nil, nil) when SSR is skipped.
+// Dispatch POSTs the page JSON to the SSR server.
 func (g *SsrHTTPGateway) Dispatch(ctx *RenderContext) (*SsrResponse, error) {
-	if !g.ssrIsEnabled(ctx) {
+	if !g.Enabled {
+		return nil, nil
+	}
+	// Honor request policy when called with an Inertia context (also checked in HTMLRenderer).
+	if ctx != nil && ctx.Inertia != nil && !ctx.Inertia.SsrEnabled() {
 		return nil, nil
 	}
 	if g.EnsureBundleExists && !g.bundleExists() {
 		return nil, nil
 	}
-
-	resp, err := g.post(ctx)
-	if err != nil {
-		return g.handleFailure(ctx, err)
-	}
-	return resp, nil
+	return g.post(ctx)
 }
 
 // IsHealthy reports whether the production SSR server responds to GET /health.
 // Mirrors inertia-laravel HasHealthCheck::isHealthy.
 func (g *SsrHTTPGateway) IsHealthy(ctx context.Context) bool {
-	client := g.HttpClient
-	if client == nil {
-		client = http.DefaultClient
-	}
+	client := g.client()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.productionURL("/health"), nil)
 	if err != nil {
 		return false
@@ -132,35 +109,6 @@ func (g *SsrHTTPGateway) IsHealthy(ctx context.Context) bool {
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
-}
-
-func (g *SsrHTTPGateway) ssrIsEnabled(ctx *RenderContext) bool {
-	if !g.Enabled {
-		return false
-	}
-	if ctx != nil && ctx.Inertia != nil && !ctx.Inertia.SsrEnabled() {
-		return false
-	}
-
-	var c *echo.Context
-	var path string
-	if ctx != nil && ctx.Inertia != nil {
-		c = ctx.Inertia.EchoContext()
-		if c != nil && c.Request() != nil {
-			path = c.Request().URL.Path
-		}
-	}
-
-	g.exceptMu.Lock()
-	except := append([]string(nil), g.Except...)
-	g.exceptMu.Unlock()
-	if matchSSRPaths(path, except) {
-		return false
-	}
-	if g.Disable != nil && c != nil && g.Disable(c) {
-		return false
-	}
-	return true
 }
 
 func (g *SsrHTTPGateway) bundleExists() bool {
@@ -176,21 +124,17 @@ func (g *SsrHTTPGateway) bundleExists() bool {
 }
 
 func (g *SsrHTTPGateway) post(ctx *RenderContext) (*SsrResponse, error) {
-	pageJSON, err := json.Marshal(ctx.Page)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal page json: %w", err)
+	if ctx == nil || ctx.Page == nil {
+		return nil, fmt.Errorf("ssr: render context or page is nil")
 	}
 
-	requestContext := context.Background()
-	if ctx.Inertia != nil {
-		echoContext := ctx.Inertia.EchoContext()
-		if echoContext != nil && echoContext.Request() != nil {
-			requestContext = echoContext.Request().Context()
-		}
+	pageJSON, err := json.Marshal(ctx.Page)
+	if err != nil {
+		return nil, fmt.Errorf("ssr: failed to marshal page json: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(
-		requestContext,
+		requestContextFrom(ctx),
 		http.MethodPost,
 		g.endpoint(),
 		bytes.NewReader(pageJSON),
@@ -199,11 +143,8 @@ func (g *SsrHTTPGateway) post(ctx *RenderContext) (*SsrResponse, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	client := g.HttpClient
-	if client == nil {
-		client = http.DefaultClient
-	}
-	resp, err := client.Do(req)
+
+	resp, err := g.client().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -223,6 +164,7 @@ func (g *SsrHTTPGateway) post(ctx *RenderContext) (*SsrResponse, error) {
 	if err := json.Unmarshal(responseJSON, &payload); err != nil {
 		return nil, fmt.Errorf("ssr: failed to decode response: %w", err)
 	}
+	// JSON null — intentional skip (e.g. Vite SSR warming up), same idea as Laravel.
 	if payload == nil {
 		return nil, nil
 	}
@@ -236,23 +178,20 @@ func (g *SsrHTTPGateway) post(ctx *RenderContext) (*SsrResponse, error) {
 	}, nil
 }
 
-func (g *SsrHTTPGateway) handleFailure(ctx *RenderContext, err error) (*SsrResponse, error) {
-	if g.ErrorReporter != nil {
-		g.ErrorReporter(ctx, err)
+func (g *SsrHTTPGateway) client() *http.Client {
+	if g.HttpClient != nil {
+		return g.HttpClient
 	}
+	return http.DefaultClient
+}
+
+func requestContextFrom(ctx *RenderContext) context.Context {
 	if ctx != nil && ctx.Inertia != nil {
-		echoContext := ctx.Inertia.EchoContext()
-		if echoContext != nil && echoContext.Request() != nil && echoContext.Request().Context().Err() != nil {
-			return nil, err
+		if ec := ctx.Inertia.EchoContext(); ec != nil && ec.Request() != nil {
+			return ec.Request().Context()
 		}
 	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return nil, err
-	}
-	if g.FallbackOnError {
-		return nil, nil
-	}
-	return nil, err
+	return context.Background()
 }
 
 func (g *SsrHTTPGateway) endpoint() string {
@@ -288,7 +227,7 @@ func ensureLeadingSlash(p string) string {
 }
 
 // matchSSRPaths reports whether path matches any exclusion pattern.
-// Patterns follow Laravel Request::is / ExcludesPaths style (* wildcards).
+// Used by Inertia.SsrEnabled for WithoutSsr (Laravel Request::is / ExcludesPaths style).
 func matchSSRPaths(path string, patterns []string) bool {
 	if len(patterns) == 0 {
 		return false

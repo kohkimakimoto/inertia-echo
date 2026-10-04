@@ -157,8 +157,8 @@ func (i *Inertia) DisableSsrWhen(fn func(c *echo.Context) bool) {
 }
 
 // SsrEnabled reports whether this request may attempt SSR from Inertia's point of view.
-// Evaluates DisableSsr / DisableSsrWhen / WithoutSsr. Shared SsrGateway may still skip
-// for its own Enabled / Except / Disable. Custom Renderers should call this instead of
+// Evaluates DisableSsr / DisableSsrWhen / WithoutSsr. SsrHTTPGateway may still skip when
+// Enabled is false or no SSR bundle exists. Custom Renderers should call this instead of
 // reading Inertia internals.
 func (i *Inertia) SsrEnabled() bool {
 	if i.ssrDisabled {

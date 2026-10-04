@@ -293,9 +293,6 @@ func TestNewSsrHTTPGateway(t *testing.T) {
 	if gateway.HttpClient.Timeout != 0 {
 		t.Errorf("Expected default HTTP client timeout to be disabled, got %s", gateway.HttpClient.Timeout)
 	}
-	if gateway.FallbackOnError {
-		t.Error("Expected FallbackOnError false by default")
-	}
 }
 
 func TestSsrHTTPGateway_Dispatch_NetworkError(t *testing.T) {
@@ -317,27 +314,6 @@ func TestSsrHTTPGateway_Dispatch_NetworkError(t *testing.T) {
 	_, err := gateway.Dispatch(ctx)
 	if err == nil {
 		t.Error("Expected network error but got none")
-	}
-}
-
-func TestSsrHTTPGateway_Dispatch_FallbackOnError(t *testing.T) {
-	reported := false
-	gateway := &SsrHTTPGateway{
-		Enabled:         true,
-		URL:             "http://invalid-host:99999",
-		HttpClient:      &http.Client{},
-		FallbackOnError: true,
-		ErrorReporter:   func(*RenderContext, error) { reported = true },
-	}
-	got, err := gateway.Dispatch(&RenderContext{Page: &Page{Props: map[string]any{}}})
-	if err != nil {
-		t.Fatalf("expected soft fallback, got %v", err)
-	}
-	if got != nil {
-		t.Fatalf("expected nil response, got %#v", got)
-	}
-	if !reported {
-		t.Fatal("expected ErrorReporter to be called")
 	}
 }
 
@@ -366,7 +342,6 @@ func TestSsrHTTPGateway_Dispatch_PropagatesRequestContext(t *testing.T) {
 				}
 			}),
 		},
-		FallbackOnError: true,
 	}
 	renderContext := &RenderContext{
 		Inertia: &Inertia{echoContext: c},
@@ -418,7 +393,7 @@ func TestSsrHTTPGateway_Dispatch_InvalidPageJSON(t *testing.T) {
 	}
 }
 
-func TestSsrHTTPGateway_ssrIsEnabledControls(t *testing.T) {
+func TestSsrHTTPGateway_Dispatch_Skips(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		t.Fatal("SSR HTTP must not be called when disabled/skipped")
 	}))
@@ -462,25 +437,6 @@ func TestSsrHTTPGateway_ssrIsEnabledControls(t *testing.T) {
 		got, err := g.Dispatch(newCtx("/admin/users", func(i *Inertia) {
 			i.WithoutSsr("admin/*")
 		}))
-		if err != nil || got != nil {
-			t.Fatalf("got=%#v err=%v", got, err)
-		}
-	})
-	t.Run("base Except path match", func(t *testing.T) {
-		g := &SsrHTTPGateway{Enabled: true, URL: server.URL, HttpClient: &http.Client{}, Except: []string{"admin/*"}}
-		got, err := g.Dispatch(newCtx("/admin/users", nil))
-		if err != nil || got != nil {
-			t.Fatalf("got=%#v err=%v", got, err)
-		}
-	})
-	t.Run("base Disable func", func(t *testing.T) {
-		g := &SsrHTTPGateway{
-			Enabled:    true,
-			URL:        server.URL,
-			HttpClient: &http.Client{},
-			Disable:    func(*echo.Context) bool { return true },
-		}
-		got, err := g.Dispatch(newCtx("/", nil))
 		if err != nil || got != nil {
 			t.Fatalf("got=%#v err=%v", got, err)
 		}
@@ -546,14 +502,6 @@ func TestSsrHTTPGateway_IsHealthy(t *testing.T) {
 	g.URL = "http://invalid-host:99999"
 	if g.IsHealthy(context.Background()) {
 		t.Fatal("expected unhealthy")
-	}
-}
-
-func TestSsrHTTPGateway_ExceptPaths(t *testing.T) {
-	g := NewSsrHTTPGateway()
-	g.ExceptPaths("admin/*", "internal")
-	if len(g.Except) != 2 || g.Except[0] != "admin/*" || g.Except[1] != "internal" {
-		t.Fatalf("Except=%v", g.Except)
 	}
 }
 
