@@ -45,9 +45,6 @@ type Inertia struct {
 	flashLoaded      bool
 	rescueReporter   RescueReporter
 	now              func() time.Time
-	// Per-request SSR controls (Share-like render parameters). Private; callers use
-	// WithoutSsr / DisableSsr* / SsrEnabled. SsrHTTPGateway stays shared and stateless —
-	// it consults SsrEnabled() instead of reading these fields.
 	withoutSsr       []string
 	ssrDisabled      bool
 	ssrDisableWhen   func(c *echo.Context) bool
@@ -74,7 +71,7 @@ func (i *Inertia) EncryptHistory(encrypt bool) {
 }
 
 // ClearHistory clears the history.
-// see https://inertiajs.com/history-encryption
+// see https://inertiajs.com/docs/v3/security/history-encryption
 func (i *Inertia) ClearHistory() {
 	i.clearHistory = true
 }
