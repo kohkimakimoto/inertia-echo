@@ -354,7 +354,6 @@ func (i *Inertia) resolveURL() string {
 func (i *Inertia) Location(url string) error {
 	if i.echoContext.Request().Header.Get(HeaderXInertia) != "" {
 		res := i.echoContext.Response()
-		addVaryHeader(res.Header(), HeaderXInertia)
 		res.Header().Set(HeaderXInertiaLocation, url)
 		res.WriteHeader(http.StatusConflict)
 		return nil
