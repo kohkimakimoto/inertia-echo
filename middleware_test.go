@@ -239,12 +239,16 @@ func TestMiddlewareFragmentRedirectContract(t *testing.T) {
 
 func TestMiddlewareFragmentRedirectExceptions(t *testing.T) {
 	tests := []struct {
-		name     string
-		inertia  bool
-		prefetch bool
+		name        string
+		inertia     bool
+		prefetchHdr string // header name; empty means no prefetch
+		prefetchVal string
 	}{
 		{name: "normal request"},
-		{name: "prefetch", inertia: true, prefetch: true},
+		{name: "Purpose prefetch", inertia: true, prefetchHdr: "Purpose", prefetchVal: "prefetch"},
+		{name: "Sec-Purpose prefetch", inertia: true, prefetchHdr: "Sec-Purpose", prefetchVal: "prefetch"},
+		{name: "X-Moz prefetch", inertia: true, prefetchHdr: "X-Moz", prefetchVal: "prefetch"},
+		{name: "Purpose case-insensitive", inertia: true, prefetchHdr: "Purpose", prefetchVal: "Prefetch"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -254,8 +258,8 @@ func TestMiddlewareFragmentRedirectExceptions(t *testing.T) {
 				req.Header.Set(HeaderXInertia, "true")
 				req.Header.Set(HeaderXInertiaVersion, "v3")
 			}
-			if tt.prefetch {
-				req.Header.Set("Purpose", "prefetch")
+			if tt.prefetchHdr != "" {
+				req.Header.Set(tt.prefetchHdr, tt.prefetchVal)
 			}
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)

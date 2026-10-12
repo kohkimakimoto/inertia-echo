@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 )
 
 // ResponseWriterWrapper is a wrapper of http.ResponseWriter for buffering a response
@@ -61,6 +60,11 @@ func (w *ResponseWriterWrapper) Write(p []byte) (int, error) {
 	return w.ResponseWriter.Write(p)
 }
 
+// StatusCode returns the status that will be flushed (buffered or already written).
+func (w *ResponseWriterWrapper) StatusCode() int {
+	return w.statusCode
+}
+
 func (w *ResponseWriterWrapper) replaceBufferedStatusCode(from, to int) {
 	if w.buffered && w.statusCode == from {
 		w.statusCode = to
@@ -76,10 +80,6 @@ func (w *ResponseWriterWrapper) replaceBufferedResponse(statusCode int, body []b
 	if len(body) > 0 {
 		_, _ = w.body.Write(body)
 	}
-}
-
-func (w *ResponseWriterWrapper) hasFragmentRedirect() bool {
-	return w.buffered && isRedirectStatus(w.statusCode) && strings.Contains(w.Header().Get("Location"), "#")
 }
 
 func (w *ResponseWriterWrapper) isRedirectResponse() bool {

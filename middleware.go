@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -204,12 +205,17 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			addVaryHeader(w.Header(), HeaderXInertia)
 
 			if req.Header.Get(HeaderXInertia) != "" {
-				changeRedirectCode(req, w)
-				onRedirectWithFragment(req, w)
+				// 302 → 303 for PUT/PATCH/DELETE so the follow-up is GET.
+				// Spec: https://inertiajs.com/docs/v3/the-basics/redirects
+				if w.StatusCode() == http.StatusFound && inArray(req.Method, []string{http.MethodPut, http.MethodPatch, http.MethodDelete}) {
+					w.replaceBufferedStatusCode(http.StatusFound, http.StatusSeeOther)
+				}
+				if w.isRedirectResponse() && redirectHasFragment(w) && !isPrefetchRequest(req) {
+					onRedirectWithFragment(w)
+				}
 			}
 
-			// Cross-request flash / flags. Laravel reflashes session flash on redirects
-			// only; we persist any unconsumed Inertia state after a successful handler.
+			// Commit the request-scoped state bag to StateStore.
 			if err := i.persistState(); err != nil {
 				return err
 			}
@@ -225,19 +231,20 @@ func checkVersion(req *http.Request, version string) bool {
 		req.Header.Get(HeaderXInertiaVersion) != version
 }
 
-// changeRedirectCode rewrites buffered 302 to 303 for Inertia PUT/PATCH/DELETE.
-// Spec: https://inertiajs.com/docs/v3/the-basics/redirects
-func changeRedirectCode(req *http.Request, w *ResponseWriterWrapper) {
-	if inArray(req.Method, []string{http.MethodPut, http.MethodPatch, http.MethodDelete}) {
-		w.replaceBufferedStatusCode(http.StatusFound, http.StatusSeeOther)
-	}
+// isPrefetchRequest mirrors Laravel Illuminate\Http\Request::prefetch.
+func isPrefetchRequest(req *http.Request) bool {
+	return strings.EqualFold(req.Header.Get("Purpose"), "prefetch") ||
+		strings.EqualFold(req.Header.Get("Sec-Purpose"), "prefetch") ||
+		strings.EqualFold(req.Header.Get("X-Moz"), "prefetch")
+}
+
+// redirectHasFragment mirrors inertia-laravel Middleware::redirectHasFragment.
+func redirectHasFragment(w *ResponseWriterWrapper) bool {
+	return strings.Contains(w.Header().Get(echo.HeaderLocation), "#")
 }
 
 // onRedirectWithFragment mirrors inertia-laravel Middleware::onRedirectWithFragment.
-func onRedirectWithFragment(req *http.Request, w *ResponseWriterWrapper) {
-	if req.Header.Get("Purpose") == "prefetch" || !w.hasFragmentRedirect() {
-		return
-	}
+func onRedirectWithFragment(w *ResponseWriterWrapper) {
 	location := w.Header().Get(echo.HeaderLocation)
 	w.replaceBufferedResponse(http.StatusConflict, nil)
 	w.Header().Del(echo.HeaderLocation)
