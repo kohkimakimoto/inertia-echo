@@ -745,12 +745,17 @@ For POST-redirect-GET, unconsumed flash (and ClearHistory / PreserveFragment fla
 
 **Not a secure session.** Default `StateStore` values are client-controlled. Treat loaded flash like any other untrusted request input. Do not use it for authorization, identity, or secrets.
 
-To replace the storage backend:
+To replace the storage backend, or tune the default cookie attributes:
 
 ```go
+cfg := inertia.DefaultCookieStateStoreConfig
+cfg.Secure = true
+cfg.Path = "/app"
+
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 	Renderer:   r,
-	StateStore: myStateStore, // implements inertia.StateStore
+	StateStore: inertia.NewCookieStateStoreWithConfig(cfg),
+	// Or: StateStore: myStateStore, // implements inertia.StateStore
 }))
 ```
 

@@ -295,13 +295,13 @@ func TestMiddlewareFinalizesOneShotStateBeforeRedirect(t *testing.T) {
 	}
 	var bagCookie *http.Cookie
 	for _, cookie := range rec.Result().Cookies() {
-		if cookie.Name == StateCookieName {
+		if cookie.Name == DefaultCookieStateStoreConfig.Name {
 			bagCookie = cookie
 			break
 		}
 	}
 	if bagCookie == nil {
-		t.Fatalf("expected %s cookie, got %v", StateCookieName, rec.Result().Cookies())
+		t.Fatalf("expected %s cookie, got %v", DefaultCookieStateStoreConfig.Name, rec.Result().Cookies())
 	}
 	bag, err := decodeStateBag(bagCookie.Value)
 	if err != nil {
@@ -496,13 +496,13 @@ func TestFlashSurvivesRedirectViaStateStore(t *testing.T) {
 	}
 	var bagCookie *http.Cookie
 	for _, cookie := range postRec.Result().Cookies() {
-		if cookie.Name == StateCookieName {
+		if cookie.Name == DefaultCookieStateStoreConfig.Name {
 			bagCookie = cookie
 			break
 		}
 	}
 	if bagCookie == nil || bagCookie.Value == "" {
-		t.Fatalf("expected %s cookie, got %v", StateCookieName, postRec.Result().Cookies())
+		t.Fatalf("expected %s cookie, got %v", DefaultCookieStateStoreConfig.Name, postRec.Result().Cookies())
 	}
 	bag, err := decodeStateBag(bagCookie.Value)
 	if err != nil {
@@ -535,7 +535,7 @@ func TestFlashSurvivesRedirectViaStateStore(t *testing.T) {
 		t.Fatalf("flash=%v", page.Flash)
 	}
 	for _, cookie := range getRec.Result().Cookies() {
-		if cookie.Name == StateCookieName && cookie.MaxAge != -1 && cookie.Value != "" {
+		if cookie.Name == DefaultCookieStateStoreConfig.Name && cookie.MaxAge != -1 && cookie.Value != "" {
 			remaining, err := decodeStateBag(cookie.Value)
 			if err == nil && remaining[StateKeyFlashData] != "" {
 				t.Fatalf("flash should be cleared from bag, got %v", remaining)

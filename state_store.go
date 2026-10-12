@@ -20,11 +20,6 @@ const (
 	StateKeyPreserveFragment = "preserve_fragment"
 )
 
-// StateCookieName is the single cookie that holds the StateStore bag for the
-// default CookieStateStore. Logical keys (StateKey*) live inside its payload,
-// analogous to keys inside Laravel's session.
-const StateCookieName = "inertia.state"
-
 // StateStore persists Inertia's request-scoped state bag across HTTP requests.
 //
 // Design intent:
@@ -49,22 +44,64 @@ type StateStore interface {
 	Save(c *echo.Context, bag map[string]string) error
 }
 
+// CookieStateStoreConfig configures cookie attributes for CookieStateStore.
+// Zero Name, Path, or SameSite are replaced with DefaultCookieStateStoreConfig
+// values. Other fields are used as provided — copy the default before overriding
+// a subset of fields so HTTPOnly stays true:
+//
+//	cfg := inertia.DefaultCookieStateStoreConfig
+//	cfg.Secure = true
+//	store := inertia.NewCookieStateStoreWithConfig(cfg)
+type CookieStateStoreConfig struct {
+	Name     string
+	Path     string
+	Domain   string
+	Secure   bool
+	HTTPOnly bool
+	SameSite http.SameSite
+}
+
+// DefaultCookieStateStoreConfig is used by NewCookieStateStore.
+var DefaultCookieStateStoreConfig = CookieStateStoreConfig{
+	Name:     "inertia.state",
+	Path:     "/",
+	HTTPOnly: true,
+	SameSite: http.SameSiteLaxMode,
+}
+
 // CookieStateStore is the default StateStore. It keeps the bag in a single
-// unsigned HttpOnly cookie (StateCookieName), like a tiny session bag.
+// unsigned cookie, like a tiny session bag.
 //
 // Security: cookie values are not authenticated. A client can forge or alter
 // them. Treat Load results as untrusted input, same as request parameters.
 // Do not store credentials, session tokens, or authorization state here.
-type CookieStateStore struct{}
+type CookieStateStore struct {
+	config CookieStateStoreConfig
+}
 
 // NewCookieStateStore returns the default unsigned cookie StateStore.
 func NewCookieStateStore() *CookieStateStore {
-	return &CookieStateStore{}
+	return NewCookieStateStoreWithConfig(DefaultCookieStateStoreConfig)
+}
+
+// NewCookieStateStoreWithConfig returns a CookieStateStore with the given
+// cookie attributes. See CookieStateStoreConfig for zero-value handling.
+func NewCookieStateStoreWithConfig(config CookieStateStoreConfig) *CookieStateStore {
+	if config.Name == "" {
+		config.Name = DefaultCookieStateStoreConfig.Name
+	}
+	if config.Path == "" {
+		config.Path = DefaultCookieStateStoreConfig.Path
+	}
+	if config.SameSite == 0 {
+		config.SameSite = DefaultCookieStateStoreConfig.SameSite
+	}
+	return &CookieStateStore{config: config}
 }
 
 func (s *CookieStateStore) Load(c *echo.Context) (map[string]string, error) {
 	bag := map[string]string{}
-	cookie, err := c.Request().Cookie(StateCookieName)
+	cookie, err := c.Request().Cookie(s.config.Name)
 	if err != nil {
 		if !errors.Is(err, http.ErrNoCookie) {
 			return nil, err
@@ -84,28 +121,28 @@ func (s *CookieStateStore) Load(c *echo.Context) (map[string]string, error) {
 
 func (s *CookieStateStore) Save(c *echo.Context, bag map[string]string) error {
 	if len(bag) == 0 {
-		replaceCookie(c.Response(), &http.Cookie{
-			Name:     StateCookieName,
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1,
-		})
+		replaceCookie(c.Response(), s.cookie("", -1))
 		return nil
 	}
 	encoded, err := encodeStateBag(bag)
 	if err != nil {
 		return err
 	}
-	replaceCookie(c.Response(), &http.Cookie{
-		Name:     StateCookieName,
-		Value:    encoded,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	replaceCookie(c.Response(), s.cookie(encoded, 0))
 	return nil
+}
+
+func (s *CookieStateStore) cookie(value string, maxAge int) *http.Cookie {
+	return &http.Cookie{
+		Name:     s.config.Name,
+		Value:    value,
+		Path:     s.config.Path,
+		Domain:   s.config.Domain,
+		Secure:   s.config.Secure,
+		HttpOnly: s.config.HTTPOnly,
+		SameSite: s.config.SameSite,
+		MaxAge:   maxAge,
+	}
 }
 
 // replaceCookie sets cookie, replacing any prior Set-Cookie for the same name
