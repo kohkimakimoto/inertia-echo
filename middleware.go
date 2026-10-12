@@ -43,11 +43,11 @@ type MiddlewareConfig struct {
 	ShareOnce SharedDataFunc
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer Renderer
-	// CarryStore persists one-shot Inertia values across redirects (flash,
-	// clear history, preserve fragment). Nil uses CookieCarryStore.
-	// Keys are fixed (CarryKey*); not configurable, matching inertia-laravel SessionKey.
-	// Not a secure session — see CarryStore docs.
-	CarryStore CarryStore
+	// StateStore persists the Inertia state bag across requests (flash,
+	// clear history, preserve fragment). Nil uses CookieStateStore.
+	// Keys are fixed (StateKey*); not configurable, matching inertia-laravel SessionKey.
+	// Not a secure session — see StateStore docs.
+	StateStore StateStore
 	// RescueReporter receives errors from deferred props with Rescue enabled.
 	RescueReporter RescueReporter
 	// Now supplies request-time timestamps for once-prop expiration metadata.
@@ -67,7 +67,7 @@ var DefaultMiddlewareConfig = MiddlewareConfig{
 	URLResolver: defaultURLResolver(),
 	Share:       nil,
 	Renderer:    nil,
-	CarryStore:  NewCookieCarryStore(),
+	StateStore:  NewCookieStateStore(),
 }
 
 func defaultVersionFunc() VersionFunc {
@@ -108,8 +108,8 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	if config.URLResolver == nil {
 		config.URLResolver = DefaultMiddlewareConfig.URLResolver
 	}
-	if config.CarryStore == nil {
-		config.CarryStore = DefaultMiddlewareConfig.CarryStore
+	if config.StateStore == nil {
+		config.StateStore = DefaultMiddlewareConfig.StateStore
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -123,6 +123,13 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			// request-associated Gateway via except(); our SsrGateway is app-scoped and
 			// shared across requests, so exclusion paths live on Inertia for SsrEnabled().
 			req := c.Request()
+			state, err := config.StateStore.Load(c)
+			if err != nil {
+				return err
+			}
+			if state == nil {
+				state = map[string]string{}
+			}
 			i := &Inertia{
 				echoContext:      c,
 				rootView:         config.RootView,
@@ -130,7 +137,8 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				version:          config.VersionFunc,
 				urlResolver:      config.URLResolver,
 				renderer:         config.Renderer,
-				carryStore:       config.CarryStore,
+				stateStore:       config.StateStore,
+				state:            state,
 				flash:            map[string]any{},
 				rescueReporter:   config.RescueReporter,
 				now:              config.Now,
@@ -149,7 +157,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			version := i.Version()
 			if checkVersion(req, version) {
 				addVaryHeader(c.Response().Header(), HeaderXInertia)
-				if err := i.persistCarry(); err != nil {
+				if err := i.persistState(); err != nil {
 					return err
 				}
 				c.Response().Header().Set(HeaderXInertiaVersion, version)
@@ -201,7 +209,7 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			addVaryHeader(w.Header(), HeaderXInertia)
 
 			transformResponse(req, w)
-			if err := i.persistCarry(); err != nil {
+			if err := i.persistState(); err != nil {
 				return err
 			}
 			return w.flushBufferedResponse()
