@@ -741,7 +741,7 @@ inertia.Flash(c, map[string]any{
 return c.Redirect(http.StatusFound, "/profile")
 ```
 
-For POST-redirect-GET, unconsumed flash (and ClearHistory / PreserveFragment flags) are held in an in-memory bag on the request-scoped `Inertia` and persisted by `StateStore`. The default stores the bag in one unsigned HttpOnly cookie (`inertia.state`) keyed like inertia-laravel's `SessionKey` (`inertia.flash_data`, etc.). Keep flash payloads small (cookie size limits).
+For POST-redirect-GET, unconsumed flash (and ClearHistory / PreserveFragment flags) are held in an in-memory bag on the request-scoped `Inertia` and persisted by `StateStore`. The default stores the bag in one unsigned HttpOnly cookie (`inertia.state`) under keys such as `flash_data`. Keep flash payloads small (cookie size limits).
 
 **Not a secure session.** Default `StateStore` values are client-controlled. Treat loaded flash like any other untrusted request input. Do not use it for authorization, identity, or secrets.
 

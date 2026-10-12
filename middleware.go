@@ -45,7 +45,7 @@ type MiddlewareConfig struct {
 	Renderer Renderer
 	// StateStore persists the Inertia state bag across requests (flash,
 	// clear history, preserve fragment). Nil uses CookieStateStore.
-	// Keys are fixed (StateKey*); not configurable, matching inertia-laravel SessionKey.
+	// Keys are fixed (StateKey*); not configurable.
 	// Not a secure session — see StateStore docs.
 	StateStore StateStore
 	// RescueReporter receives errors from deferred props with Rescue enabled.

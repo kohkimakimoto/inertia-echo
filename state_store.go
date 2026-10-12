@@ -10,14 +10,14 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-// StateStore keys mirror inertia-laravel's Inertia\Support\SessionKey constants.
-// They are logical keys inside the in-memory state bag on Inertia (not cookie names).
-// Laravel stores them in the session bag; CookieStateStore persists the whole bag
-// in one cookie payload. They are not configurable — Laravel fixes them too.
+// StateStore logical keys inside the in-memory bag on Inertia (not cookie names).
+// Unlike inertia-laravel's SessionKey values (which use an "inertia." prefix because
+// they share Laravel's app session), this bag is Inertia-owned, so bare names suffice.
+// They are not configurable — Laravel fixes its SessionKey names too.
 const (
-	StateKeyClearHistory     = "inertia.clear_history"
-	StateKeyFlashData        = "inertia.flash_data"
-	StateKeyPreserveFragment = "inertia.preserve_fragment"
+	StateKeyClearHistory     = "clear_history"
+	StateKeyFlashData        = "flash_data"
+	StateKeyPreserveFragment = "preserve_fragment"
 )
 
 // StateCookieName is the single cookie that holds the StateStore bag for the
