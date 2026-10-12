@@ -40,11 +40,6 @@ func newPropsResolver(i *Inertia, component string) *propsResolver {
 		loadedOnce[key] = struct{}{}
 	}
 
-	now := time.Now()
-	if i.now != nil {
-		now = i.now()
-	}
-
 	return &propsResolver{
 		inertia:    i,
 		component:  component,
@@ -54,7 +49,7 @@ func newPropsResolver(i *Inertia, component string) *propsResolver {
 		except:     append([]string(nil), i.exceptProps...),
 		reset:      append([]string(nil), i.resetProps...),
 		loadedOnce: loadedOnce,
-		now:        now,
+		now:        i.now(),
 		metadata: propsMetadata{
 			deferredProps: make(map[string]any),
 			scrollProps:   make(map[string]ScrollMetadata),

@@ -50,6 +50,7 @@ type MiddlewareConfig struct {
 	// RescueReporter receives errors from deferred props with Rescue enabled.
 	RescueReporter RescueReporter
 	// Now supplies request-time timestamps for once-prop expiration metadata.
+	// Nil defaults to time.Now.
 	Now func() time.Time
 	// WithoutSsr excludes matching paths from SSR for each request.
 	// Mirrors inertia-laravel Middleware::$withoutSsr (patterns: * wildcards like Request::is).
@@ -109,6 +110,9 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	}
 	if config.StateStore == nil {
 		config.StateStore = DefaultMiddlewareConfig.StateStore
+	}
+	if config.Now == nil {
+		config.Now = time.Now
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
