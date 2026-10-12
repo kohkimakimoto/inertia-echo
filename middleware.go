@@ -18,21 +18,16 @@ const (
 type SharedDataFunc func(c *echo.Context) (map[string]any, error)
 
 type MiddlewareConfig struct {
+	// Skipper is a function to skip middleware. Returning true skips processing the middleware.
 	Skipper middleware.Skipper
 	// The root template that's loaded on the first page visit.
-	// Corresponding specification: https://inertiajs.com/docs/v3/installation/server-side-setup
 	// Unlike inertia-laravel's rootView(Request), this stays a static string: in practice
 	// a fixed template name is enough. Override per request with SetRootView if needed.
 	RootView string
 	// Determines the current asset version.
 	// Corresponding specification: https://inertiajs.com/docs/v3/advanced/asset-versioning
-	// Signature mirrors inertia-laravel's version(Request); the default ignores c.
 	VersionFunc VersionFunc
 	// URLResolver resolves the Page object URL.
-	// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object
-	// Mirrors inertia-laravel's resolveUrlUsing / Middleware::urlResolver.
-	// Unlike Laravel (null means inline default at render), nil is replaced with
-	// defaultURLResolver at middleware setup — same pattern as VersionFunc.
 	URLResolver URLResolverFunc
 	// Defines the props that are shared by default.
 	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data
@@ -43,10 +38,13 @@ type MiddlewareConfig struct {
 	ShareOnce SharedDataFunc
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer Renderer
-	// StateStore persists the Inertia state bag across requests (flash,
-	// clear history, preserve fragment). Nil uses CookieStateStore.
-	// Keys are fixed (StateKey*); not configurable.
-	// Not a secure session — see StateStore docs.
+	// StateStore is inertia-echo's own design for cross-request state, not an
+	// official Inertia protocol feature. Echo has no built-in session, but
+	// Inertia features such as flash, clear history, and preserve fragment need
+	// state that survives to a later request (inertia-laravel uses the Laravel
+	// session). This package therefore owns a small stateful bag and API scoped
+	// to Inertia, rather than depending on or replacing an application session.
+	// Nil uses CookieStateStore. Not a secure session — see StateStore docs.
 	StateStore StateStore
 	// RescueReporter receives errors from deferred props with Rescue enabled.
 	RescueReporter RescueReporter
@@ -119,9 +117,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 			}
 
 			// Create the request-scoped Inertia instance.
-			// WithoutSsr is copied here (not applied to SsrGateway): Laravel mutates a
-			// request-associated Gateway via except(); our SsrGateway is app-scoped and
-			// shared across requests, so exclusion paths live on Inertia for SsrEnabled().
 			req := c.Request()
 			state, err := config.StateStore.Load(c)
 			if err != nil {
