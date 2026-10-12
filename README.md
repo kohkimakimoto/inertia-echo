@@ -32,6 +32,8 @@ Table of Contents
     - [Root template data](#root-template-data)
   - [Redirects](#redirects)
     - [External redirects](#external-redirects)
+    - [Redirect status (302 → 303)](#redirect-status-302--303)
+    - [Redirects with URL fragments](#redirects-with-url-fragments)
   - [Routing](#routing)
     - [Shorthand routes](#shorthand-routes)
   - [Shared data](#shared-data)
@@ -44,6 +46,7 @@ Table of Contents
   - [Once props](#once-props)
   - [Merging props](#merging-props)
   - [Infinite scroll props](#infinite-scroll-props)
+  - [Cross-request state (StateStore)](#cross-request-state-statestore)
   - [Flash data](#flash-data)
   - [Preserving URL fragments](#preserving-url-fragments)
   - [Error responses](#error-responses)
@@ -407,7 +410,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 
 ### Middleware
 
-After setting up the renderer, you need to add the Inertia middleware to your Echo application.
+Add the Inertia middleware after configuring a renderer:
 
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -415,9 +418,19 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 }))
 ```
 
-The middleware handles Inertia requests, a foundational functionality of this package.
-You can pass a configuration to customize its behavior.
-For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#MiddlewareConfig) documentation.
+The middleware is the core of this package. For each request it:
+
+1. Creates a request-scoped [`Inertia`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#Inertia) instance and stores it on `echo.Context`
+2. Loads the cross-request state bag via [`StateStore`](#cross-request-state-statestore)
+3. Checks asset version **before** `Share` / the handler (unlike inertia-laravel, which does this after `$next`). On mismatch it returns an Inertia `Location` response
+4. Applies `Share` / `ShareOnce` when configured
+5. Runs the next handler (with a response writer wrapper so redirects can be rewritten)
+6. On success: sets `Vary: X-Inertia`, rewrites Inertia redirects when needed (302→303, fragment → 409), then commits state via `StateStore`
+7. On handler error: returns the error immediately (no redirect rewrite, no state commit). Use Echo's `HTTPErrorHandler` for error pages
+
+Unlike inertia-laravel, empty Inertia `200` responses are **not** automatically converted to a back redirect. Return `Redirect`, `Render`, or an error explicitly.
+
+Configure behavior through [`MiddlewareConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#MiddlewareConfig) (`Renderer`, `Share`, `ShareOnce`, `VersionFunc`, `URLResolver`, `StateStore`, `WithoutSsr`, `RescueReporter`, and others).
 
 ### Responses
 
@@ -469,19 +482,39 @@ You can then access this variable like a regular template variable.
 
 :book: The related official document: [Redirects](https://inertiajs.com/docs/v3/the-basics/redirects)
 
-You can use Echo's standard way to redirect.
+Use Echo's standard redirect:
 
 ```go
 return c.Redirect(http.StatusFound, "/")
 ```
 
+The middleware may rewrite Inertia redirect responses after the handler returns (see below).
+
 #### External redirects
 
-The following is a way to redirect to an external website in Inertia apps.
+For a full page visit outside the current Inertia app (or a hard reload):
 
 ```go
 return inertia.Location(c, "/path/to/external")
 ```
+
+For Inertia requests this returns `409` with `X-Inertia-Location`. For non-Inertia requests it falls back to a normal `302` redirect.
+
+#### Redirect status (302 → 303)
+
+For Inertia requests that use `PUT`, `PATCH`, or `DELETE`, a buffered `302 Found` is rewritten to `303 See Other` so the follow-up visit is a GET. This matches the Inertia protocol and inertia-laravel middleware behavior.
+
+#### Redirects with URL fragments
+
+When an Inertia request redirects to a `Location` that already contains `#…`, the middleware converts it to:
+
+- status `409 Conflict`
+- header `X-Inertia-Redirect` with the original location (including the fragment)
+- no `Location` header
+
+Prefetch requests are skipped (`Purpose`, `Sec-Purpose`, or `X-Moz` equal to `prefetch`, case-insensitive — same as Laravel's `Request::prefetch()`).
+
+This is separate from [`PreserveFragment`](#preserving-url-fragments), which asks the client to keep the **current** URL fragment across the next page.
 
 ### Routing
 
@@ -551,29 +584,21 @@ inertia.Render(c, "Users/Index", map[string]any{
 	// ALWAYS included on standard visits
 	// OPTIONALLY included on partial reloads
 	// ONLY evaluated when needed
-	"users": func() (any, error) {
-		users, err := // get users...
-		if err != nil {
-			return nil, err
-		}
-		return users
+	"companies": func() (any, error) {
+		return loadCompanies()
 	},
 
 	// NEVER included on standard visits
 	// OPTIONALLY included on partial reloads
 	// ONLY evaluated when needed
-	"users": inertia.Optional(func() (any, error) {
-		users, err := // get users...
-		if err != nil {
-			return nil, err
-		}
-		return users, nil
+	"permissions": inertia.Optional(func() (any, error) {
+		return loadPermissions()
 	}),
 
 	// ALWAYS included on standard visits
 	// ALWAYS included on partial reloads
 	// ALWAYS evaluated
-	"users": inertia.Always(users),
+	"auth": inertia.Always(authUser),
 })
 ```
 
@@ -730,22 +755,21 @@ The default data path is `data`. Use `WithDataPath` to change it and `Defer` to 
 
 :book: The related official document: [Infinite Scroll](https://inertiajs.com/docs/v3/data-props/infinite-scroll)
 
-### Flash data
+### Cross-request state (StateStore)
 
-`Flash` adds one-time data to the top-level Page `flash` object for the current render:
+Echo has no built-in session, but several Inertia features need values that survive until a later request (flash, clear history, preserve fragment). inertia-laravel stores those in the Laravel session. **StateStore is inertia-echo's own design** for that gap — not an official Inertia protocol feature and not a general-purpose application session.
 
-```go
-inertia.Flash(c, map[string]any{
-	"message": "Profile updated.",
-})
-return c.Redirect(http.StatusFound, "/profile")
-```
+Architecture:
 
-For POST-redirect-GET, unconsumed flash (and ClearHistory / PreserveFragment flags) are held in an in-memory bag on the request-scoped `Inertia` and persisted by `StateStore`. The default stores the bag in one unsigned HttpOnly cookie (`inertia.state`) under keys such as `flash_data`. Keep flash payloads small (cookie size limits).
+- During a request, values live in an in-memory bag on the request-scoped `Inertia` (`Get` / `Set` / `Delete` / `Pull`)
+- [`StateStore`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#StateStore) only **Load**s the bag at the start of the middleware and **Save**s it after a successful handler (and on asset version mismatch before `Location`)
+- Bag keys are fixed: `flash_data`, `clear_history`, `preserve_fragment` (see `StateKey*`)
 
-**Not a secure session.** Default `StateStore` values are client-controlled. Treat loaded flash like any other untrusted request input. Do not use it for authorization, identity, or secrets.
+The default implementation is [`CookieStateStore`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#CookieStateStore): one unsigned HttpOnly cookie (`inertia.state` by default) holding the whole bag.
 
-To replace the storage backend, or tune the default cookie attributes:
+**Not a secure session.** Cookie values are client-controlled. Treat loaded data like any other untrusted request input. Do not store credentials, identity, or authorization state. Keep payloads small (cookie size limits).
+
+Tune cookie attributes or replace the backend:
 
 ```go
 cfg := inertia.DefaultCookieStateStoreConfig
@@ -755,22 +779,37 @@ cfg.Path = "/app"
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 	Renderer:   r,
 	StateStore: inertia.NewCookieStateStoreWithConfig(cfg),
-	// Or: StateStore: myStateStore, // implements inertia.StateStore
+	// Or: StateStore: myStateStore, // implements inertia.StateStore (Load/Save)
 }))
 ```
 
+Copy `DefaultCookieStateStoreConfig` before changing a subset of fields so defaults such as `HTTPOnly: true` are preserved.
+
+### Flash data
+
 :book: The related official document: [Flash data](https://inertiajs.com/docs/v3/data-props/flash-data)
+
+`Flash` adds one-time data to the top-level Page `flash` object:
+
+```go
+inertia.Flash(c, map[string]any{
+	"message": "Profile updated.",
+})
+return c.Redirect(http.StatusFound, "/profile")
+```
+
+For POST-redirect-GET, unconsumed flash is kept in the in-memory bag and committed through [`StateStore`](#cross-request-state-statestore) after the redirect response. The next request loads it and merges it into the Page on render (then clears it).
 
 ### Preserving URL fragments
 
-Call `PreserveFragment` before a redirect to ask the client to retain the source visit's URL fragment on the next rendered page:
+Call `PreserveFragment` before a redirect to set the Page `preserveFragment` flag so the client retains the **source** URL fragment on the next rendered page. The flag survives redirects via [`StateStore`](#cross-request-state-statestore):
 
 ```go
 inertia.PreserveFragment(c)
 return c.Redirect(http.StatusFound, "/account")
 ```
 
-For Inertia requests, redirects whose destination already contains a fragment are converted to the v3 `409` and `X-Inertia-Redirect` response. Prefetch requests are excluded from this conversion.
+If the redirect **destination** already includes `#…`, see [Redirects with URL fragments](#redirects-with-url-fragments) — that is a different middleware rewrite (`409` + `X-Inertia-Redirect`).
 
 ### Error responses
 
@@ -865,6 +904,8 @@ inertia.EncryptHistory(c, true)
 inertia.ClearHistory(c)
 ```
 
+If the response is a redirect (or otherwise does not consume the flag on a Page render), the flag is persisted via [`StateStore`](#cross-request-state-statestore) until the next rendered page.
+
 ### Asset versioning
 
 :book: The related official document: [Asset versioning](https://inertiajs.com/docs/v3/advanced/asset-versioning)
@@ -877,7 +918,9 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 }))
 ```
 
-Configure asset version manually.
+The default `VersionFunc` reads `INERTIA_VERSION`, then `GAE_VERSION`, then a development timestamp. Version mismatch is handled **before** `Share` and the handler: the middleware returns an Inertia `Location` for the current URL and sets `X-Inertia-Version`.
+
+Configure asset version manually for the current request:
 
 ```go
 inertia.SetVersion(c, func(c *echo.Context) string { return version })
