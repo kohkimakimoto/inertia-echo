@@ -203,7 +203,13 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 
 			addVaryHeader(w.Header(), HeaderXInertia)
 
-			transformResponse(req, w)
+			if req.Header.Get(HeaderXInertia) != "" {
+				changeRedirectCode(req, w)
+				onRedirectWithFragment(req, w)
+			}
+
+			// Cross-request flash / flags. Laravel reflashes session flash on redirects
+			// only; we persist any unconsumed Inertia state after a successful handler.
 			if err := i.persistState(); err != nil {
 				return err
 			}
@@ -219,27 +225,25 @@ func checkVersion(req *http.Request, version string) bool {
 		req.Header.Get(HeaderXInertiaVersion) != version
 }
 
-// changeRedirectCode changes the status code during redirects, ensuring they are made as
-// GET requests, preventing "MethodNotAllowedHttpException" errors.
-// Corresponding specification: https://inertiajs.com/docs/v3/the-basics/redirects
+// changeRedirectCode rewrites buffered 302 to 303 for Inertia PUT/PATCH/DELETE.
+// Spec: https://inertiajs.com/docs/v3/the-basics/redirects
 func changeRedirectCode(req *http.Request, w *ResponseWriterWrapper) {
-	if req.Header.Get(HeaderXInertia) != "" &&
-		inArray(req.Method, []string{http.MethodPut, http.MethodPatch, http.MethodDelete}) {
+	if inArray(req.Method, []string{http.MethodPut, http.MethodPatch, http.MethodDelete}) {
 		w.replaceBufferedStatusCode(http.StatusFound, http.StatusSeeOther)
 	}
 }
 
-func transformResponse(req *http.Request, w *ResponseWriterWrapper) {
-	if req.Header.Get(HeaderXInertia) != "" && req.Header.Get("Purpose") != "prefetch" && w.hasFragmentRedirect() {
-		location := w.Header().Get(echo.HeaderLocation)
-		w.replaceBufferedResponse(http.StatusConflict, nil)
-		w.Header().Del(echo.HeaderLocation)
-		w.Header().Del(echo.HeaderContentLength)
-		w.Header().Del(echo.HeaderContentType)
-		w.Header().Set(HeaderXInertiaRedirect, location)
+// onRedirectWithFragment mirrors inertia-laravel Middleware::onRedirectWithFragment.
+func onRedirectWithFragment(req *http.Request, w *ResponseWriterWrapper) {
+	if req.Header.Get("Purpose") == "prefetch" || !w.hasFragmentRedirect() {
 		return
 	}
-	changeRedirectCode(req, w)
+	location := w.Header().Get(echo.HeaderLocation)
+	w.replaceBufferedResponse(http.StatusConflict, nil)
+	w.Header().Del(echo.HeaderLocation)
+	w.Header().Del(echo.HeaderContentLength)
+	w.Header().Del(echo.HeaderContentType)
+	w.Header().Set(HeaderXInertiaRedirect, location)
 }
 
 func Get(c *echo.Context) (*Inertia, error) {
