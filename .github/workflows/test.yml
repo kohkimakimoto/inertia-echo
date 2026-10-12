@@ -5,13 +5,15 @@ on:
   push:
     branches:
       - master
+      - dev-5
   pull_request:
     branches:
       - master
+      - dev-5
 
 jobs:
   test:
-    name: test
+    name: Go / root
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

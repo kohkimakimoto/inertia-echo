@@ -7,12 +7,12 @@
 This is the [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](https://echo.labstack.com/) Go web framework.
 
 [Inertia.js](https://inertiajs.com) is a JavaScript library that allows you to build a fully JavaScript-based single-page app without complexity.
-I assume that you are familiar with Inertia.js and [how it works](https://inertiajs.com/how-it-works).
+I assume that you are familiar with Inertia.js and [how it works](https://inertiajs.com/docs/v3/core-concepts/how-it-works).
 You also need to familiarize yourself with [Echo](https://echo.labstack.com/), a Go web framework.
 Inertia Echo assists you in developing web applications that leverage both of these technologies.
 
 > [!NOTE]
-> Inertia Echo v5 supports Echo v5.
+> Inertia Echo v5.1.0+ supports Echo v5 and Inertia.js v3. v5.0.0 is the final release for Inertia.js v2.
 
 Table of Contents
 
@@ -23,15 +23,17 @@ Table of Contents
   - [Setup frontend](#setup-frontend)
   - [Run the application](#run-the-application)
   - [Run in Dev mode](#run-in-dev-mode)
+  - [Embed assets into a single binary](#embed-assets-into-a-single-binary)
 - [Usage](#usage)
   - [Renderer](#renderer)
   - [Middleware](#middleware)
   - [Responses](#responses)
     - [Creating responses](#creating-responses)
-    - [Creating responses using structs](#creating-responses-using-structs)
     - [Root template data](#root-template-data)
   - [Redirects](#redirects)
     - [External redirects](#external-redirects)
+    - [Redirect status (302 → 303)](#redirect-status-302--303)
+    - [Redirects with URL fragments](#redirects-with-url-fragments)
   - [Routing](#routing)
     - [Shorthand routes](#shorthand-routes)
   - [Shared data](#shared-data)
@@ -40,10 +42,18 @@ Table of Contents
   - [Partial reloads](#partial-reloads)
   - [Deferred props](#deferred-props)
     - [Grouping requests](#grouping-requests)
+    - [Rescuing deferred errors](#rescuing-deferred-errors)
+  - [Once props](#once-props)
   - [Merging props](#merging-props)
+  - [Infinite scroll props](#infinite-scroll-props)
+  - [Cross-request state (StateStore)](#cross-request-state-statestore)
+  - [Flash data](#flash-data)
+  - [Preserving URL fragments](#preserving-url-fragments)
+  - [Error responses](#error-responses)
   - [CSRF protection](#csrf-protection)
   - [History encryption](#history-encryption)
   - [Asset versioning](#asset-versioning)
+  - [Page URL](#page-url)
   - [Server-side Rendering (SSR)](#server-side-rendering-ssr)
   - [Embed](#embed)
 - [Compatibility](#compatibility)
@@ -72,7 +82,9 @@ go get github.com/labstack/echo/v5
 
 Next, setup the root template that will be loaded on the first page visit to your application. This template should include your site's CSS and JavaScript assets, along with the `.inertia` and `.inertiaHead` variables.
 
-In this tutorial, we will create the `views/app.html` file as the root template.
+The built-in renderer emits the Inertia v3 initial page as a JSON `script` element followed by the root `div`. The `script` element's `data-page` value and the root element's `id` both use the renderer's `ContainerId`.
+
+In this tutorial, we will create the `resources/views/app.html` file as the root template.
 
 ```html
 <!DOCTYPE html>
@@ -80,11 +92,11 @@ In this tutorial, we will create the `views/app.html` file as the root template.
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{ vite "resources/js/app.jsx" }}
     {{- .inertiaHead -}}
   </head>
   <body>
-  {{ .inertia }}
-  {{ vite "js/app.jsx" }}
+    {{ .inertia }}
   </body>
 </html>
 
@@ -93,7 +105,6 @@ In this tutorial, we will create the `views/app.html` file as the root template.
 ### Write Go code
 
 Next, you need to implement Go application code with the Echo framework. Create the `main.go` file with the following code:
-
 
 ```go
 package main
@@ -113,16 +124,16 @@ func main() {
 	e.Use(middleware.RequestLogger())
 
 	r := inertia.NewHTMLRenderer()
-	r.MustParseGlob("views/*.html")
 	r.ViteBasePath = "/build"
-	r.MustParseViteManifestFile("public/build/manifest.json")
+	r.ViteManifest = inertia.MustParseViteManifestFile("resources/public/build/manifest.json")
+	r.MustParseGlob("resources/views/*.html")
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 		Renderer: r,
 	}))
 	e.Use(inertia.CSRF())
 
-	e.Static("/", "public")
+	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{
@@ -149,7 +160,7 @@ npm init -y
 Install the required packages:
 
 ```sh
-npm install -D @inertiajs/react react react-dom vite @vitejs/plugin-react
+npm install @inertiajs/react react react-dom vite @vitejs/plugin-react
 ```
 
 Create the `vite.config.js` file with the following content:
@@ -163,32 +174,28 @@ export default defineConfig({
   publicDir: false,
   build: {
     manifest: "manifest.json",
-    outDir: "public/build",
+    outDir: "resources/public/build",
     rollupOptions: {
-      input: ['js/app.jsx'],
+      input: ['resources/js/app.jsx'],
     },
   },
 })
 ```
 
-Create the `js/app.jsx` file with the following content:
+Create the `resources/js/app.jsx` file with the following content:
 
 ```js
 import { createInertiaApp } from '@inertiajs/react'
-import { createRoot } from 'react-dom/client'
 
 createInertiaApp({
   resolve: name => {
-    const pages = import.meta.glob('./pages/**/*.jsx', { eager: true })
-    return pages[`./pages/${name}.jsx`]
-  },
-  setup({ el, App, props }) {
-    createRoot(el).render(<App {...props} />)
+    const pages = import.meta.glob('./pages/**/*.jsx')
+    return pages[`./pages/${name}.jsx`]()
   },
 })
 ```
 
-Create a [page component](https://inertiajs.com/pages) as the  `js/pages/Index.jsx` file with the following content:
+Create a [page component](https://inertiajs.com/docs/v3/the-basics/pages) as the  `resources/js/pages/Index.jsx` file with the following content:
 
 ```jsx
 import React from 'react';
@@ -216,35 +223,68 @@ Now you can run the application with the following command:
 go run .
 ```
 
-Then, open your browser and navigate to `http://localhost:8080`.
-You should see the message "Hello, World!" displayed on the page.
+Then, open your browser and navigate to `http://localhost:8080`. You should see the message "Hello, World!" displayed on the page.
 
-You can find the complete code of this example in the [examples/getting-started](./examples/getting-started) directory of this repository.
+You can find the complete code of this example in the [examples/getting-started-step1](./examples/getting-started-step1) directory of this repository.
 
 ### Run in Dev mode
 
-If you want to run in dev mode so that you can hot-reload frontend updates, set `Debug` to `true`.
+If you want to run in dev mode so that you can hot-reload frontend updates, introduce a `BuildMode` variable that is overwritten at build time via `-ldflags`.
 
-```go
-r := inertia.NewHTMLRenderer()
-// ...
-r.Debug = true
-r.ViteDevServerURL = "http://localhost:5173" // set this to change your Vite server host/port.
+Install [kohkimakimoto/go-subprocess](https://github.com/kohkimakimoto/go-subprocess) to start the Vite development server from your Go process:
+
+```sh
+go get github.com/kohkimakimoto/go-subprocess
 ```
 
-You need to run Vite server while you running in dev mode. To do so, you also can use [kohkimakimoto/go-subprocess](https://github.com/kohkimakimoto/go-subprocess) to simplify your operation with Vite server.
+Update your `main.go` as follows:
 
 ```go
+package main
+
 import (
+	"context"
+	"errors"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kohkimakimoto/go-subprocess"
+	inertia "github.com/kohkimakimoto/inertia-echo/v5"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
-// ...
-func main(){
-	// ...
+// BuildMode is overwritten at build time via -ldflags "-X main.BuildMode=production".
+var BuildMode = "debug"
+
+func main() {
+	isDebug := BuildMode == "debug"
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	e := echo.New()
+
+	e.Use(middleware.Recover())
+	e.Use(middleware.RequestLogger())
+
+	r := inertia.NewHTMLRenderer()
+	r.Debug = isDebug
+	r.ViteBasePath = "/build"
+	if !isDebug {
+		r.ViteManifest = inertia.MustParseViteManifestFile("resources/public/build/manifest.json")
+	}
+	r.MustParseGlob("resources/views/*.html")
+
+	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+		Renderer: r,
+	}))
+	e.Use(inertia.CSRF())
+
+	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
 		return inertia.Render(c, "Index", map[string]any{
@@ -252,48 +292,96 @@ func main(){
 		})
 	})
 
-	// Add this to run Vite server.
-	go func() {
-		if err := subprocess.Run(&subprocess.Config{
-			Command:         "bun",
-			Args:            []string{"run", "dev"},
+	var vite *subprocess.Process
+	if isDebug {
+		p, err := subprocess.Start(ctx, subprocess.Config{
+			Command:         "npx",
+			Args:            []string{"vite"},
 			Stdout:          os.Stdout,
 			StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
 			Stderr:          os.Stderr,
 			StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
 			Dir:             ".",
-		}); err != nil {
-			slog.Error("the Vite subprocess returned an error", "error", err)
+		})
+		if err != nil {
+			slog.Error("failed to start Vite subprocess", "error", err)
+			return
 		}
-	}()
+		vite = p
+	}
 
-	if err := e.Start(":8080"); err != nil {
+	if err := (echo.StartConfig{Address: ":8080"}).Start(ctx, e); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
 	}
+
+	if vite != nil {
+		if err := vite.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("the Vite subprocess returned an error", "error", err)
+		}
+	}
 }
-
-
 ```
 
-> [!NOTE]
-> If you're using React with `@vitejs/plugin-react`, you have to add `{{ vite_react_refresh }}` on your view file as well.  
-> For more information, see [Vite docs](https://vitejs.dev/guide/backend-integration.html).
->
-> `views/app.html`
->
-> ```html
-> <!DOCTYPE html>
-> <html>
->   <head>
->     <meta charset="UTF-8" />
->     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
->     {{- .inertiaHead -}}
->   </head>
->   <body>
->     {{ .inertia }} {{ vite_react_refresh }} {{ vite "js/app.jsx" }}
->   </body>
-> </html>
-> ```
+This example uses [kohkimakimoto/go-subprocess](https://github.com/kohkimakimoto/go-subprocess) to start the Vite server only when `BuildMode` is `"debug"`.
+A shared cancelable context ties the Echo server and Vite process together so both stop on interrupt.
+
+Also add `{{ vite_react_refresh }}` to your root template for React Fast Refresh with `@vitejs/plugin-react`.
+For more information, see [Vite docs](https://vitejs.dev/guide/backend-integration.html).
+
+`resources/views/app.html`
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {{ vite_react_refresh }}
+    {{ vite "resources/js/app.jsx" }}
+    {{- .inertiaHead -}}
+  </head>
+  <body>
+    {{ .inertia }}
+  </body>
+</html>
+```
+
+Run in debug mode. This starts the Vite development server so you can hot-reload frontend updates:
+
+```sh
+go run .
+```
+
+Run in production mode. This serves the compiled frontend assets produced by `npx vite build`:
+
+```sh
+npx vite build
+go run -ldflags="-X main.BuildMode=production" .
+```
+
+You can find the complete code of this example in the [examples/getting-started-step2](./examples/getting-started-step2) directory of this repository.
+
+### Embed assets into a single binary
+
+For production, you can embed the root template and built frontend assets into the Go binary.
+Inertia Echo accepts `fs.FS` for templates and the Vite manifest (`MustParseFS`, `MustParseViteManifestFS`, and Echo's `StaticFS`), so the same application code can serve files from disk in development and from the embedded filesystem in production.
+
+See the complete code in the [examples/getting-started-step3](./examples/getting-started-step3) directory of this repository.
+
+With that example, build the frontend assets, then compile with production `BuildMode` so the binary embeds those assets:
+
+```sh
+npx vite build
+go build -ldflags="-X main.BuildMode=production" -o app
+```
+
+Run the resulting binary:
+
+```sh
+./app
+```
+
+Open `http://localhost:8080`. The server no longer depends on `resources/` on disk; the views and public assets are inside the binary.
 
 ## Usage
 
@@ -304,14 +392,15 @@ This means you'll have to build your own view system and integrate it with Inert
 
 Inertia Echo defines [`Renderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#Renderer) interface to integrate view system with Inertia.js.
 It also provides a built-in renderer implementation based on the `html/template` package.
+Use [`ParseGlob`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer.ParseGlob), [`ParseFS`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer.ParseFS), or [`ParseFiles`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer.ParseFiles) (or their `Must*` variants) to load templates with Inertia/Vite helpers applied.
 
 To setup Inertia Echo with your Echo application, you need to initialize the renderer and set it up with the [middleware](#middleware).
 
 ```go
 // Create and configure the renderer...
 r := inertia.NewHTMLRenderer()
-r.MustParseGlob("views/*.html")
 r.ViteBasePath = "/build"
+r.MustParseGlob("resources/views/*.html")
 
 // Setup the middleware with the renderer
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -321,7 +410,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 
 ### Middleware
 
-After setting up the renderer, you need to add the Inertia middleware to your Echo application.
+Add the Inertia middleware after configuring a renderer:
 
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -329,13 +418,23 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 }))
 ```
 
-The middleware handles Inertia requests, a foundational functionality of this package.
-You can pass a configuration to customize its behavior.
-For more details, see the [`MiddlewareConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#MiddlewareConfig) documentation.
+The middleware is the core of this package. For each request it:
+
+1. Creates a request-scoped [`Inertia`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#Inertia) instance and stores it on `echo.Context`
+2. Loads the cross-request state bag via [`StateStore`](#cross-request-state-statestore)
+3. Checks asset version **before** `Share` / the handler (unlike inertia-laravel, which does this after `$next`). On mismatch it returns an Inertia `Location` response
+4. Applies `Share` / `ShareOnce` when configured
+5. Runs the next handler (with a response writer wrapper so redirects can be rewritten)
+6. On success: sets `Vary: X-Inertia`, rewrites Inertia redirects when needed (302→303, fragment → 409), then commits state via `StateStore`
+7. On handler error: returns the error immediately (no redirect rewrite, no state commit). Use Echo's `HTTPErrorHandler` for error pages
+
+Unlike inertia-laravel, empty Inertia `200` responses are **not** automatically converted to a back redirect. Return `Redirect`, `Render`, or an error explicitly.
+
+Configure behavior through [`MiddlewareConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#MiddlewareConfig) (`Renderer`, `Share`, `ShareOnce`, `VersionFunc`, `URLResolver`, `StateStore`, `WithoutSsr`, `RescueReporter`, and others).
 
 ### Responses
 
-:book: The related official document: [Responses](https://inertiajs.com/responses)
+:book: The related official document: [Responses](https://inertiajs.com/docs/v3/the-basics/responses)
 
 #### Creating responses
 
@@ -347,23 +446,6 @@ func ShowEventHandler(c *echo.Context) error {
 	event := // retrieve a event...
 	return inertia.Render(c, "Event/Show", map[string]any{
 		"event": event,
-	})
-}
-```
-
-#### Creating responses using structs
-
-You can also pass a struct with the `prop` struct tag.
-
-```go
-type ShowEventProps struct {
-	Event *Event `prop:"event"`
-}
-
-func ShowEventHandler(c *echo.Context) error {
-	event := // retrieve a event...
-	return inertia.Render(c, "Event/Show", &ShowEventProps{
-		Event: event,
 	})
 }
 ```
@@ -384,7 +466,7 @@ func ShowEventsHandler(c *echo.Context) error {
 	event := // retrieve a event...
 	return inertia.RenderWithViewData(c, "Event/Show", map[string]any{
 		"event": event,
-	}, map[string]interface{}{
+	}, map[string]any{
 		"meta": "Meta data...",
 	})
 }
@@ -398,25 +480,45 @@ You can then access this variable like a regular template variable.
 
 ### Redirects
 
-:book: The related official document: [Redirects](https://inertiajs.com/redirects)
+:book: The related official document: [Redirects](https://inertiajs.com/docs/v3/the-basics/redirects)
 
-You can use Echo's standard way to redirect.
+Use Echo's standard redirect:
 
 ```go
 return c.Redirect(http.StatusFound, "/")
 ```
 
+The middleware may rewrite Inertia redirect responses after the handler returns (see below).
+
 #### External redirects
 
-The following is a way to redirect to an external website in Inertia apps.
+For a full page visit outside the current Inertia app (or a hard reload):
 
 ```go
 return inertia.Location(c, "/path/to/external")
 ```
 
+For Inertia requests this returns `409` with `X-Inertia-Location`. For non-Inertia requests it falls back to a normal `302` redirect.
+
+#### Redirect status (302 → 303)
+
+For Inertia requests that use `PUT`, `PATCH`, or `DELETE`, a buffered `302 Found` is rewritten to `303 See Other` so the follow-up visit is a GET. This matches the Inertia protocol and inertia-laravel middleware behavior.
+
+#### Redirects with URL fragments
+
+When an Inertia request redirects to a `Location` that already contains `#…`, the middleware converts it to:
+
+- status `409 Conflict`
+- header `X-Inertia-Redirect` with the original location (including the fragment)
+- no `Location` header
+
+Prefetch requests are skipped (`Purpose`, `Sec-Purpose`, or `X-Moz` equal to `prefetch`, case-insensitive — same as Laravel's `Request::prefetch()`).
+
+This is separate from [`PreserveFragment`](#preserving-url-fragments), which asks the client to keep the **current** URL fragment across the next page.
+
 ### Routing
 
-:book: The related official document: [Routing](https://inertiajs.com/routing)
+:book: The related official document: [Routing](https://inertiajs.com/docs/v3/the-basics/routing)
 
 #### Shorthand routes
 
@@ -428,7 +530,7 @@ e.GET("/about", inertia.Handler("About"))
 
 ### Shared data
 
-:book: The related official document: [Shared data](https://inertiajs.com/shared-data)
+:book: The related official document: [Shared data](https://inertiajs.com/docs/v3/data-props/shared-data)
 
 #### Sharing data using middleware
 
@@ -443,8 +545,19 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 			"authUser": user,
 		}, nil
 	},
+	// Once props remembered by the client across navigations.
+	// see https://inertiajs.com/docs/v3/data-props/shared-data#sharing-once-props
+	ShareOnce: func(c *echo.Context) (map[string]any, error) {
+		return map[string]any{
+			"countries": func() (any, error) {
+				return loadCountries()
+			},
+		}, nil
+	},
 }))
 ```
+
+You can also put `inertia.Once(...)` in `Share`, or call `inertia.ShareOnce` manually after the middleware has run.
 
 #### Sharing data manually
 
@@ -459,7 +572,7 @@ inertia.Share(c, map[string]any{
 
 ### Partial reloads
 
-:book: The related official document: [Partial reloads](https://inertiajs.com/partial-reloads)
+:book: The related official document: [Partial reloads](https://inertiajs.com/docs/v3/data-props/partial-reloads)
 
 ```go
 inertia.Render(c, "Users/Index", map[string]any{
@@ -471,35 +584,27 @@ inertia.Render(c, "Users/Index", map[string]any{
 	// ALWAYS included on standard visits
 	// OPTIONALLY included on partial reloads
 	// ONLY evaluated when needed
-	"users": func() (any, error) {
-		users, err := // get users...
-		if err != nil {
-			return nil, err
-		}
-		return users
+	"companies": func() (any, error) {
+		return loadCompanies()
 	},
 
 	// NEVER included on standard visits
 	// OPTIONALLY included on partial reloads
 	// ONLY evaluated when needed
-	"users": inertia.Optional(func() (any, error) {
-		users, err := // get users...
-		if err != nil {
-			return nil, err
-		}
-		return users, nil
+	"permissions": inertia.Optional(func() (any, error) {
+		return loadPermissions()
 	}),
 
 	// ALWAYS included on standard visits
 	// ALWAYS included on partial reloads
 	// ALWAYS evaluated
-	"users": inertia.Always(users),
+	"auth": inertia.Always(authUser),
 })
 ```
 
 ### Deferred props
 
-:book: The related official document: [Deferred props](https://inertiajs.com/deferred-props)
+:book: The related official document: [Deferred props](https://inertiajs.com/docs/v3/data-props/deferred-props)
 
 ```go
 inertia.Render(c, "Users/Index", map[string]any{
@@ -552,9 +657,44 @@ inertia.Render(c, "Users/Index", map[string]any{
 })
 ```
 
+#### Rescuing deferred errors
+
+Deferred callback errors are returned by default. Use `Rescue` to omit a failed deferred prop while allowing the rest of the response to render. Configure `RescueReporter` to observe rescued errors without exposing their contents to the client.
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	Renderer: r,
+	RescueReporter: func(path string, err error) {
+		logger.Error("deferred prop failed", "path", path, "error", err)
+	},
+}))
+
+inertia.Render(c, "Users/Index", map[string]any{
+	"permissions": inertia.Defer(func() (any, error) {
+		return loadPermissions()
+	}).Rescue(),
+})
+```
+
+### Once props
+
+Once props let the client reuse a previously loaded value. The server remains stateless; the client reports loaded keys in later requests.
+
+```go
+inertia.Render(c, "Dashboard", map[string]any{
+	"settings": inertia.Once(func() (any, error) {
+		return loadSettings()
+	}).As("dashboard-settings").For(10 * time.Minute),
+})
+```
+
+Use `Fresh(true)` to resolve the value even when the client already has it, `Until(time.Time)` to set an absolute expiration, or `For(time.Duration)` to set a relative expiration. `OptionalProp`, `DeferProp`, and `MergeProp` can opt in with `Once()`; calling `As`, `Fresh`, `Until`, or `For` on those prop types also enables once behavior. `ShareOnce` is a shortcut for sharing a callback-backed once prop.
+
+:book: The related official document: [Once props](https://inertiajs.com/docs/v3/data-props/once-props)
+
 ### Merging props
 
-:book: The related official document: [Merging props](https://inertiajs.com/merging-props)
+:book: The related official document: [Merging props](https://inertiajs.com/docs/v3/data-props/merging-props)
 
 #### Shallow merge
 
@@ -576,13 +716,152 @@ You may chain the matchOn method to determine how existing items should be match
 
 ```go
 inertia.Render(c, "Users/Index", map[string]any{
-	"tags": inertia.DeepMerge(users).MatchesOn("data.id"),
+	"tags": inertia.DeepMerge(users).MatchOn("data.id"),
 })
 ```
 
+Use `Append` or `Prepend` to select the client-side merge direction at the root or at nested paths:
+
+```go
+inertia.Render(c, "Users/Index", map[string]any{
+	"users": inertia.Merge(users).Append("data").MatchOn("data.id"),
+	"activity": inertia.Merge(activity).Prepend(),
+})
+```
+
+### Infinite scroll props
+
+`Scroll` receives the page value and pagination metadata together, so loading the data does not need to run twice. Page identifiers may be numbers, cursor strings, or `nil`.
+
+```go
+inertia.Render(c, "Users/Index", map[string]any{
+	"users": inertia.Scroll(func() (inertia.ScrollResult, error) {
+		users, err := loadUsers()
+		if err != nil {
+			return inertia.ScrollResult{}, err
+		}
+		return inertia.ScrollResult{
+			Value: map[string]any{"data": users},
+			Metadata: inertia.ScrollMetadata{
+				PageName: "page", PreviousPage: nil,
+				CurrentPage: 1, NextPage: 2,
+			},
+		}, nil
+	}),
+})
+```
+
+The default data path is `data`. Use `WithDataPath` to change it and `Defer` to defer the initial load.
+
+:book: The related official document: [Infinite Scroll](https://inertiajs.com/docs/v3/data-props/infinite-scroll)
+
+### Cross-request state (StateStore)
+
+Echo has no built-in session, but several Inertia features need values that survive until a later request (flash, clear history, preserve fragment). inertia-laravel stores those in the Laravel session. **StateStore is inertia-echo's own design** for that gap — not an official Inertia protocol feature and not a general-purpose application session.
+
+Architecture:
+
+- During a request, values live in an in-memory bag on the request-scoped `Inertia` (`Get` / `Set` / `Delete` / `Pull`)
+- [`StateStore`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#StateStore) only **Load**s the bag at the start of the middleware and **Save**s it after a successful handler (and on asset version mismatch before `Location`)
+- Bag keys are fixed: `flash_data`, `clear_history`, `preserve_fragment` (see `StateKey*`)
+
+The default implementation is [`CookieStateStore`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#CookieStateStore): one unsigned HttpOnly cookie (`inertia.state` by default) holding the whole bag.
+
+**Not a secure session.** Cookie values are client-controlled. Treat loaded data like any other untrusted request input. Do not store credentials, identity, or authorization state. Keep payloads small (cookie size limits).
+
+Tune cookie attributes or replace the backend:
+
+```go
+cfg := inertia.DefaultCookieStateStoreConfig
+cfg.Secure = true
+cfg.Path = "/app"
+
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	Renderer:   r,
+	StateStore: inertia.NewCookieStateStoreWithConfig(cfg),
+	// Or: StateStore: myStateStore, // implements inertia.StateStore (Load/Save)
+}))
+```
+
+Copy `DefaultCookieStateStoreConfig` before changing a subset of fields so defaults such as `HTTPOnly: true` are preserved.
+
+### Flash data
+
+:book: The related official document: [Flash data](https://inertiajs.com/docs/v3/data-props/flash-data)
+
+`Flash` adds one-time data to the top-level Page `flash` object:
+
+```go
+inertia.Flash(c, map[string]any{
+	"message": "Profile updated.",
+})
+return c.Redirect(http.StatusFound, "/profile")
+```
+
+For POST-redirect-GET, unconsumed flash is kept in the in-memory bag and committed through [`StateStore`](#cross-request-state-statestore) after the redirect response. The next request loads it and merges it into the Page on render (then clears it).
+
+### Preserving URL fragments
+
+Call `PreserveFragment` before a redirect to set the Page `preserveFragment` flag so the client retains the **source** URL fragment on the next rendered page. The flag survives redirects via [`StateStore`](#cross-request-state-statestore):
+
+```go
+inertia.PreserveFragment(c)
+return c.Redirect(http.StatusFound, "/account")
+```
+
+If the redirect **destination** already includes `#…`, see [Redirects with URL fragments](#redirects-with-url-fragments) — that is a different middleware rewrite (`409` + `X-Inertia-Redirect`).
+
+### Error responses
+
+This package does not provide an inertia-laravel-style error-handling framework
+(`handleExceptionsUsing` / `ExceptionResponse`). Echo already has
+`HTTPErrorHandler`, and Inertia request state is available on `echo.Context`
+after the middleware runs. Prefer those primitives over a library-specific
+abstraction.
+
+**In a handler**, render an error page with `RenderWithStatus`:
+
+```go
+return inertia.RenderWithStatus(c, http.StatusNotFound, "ErrorPage", map[string]any{
+	"status": http.StatusNotFound,
+})
+```
+
+**Centrally**, use Echo's `HTTPErrorHandler`. When the Inertia middleware has
+already run, `inertia.Get(c)` succeeds and shared props / renderer settings are
+available:
+
+```go
+e.HTTPErrorHandler = func(c *echo.Context, err error) {
+	status := http.StatusInternalServerError
+	var he *echo.HTTPError
+	if errors.As(err, &he) && he.Code != 0 {
+		status = he.Code
+	}
+
+	if i, e := inertia.Get(c); e == nil {
+		switch status {
+		case http.StatusForbidden, http.StatusNotFound, http.StatusInternalServerError, http.StatusServiceUnavailable:
+			if renderErr := i.RenderWithStatus(status, "ErrorPage", map[string]any{
+				"status": status,
+			}); renderErr == nil {
+				return
+			}
+		}
+	}
+
+	echo.DefaultHTTPErrorHandler(false)(c, err)
+}
+```
+
+Errors that occur before the Inertia middleware runs have no Inertia context;
+fall back to Echo's default (or your own) handler in that case.
+
+:book: Related official document: [Error handling](https://inertiajs.com/docs/v3/advanced/error-handling)
+
 ### CSRF protection
 
-:book: The related official document: [CSRF protection](https://inertiajs.com/csrf-protection)
+:book: The related official document: [CSRF protection](https://inertiajs.com/docs/v3/security/csrf-protection)
 
 Inertia Echo has CSRF middleware that is configured for Inertia.js.
 This middleware provides `XSRF-TOKEN` cookie and verifies the `X-XSRF-TOKEN` header in the request.
@@ -595,7 +874,7 @@ e.Use(inertia.CSRF())
 
 ### History encryption
 
-:book: The related official document: [History encryption](https://inertiajs.com/history-encryption)
+:book: The related official document: [History encryption](https://inertiajs.com/docs/v3/security/history-encryption)
 
 #### Encrypt middleware
 
@@ -625,39 +904,135 @@ inertia.EncryptHistory(c, true)
 inertia.ClearHistory(c)
 ```
 
+If the response is a redirect (or otherwise does not consume the flag on a Page render), the flag is persisted via [`StateStore`](#cross-request-state-statestore) until the next rendered page.
+
 ### Asset versioning
 
-:book: The related official document: [Asset versioning](https://inertiajs.com/asset-versioning)
+:book: The related official document: [Asset versioning](https://inertiajs.com/docs/v3/advanced/asset-versioning)
 
 Configure asset version via middleware.
 
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
-	VersionFunc: func() string { return version },
+	VersionFunc: func(c *echo.Context) string { return version },
 }))
 ```
 
-Configure asset version manually.
+The default `VersionFunc` reads `INERTIA_VERSION`, then `GAE_VERSION`, then a development timestamp. Version mismatch is handled **before** `Share` and the handler: the middleware returns an Inertia `Location` for the current URL and sets `X-Inertia-Version`.
+
+Configure asset version manually for the current request:
 
 ```go
-inertia.SetVersion(c, func() string { return version })
+inertia.SetVersion(c, func(c *echo.Context) string { return version })
+```
+
+### Page URL
+
+:book: The related official document: [The Page object](https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object)
+
+By default the Page `url` is resolved with `req.URL.String()` (path and query), via the same middleware defaulting pattern as `VersionFunc`. Customize it when the request URL differs from the URL you want the client to see (for example behind a path prefix):
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	URLResolver: func(c *echo.Context) string {
+		return "/app" + c.Request().URL.String()
+	},
+}))
+```
+
+Or set it per request:
+
+```go
+inertia.SetURLResolver(c, func(c *echo.Context) string {
+	return "/app" + c.Request().URL.String()
+})
 ```
 
 ### Server-side Rendering (SSR)
 
-:book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/server-side-rendering)
+:book: The related official document: [Server-side Rendering (SSR)](https://inertiajs.com/docs/v3/advanced/server-side-rendering)
 
-Inertia Echo supports SSR. See [SSR example](./examples/ssr).
+Inertia Echo supports SSR via an `SsrGateway` abstraction (mirroring inertia-laravel's `Ssr\Gateway`). See [SSR example](./examples/ssr).
+
+`SsrHTTPGateway` posts the Page JSON to a remote SSR server. Production uses `URL + "/render"`. For Vite hot mode set `UseHot` and `HotURL` (requests go to `HotURL + "/__inertia_ssr"`). `Endpoint` overrides both when you need a full URL:
+
+```go
+gateway := inertia.NewSsrHTTPGateway()
+gateway.UseHot = true
+gateway.HotURL = "http://localhost:5173"
+renderer.SsrGateway = gateway
+```
+
+Exclude paths from SSR (inertia-laravel `$withoutSsr` / `withoutSsr`):
+
+```go
+e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
+	WithoutSsr: []string{"admin/*"},
+	Renderer:   renderer,
+}))
+```
+
+Or per request:
+
+```go
+inertia.DisableSsr(c)
+inertia.WithoutSsr(c, "billing/*")
+```
+
+Custom Renderers should call `inertia.SsrEnabled(c)` (or `MustGet(c).SsrEnabled()`) instead of reading Inertia internals. Shared `SsrGateway` remains request-stateless; request skip state lives on Inertia.
+
+For Vite development SSR, install `@inertiajs/vite`, configure the SSR entry explicitly, and let Inertia v3 provide React's default CSR/SSR setup:
+
+```ts
+import inertia from '@inertiajs/vite'
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  plugins: [inertia({ ssr: 'resources/js/app.tsx' }), react()],
+})
+```
+
+```tsx
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react'
+
+const pages = import.meta.glob<{ default: ResolvedComponent }>('./pages/**/*.tsx', { eager: true })
+
+createInertiaApp({
+  resolve: name => pages[`./pages/${name}.tsx`],
+})
+```
+
+The same `resources/js/app.tsx` entry is used for both the browser bundle and SSR. The Vite plugin wraps `createInertiaApp` for SSR builds and the development `/__inertia_ssr` endpoint.
 
 The default SSR HTTP client does not set a request timeout. The current Echo request context is propagated to the SSR request, so its cancellation and deadline are respected. Configure an overall timeout when required by your application:
 
 ```go
-gateway := inertia.NewSsrEngineHTTPGateway()
+gateway := inertia.NewSsrHTTPGateway()
 gateway.HttpClient.Timeout = 5 * time.Second
-renderer.SsrEngine = gateway
+renderer.SsrGateway = gateway
 ```
 
-The five-second timeout above is only an example, not a library default. SSR request errors, including cancellation and timeout errors, are returned without automatically falling back to client-side rendering.
+The five-second timeout above is only an example, not a library default.
+
+Unlike inertia-laravel (which falls back to CSR and optionally fires `SsrRenderFailed`), `SsrHTTPGateway` returns errors to the caller — Go style, no built-in fallback or error callback. Handle failures in your `HTTPErrorHandler`, or wrap `SsrGateway` / use a custom `Renderer` if you want CSR-on-failure:
+
+```go
+type fallbackGateway struct{ inner inertia.SsrGateway }
+
+func (g fallbackGateway) Dispatch(ctx *inertia.RenderContext) (*inertia.SsrResponse, error) {
+	ssr, err := g.inner.Dispatch(ctx)
+	if err != nil {
+		slog.Error("SSR failed; falling back to CSR", "error", err)
+		return nil, nil
+	}
+	return ssr, nil
+}
+
+renderer.SsrGateway = fallbackGateway{inner: inertia.NewSsrHTTPGateway()}
+```
+
+A `Dispatch` result of `(nil, nil)`, including the Vite development endpoint's temporary JSON `null` response while warming up, is treated as an intentional skip and renders the normal CSR bootstrap.
 
 ### Embed
 
@@ -676,10 +1051,10 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-//go:embed views/*.html
+//go:embed resources/views/*.html
 var viewFiles embed.FS
 
-//go:embed public/*
+//go:embed resources/public/*
 var publicFiles embed.FS
 
 func main() {
@@ -687,8 +1062,8 @@ func main() {
 	// ...
 
 	r := inertia.NewHTMLRenderer()
-	r.MustParseFS(viewFiles, "views/*.html")
-	r.MustParseViteManifestFS(publicFiles, "public/build/manifest.json")
+	r.ViteManifest = inertia.MustParseViteManifestFS(publicFiles, "resources/public/build/manifest.json")
+	r.MustParseFS(viewFiles, "resources/views/*.html")
 	// ...
 
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -696,7 +1071,7 @@ func main() {
 	}))
 	// ...
 
-	fsys, err := fs.Sub(publicFiles, "public")
+	fsys, err := fs.Sub(publicFiles, "resources/public")
 	if err != nil {
 		panic(err)
 	}
@@ -720,12 +1095,11 @@ func main() {
 
 Inertia Echo aligns its major version with the supported Echo major version.
 
-| Inertia Echo | Echo | Go | Status |
+| Inertia Echo | Echo | Inertia.js | Status |
 | --- | --- | --- | --- |
-| v5.x | v5.3.1 or later | 1.25 or later | Current |
-| v4.x | v4.15.4 or later | 1.25 or later | Maintained on the [`v4` branch](https://github.com/kohkimakimoto/inertia-echo/tree/v4) |
-
-The major versions align for compatibility; their minor and patch versions do not need to match.
+| v5.1.0+ | v5 | v3 | Current |
+| v5.0.0 | v5 | v2 | Final |
+| v4.0.1 | v4 | v2 | Final |
 
 ## Author
 

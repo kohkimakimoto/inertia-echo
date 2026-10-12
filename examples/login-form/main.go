@@ -1,31 +1,40 @@
 package main
 
 import (
-	"flag"
+	"context"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	session "github.com/kohkimakimoto/echo-session/v5"
 	"github.com/kohkimakimoto/go-subprocess"
-	"github.com/kohkimakimoto/inertia-echo/v5"
+	"github.com/kohkimakimoto/inertia-echo/examples/login-form/resources"
+	inertia "github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
 
+// BuildMode is overwritten at build time via -ldflags "-X main.BuildMode=production".
 var BuildMode = "debug"
 
-func IsDebug() bool {
-	return BuildMode == "debug"
-}
-
 func main() {
-	var optDir string
-	flag.StringVar(&optDir, "dir", "", "project directory")
-	flag.Parse()
+	isDebug := BuildMode == "debug"
 
-	if optDir == "" {
-		optDir, _ = os.Getwd()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	var root string
+	if isDebug {
+		var err error
+		root, err = os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+		resources.UseDir(filepath.Join(root, "resources"))
 	}
 
 	e := echo.New()
@@ -33,13 +42,13 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLogger())
 
-	// setup inertia
 	r := inertia.NewHTMLRenderer()
-	r.Debug = IsDebug()
-	r.MustParseGlob(filepath.Join(optDir, "views/*.html"))
+	r.Debug = isDebug
 	r.ViteBasePath = "/build"
-	r.AddViteEntryPoint("assets/app.tsx")
-	r.MustParseViteManifestFile(filepath.Join(optDir, "public/build/manifest.json"))
+	if !r.Debug {
+		r.ViteManifest = inertia.MustParseViteManifestFS(resources.Public(), "build/manifest.json")
+	}
+	r.MustParseFS(resources.Views(), "*.html")
 
 	e.Use(session.Middleware(session.NewCookieStore([]byte("secret"))))
 	e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
@@ -48,12 +57,12 @@ func main() {
 	e.Use(inertia.CSRF())
 	e.Use(inertia.EncryptHistoryMiddleware())
 
-	e.Static("/", filepath.Join(optDir, "public"))
+	e.StaticFS("/", resources.Public())
 
 	e.GET("/", func(c *echo.Context) error {
 		s := session.MustGet(c)
 		authEmail := s.GetString("auth_email")
-		c.Logger().Debug("authEmail", "email", authEmail)
+		slog.Debug("authEmail", "email", authEmail)
 
 		return inertia.Render(c, "Index", map[string]any{
 			"message": "You are logged in!",
@@ -104,7 +113,7 @@ func main() {
 		if err := s.Save(); err != nil {
 			return err
 		}
-		c.Logger().Debug("User authenticated", "email", form.Email)
+		slog.Debug("User authenticated", "email", form.Email)
 
 		// Redirect to the home page after login
 		inertia.ClearHistory(c)
@@ -118,32 +127,39 @@ func main() {
 		if err := s.Save(); err != nil {
 			return err
 		}
-		c.Logger().Debug("User logged out")
+		slog.Debug("User logged out")
 
 		// Redirect to the login page after logout
 		inertia.ClearHistory(c)
 		return c.Redirect(http.StatusFound, "/login")
 	})
 
-	if IsDebug() {
-		go func() {
-			// Run a subprocess for Vite development server.
-			if err := subprocess.Run(&subprocess.Config{
-				Command:         "npm",
-				Args:            []string{"run", "dev"},
-				Stdout:          os.Stdout,
-				StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
-				Stderr:          os.Stderr,
-				StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
-				Dir:             optDir,
-			}); err != nil {
-				e.Logger.Error("the Vite subprocess returned an error", "error", err)
-			}
-		}()
+	var vite *subprocess.Process
+	if isDebug {
+		p, err := subprocess.Start(ctx, subprocess.Config{
+			Command:         "npx",
+			Args:            []string{"vite"},
+			Stdout:          os.Stdout,
+			StdoutFormatter: subprocess.PrefixFormatter("[Vite] "),
+			Stderr:          os.Stderr,
+			StderrFormatter: subprocess.PrefixFormatter("[Vite] "),
+			Dir:             root,
+		})
+		if err != nil {
+			slog.Error("failed to start Vite subprocess", "error", err)
+			return
+		}
+		vite = p
 	}
 
-	if err := e.Start(":8080"); err != nil {
-		e.Logger.Error("failed to start server", "error", err)
+	if err := (echo.StartConfig{Address: ":8080"}).Start(ctx, e); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		slog.Error("failed to start server", "error", err)
+	}
+
+	if vite != nil {
+		if err := vite.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("the Vite subprocess returned an error", "error", err)
+		}
 	}
 }
 
@@ -152,7 +168,7 @@ func AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		s := session.MustGet(c)
 		authEmail := s.GetString("auth_email")
 		if authEmail == "" {
-			c.Logger().Debug("User is not authenticated, redirecting to login page")
+			slog.Debug("User is not authenticated, redirecting to login page")
 			return c.Redirect(http.StatusFound, "/login")
 		}
 		return next(c)

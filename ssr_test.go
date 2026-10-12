@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"html/template"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -19,58 +22,97 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
-func TestSsrEngineHTTPGateway_Render(t *testing.T) {
+func TestSsrHTTPGateway_Dispatch(t *testing.T) {
 	tests := []struct {
-		name           string
-		mockResponse   SsrResponse
-		mockStatusCode int
-		expectError    bool
-		errorContains  string
+		name          string
+		responseBody  string
+		statusCode    int
+		want          *SsrResponse
+		errorContains string
 	}{
 		{
-			name: "successful render",
-			mockResponse: SsrResponse{
+			name:         "successful render",
+			responseBody: `{"head":["<title>Test Page</title>","<meta name=\"description\" content=\"test\">"],"body":"<div>Test Content</div>"}`,
+			statusCode:   http.StatusOK,
+			want: &SsrResponse{
 				Head: []string{"<title>Test Page</title>", "<meta name=\"description\" content=\"test\">"},
 				Body: "<div>Test Content</div>",
 			},
-			mockStatusCode: http.StatusOK,
-			expectError:    false,
 		},
 		{
-			name:           "server error",
-			mockStatusCode: http.StatusInternalServerError,
-			expectError:    true,
-			errorContains:  "status code is not 200: 500",
+			name:         "null response skips SSR",
+			responseBody: "null",
+			statusCode:   http.StatusOK,
+			want:         nil,
+		},
+		{
+			name:          "missing body",
+			responseBody:  `{"head":[]}`,
+			statusCode:    http.StatusOK,
+			errorContains: "response body is missing or null",
+		},
+		{
+			name:          "null body",
+			responseBody:  `{"head":[],"body":null}`,
+			statusCode:    http.StatusOK,
+			errorContains: "response body is missing or null",
+		},
+		{
+			name:          "body has invalid type",
+			responseBody:  `{"head":[],"body":42}`,
+			statusCode:    http.StatusOK,
+			errorContains: "failed to decode response",
+		},
+		{
+			name:          "invalid JSON",
+			responseBody:  `{"head":`,
+			statusCode:    http.StatusOK,
+			errorContains: "failed to decode response",
+		},
+		{
+			name:          "trailing invalid JSON",
+			responseBody:  `{"head":[],"body":"<div>SSR</div>"} trailing`,
+			statusCode:    http.StatusOK,
+			errorContains: "failed to decode response",
+		},
+		{
+			name:          "server error",
+			statusCode:    http.StatusInternalServerError,
+			errorContains: "status code is not 200: 500",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify request body contains valid page JSON
-				var page Page
-				if err := json.NewDecoder(r.Body).Decode(&page); err != nil {
-					t.Errorf("Failed to decode request body: %v", err)
+				if r.Method != http.MethodPost {
+					t.Errorf("expected POST request, got %s", r.Method)
+				}
+				if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
+					t.Errorf("expected Content-Type application/json, got %q", contentType)
 				}
 
-				// Set response status
-				w.WriteHeader(tt.mockStatusCode)
+				var page Page
+				if err := json.NewDecoder(r.Body).Decode(&page); err != nil {
+					t.Errorf("failed to decode request body: %v", err)
+				}
+				if page.Component != "TestComponent" {
+					t.Errorf("expected direct Page payload, got component %q", page.Component)
+				}
 
-				// Return response based on test case
-				if tt.mockStatusCode == http.StatusOK {
-					json.NewEncoder(w).Encode(tt.mockResponse)
+				w.WriteHeader(tt.statusCode)
+				if tt.responseBody != "" {
+					_, _ = io.WriteString(w, tt.responseBody)
 				}
 			}))
 			defer server.Close()
 
-			// Create SSR engine with mock server URL
-			engine := &SsrEngineHTTPGateway{
+			gateway := &SsrHTTPGateway{
+				Enabled:    true,
 				URL:        server.URL,
 				HttpClient: &http.Client{},
 			}
 
-			// Create test render context
 			ctx := &RenderContext{
 				Page: &Page{
 					Component: "TestComponent",
@@ -80,42 +122,122 @@ func TestSsrEngineHTTPGateway_Render(t *testing.T) {
 				},
 			}
 
-			// Execute render
-			result, err := engine.Render(ctx)
-
-			// Check error expectations
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
+			got, err := gateway.Dispatch(ctx)
+			if tt.errorContains != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.errorContains) {
+					t.Fatalf("expected error containing %q, got %v", tt.errorContains, err)
 				}
 				return
 			}
-
-			// Check success case
 			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
+				t.Fatalf("unexpected error: %v", err)
 			}
-
-			if result == nil {
-				t.Error("Expected non-nil result")
-				return
-			}
-
-			// Verify response content
-			if len(result.Head) != len(tt.mockResponse.Head) {
-				t.Errorf("Expected %d head elements, got %d", len(tt.mockResponse.Head), len(result.Head))
-			}
-			for i, head := range tt.mockResponse.Head {
-				if i < len(result.Head) && result.Head[i] != head {
-					t.Errorf("Expected head[%d] to be '%s', got '%s'", i, head, result.Head[i])
+			if tt.want == nil {
+				if got != nil {
+					t.Fatalf("expected nil SSR response, got %#v", got)
 				}
+				return
 			}
-
-			if result.Body != tt.mockResponse.Body {
-				t.Errorf("Expected body '%s', got '%s'", tt.mockResponse.Body, result.Body)
+			if got == nil {
+				t.Fatal("expected non-nil SSR response")
+			}
+			if !testDeepEqual(t, got.Head, tt.want.Head) {
+				t.Errorf("expected head %v, got %v", tt.want.Head, got.Head)
+			}
+			if got.Body != tt.want.Body {
+				t.Errorf("expected body %q, got %q", tt.want.Body, got.Body)
 			}
 		})
+	}
+}
+
+func TestSsrHTTPGateway_Dispatch_EndpointSelection(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"head":[],"body":"<div>SSR</div>"}`)
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		name     string
+		url      string
+		hotURL   string
+		useHot   bool
+		endpoint string
+		wantPath string
+	}{
+		{
+			name:     "production URL",
+			url:      server.URL,
+			wantPath: "/render",
+		},
+		{
+			name:     "production URL with trailing slash",
+			url:      server.URL + "/",
+			wantPath: "/render",
+		},
+		{
+			name:     "hot URL",
+			url:      "http://invalid.example",
+			hotURL:   server.URL,
+			useHot:   true,
+			wantPath: "/__inertia_ssr",
+		},
+		{
+			name:     "Endpoint takes precedence",
+			url:      "http://invalid.example",
+			endpoint: server.URL + "/__inertia_ssr",
+			wantPath: "/__inertia_ssr",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &http.Client{
+				Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					if req.URL.Path != tt.wantPath {
+						t.Errorf("expected request path %q, got %q", tt.wantPath, req.URL.Path)
+					}
+					return http.DefaultTransport.RoundTrip(req)
+				}),
+			}
+			gateway := &SsrHTTPGateway{
+				Enabled:    true,
+				URL:        tt.url,
+				HotURL:     tt.hotURL,
+				UseHot:     tt.useHot,
+				Endpoint:   tt.endpoint,
+				HttpClient: client,
+			}
+
+			response, err := gateway.Dispatch(&RenderContext{Page: &Page{
+				Component: "TestComponent",
+				Props:     map[string]any{},
+				URL:       "/test",
+				Version:   "1.0.0",
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response == nil || response.Body != "<div>SSR</div>" {
+				t.Fatalf("unexpected SSR response: %#v", response)
+			}
+		})
+	}
+}
+
+func TestSsrHTTPGateway_Dispatch_UsesDefaultClientWhenNil(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"head":[],"body":"<div>SSR</div>"}`)
+	}))
+	defer server.Close()
+
+	gateway := &SsrHTTPGateway{Enabled: true, URL: server.URL}
+	response, err := gateway.Dispatch(&RenderContext{Page: &Page{Props: map[string]any{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response == nil || response.Body != "<div>SSR</div>" {
+		t.Fatalf("unexpected response: %#v", response)
 	}
 }
 
@@ -149,30 +271,33 @@ func TestSsrResponse_BodyHTML(t *testing.T) {
 	}
 }
 
-func TestNewSsrEngineHTTPGateway(t *testing.T) {
-	engine := NewSsrEngineHTTPGateway()
+func TestNewSsrHTTPGateway(t *testing.T) {
+	gateway := NewSsrHTTPGateway()
 
-	if engine == nil {
-		t.Error("Expected non-nil engine")
+	if gateway == nil {
+		t.Error("Expected non-nil gateway")
 		return
 	}
-
-	if engine.URL != "http://127.0.0.1:13714" {
-		t.Errorf("Expected default URL 'http://127.0.0.1:13714', got '%s'", engine.URL)
+	if !gateway.Enabled {
+		t.Error("Expected Enabled true by default")
 	}
-
-	if engine.HttpClient == nil {
+	if gateway.URL != "http://127.0.0.1:13714" {
+		t.Errorf("Expected default URL 'http://127.0.0.1:13714', got '%s'", gateway.URL)
+	}
+	if gateway.Endpoint != "" {
+		t.Errorf("expected default Endpoint to be empty, got %q", gateway.Endpoint)
+	}
+	if gateway.HttpClient == nil {
 		t.Error("Expected non-nil HTTP client")
 	}
-
-	if engine.HttpClient.Timeout != 0 {
-		t.Errorf("Expected default HTTP client timeout to be disabled, got %s", engine.HttpClient.Timeout)
+	if gateway.HttpClient.Timeout != 0 {
+		t.Errorf("Expected default HTTP client timeout to be disabled, got %s", gateway.HttpClient.Timeout)
 	}
 }
 
-func TestSsrEngineHTTPGateway_Render_NetworkError(t *testing.T) {
-	// Create SSR engine with invalid URL to simulate network error
-	engine := &SsrEngineHTTPGateway{
+func TestSsrHTTPGateway_Dispatch_NetworkError(t *testing.T) {
+	gateway := &SsrHTTPGateway{
+		Enabled:    true,
 		URL:        "http://invalid-host:99999",
 		HttpClient: &http.Client{},
 	}
@@ -186,21 +311,22 @@ func TestSsrEngineHTTPGateway_Render_NetworkError(t *testing.T) {
 		},
 	}
 
-	_, err := engine.Render(ctx)
+	_, err := gateway.Dispatch(ctx)
 	if err == nil {
 		t.Error("Expected network error but got none")
 	}
 }
 
-func TestSsrEngineHTTPGateway_Render_PropagatesRequestContext(t *testing.T) {
+func TestSsrHTTPGateway_Dispatch_PropagatesRequestContext(t *testing.T) {
 	requestContext, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(requestContext)
 	c := e.NewContext(req, httptest.NewRecorder())
-	engine := &SsrEngineHTTPGateway{
-		URL: "http://ssr.test",
+	gateway := &SsrHTTPGateway{
+		Enabled: true,
+		URL:     "http://ssr.test",
 		HttpClient: &http.Client{
 			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				select {
@@ -227,43 +353,243 @@ func TestSsrEngineHTTPGateway_Render_PropagatesRequestContext(t *testing.T) {
 		},
 	}
 
-	_, err := engine.Render(renderContext)
+	_, err := gateway.Dispatch(renderContext)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation error, got %v", err)
 	}
 }
 
-func TestSsrEngineHTTPGateway_Render_InvalidPageJSON(t *testing.T) {
-	// Create mock server
+func TestSsrHTTPGateway_Dispatch_InvalidPageJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(SsrResponse{
+		_ = json.NewEncoder(w).Encode(SsrResponse{
 			Head: []string{"<title>Test</title>"},
 			Body: "<div>Test</div>",
 		})
 	}))
 	defer server.Close()
 
-	engine := &SsrEngineHTTPGateway{
+	gateway := &SsrHTTPGateway{
+		Enabled:    true,
 		URL:        server.URL,
 		HttpClient: &http.Client{},
 	}
 
-	// Create render context with page that contains unmarshalable data
 	ctx := &RenderContext{
 		Page: &Page{
 			Component: "TestComponent",
-			Props:     map[string]any{"invalid": make(chan int)}, // channels can't be marshaled to JSON
+			Props:     map[string]any{"invalid": make(chan int)},
 			URL:       "/test",
 			Version:   "1.0.0",
 		},
 	}
 
-	_, err := engine.Render(ctx)
+	_, err := gateway.Dispatch(ctx)
 	if err == nil {
 		t.Error("Expected JSON marshal error but got none")
 	}
 	if !strings.Contains(err.Error(), "failed to marshal page json") {
 		t.Errorf("Expected error about JSON marshal, got: %v", err)
 	}
+}
+
+func TestSsrHTTPGateway_Dispatch_Skips(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Fatal("SSR HTTP must not be called when disabled/skipped")
+	}))
+	defer server.Close()
+
+	newCtx := func(path string, mutate func(*Inertia)) *RenderContext {
+		e := echo.New()
+		c := e.NewContext(httptest.NewRequest(http.MethodGet, path, nil), httptest.NewRecorder())
+		i := &Inertia{echoContext: c}
+		if mutate != nil {
+			mutate(i)
+		}
+		return &RenderContext{Inertia: i, Page: &Page{Props: map[string]any{}}}
+	}
+
+	t.Run("Enabled false", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: false, URL: server.URL, HttpClient: &http.Client{}}
+		got, err := g.Dispatch(newCtx("/", nil))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("DisableSsr on Inertia", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: true, URL: server.URL, HttpClient: &http.Client{}}
+		got, err := g.Dispatch(newCtx("/", func(i *Inertia) { i.DisableSsr() }))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("DisableSsrWhen", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: true, URL: server.URL, HttpClient: &http.Client{}}
+		got, err := g.Dispatch(newCtx("/", func(i *Inertia) {
+			i.DisableSsrWhen(func(*echo.Context) bool { return true })
+		}))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("WithoutSsr path match", func(t *testing.T) {
+		g := &SsrHTTPGateway{Enabled: true, URL: server.URL, HttpClient: &http.Client{}}
+		got, err := g.Dispatch(newCtx("/admin/users", func(i *Inertia) {
+			i.WithoutSsr("admin/*")
+		}))
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+}
+
+func TestSsrHTTPGateway_EnsureBundleExists(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"head":[],"body":"<div>SSR</div>"}`)
+	}))
+	defer server.Close()
+
+	t.Run("missing bundle skips", func(t *testing.T) {
+		g := &SsrHTTPGateway{
+			Enabled:            true,
+			URL:                server.URL,
+			HttpClient:         &http.Client{},
+			EnsureBundleExists: true,
+			BundlePaths:        []string{filepath.Join(t.TempDir(), "missing.js")},
+		}
+		got, err := g.Dispatch(&RenderContext{Page: &Page{Props: map[string]any{}}})
+		if err != nil || got != nil {
+			t.Fatalf("got=%#v err=%v", got, err)
+		}
+	})
+	t.Run("existing bundle dispatches", func(t *testing.T) {
+		dir := t.TempDir()
+		bundle := filepath.Join(dir, "ssr.js")
+		if err := os.WriteFile(bundle, []byte("// ssr"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		g := &SsrHTTPGateway{
+			Enabled:            true,
+			URL:                server.URL,
+			HttpClient:         &http.Client{},
+			EnsureBundleExists: true,
+			BundlePaths:        []string{bundle},
+		}
+		got, err := g.Dispatch(&RenderContext{Page: &Page{Props: map[string]any{}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got == nil || got.Body != "<div>SSR</div>" {
+			t.Fatalf("got=%#v", got)
+		}
+	})
+}
+
+func TestSsrHTTPGateway_IsHealthy(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/health" {
+			t.Fatalf("path=%q", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	g := &SsrHTTPGateway{URL: server.URL, HttpClient: &http.Client{}}
+	if !g.IsHealthy(context.Background()) {
+		t.Fatal("expected healthy")
+	}
+
+	g.URL = "http://invalid-host:99999"
+	if g.IsHealthy(context.Background()) {
+		t.Fatal("expected unhealthy")
+	}
+}
+
+func TestMatchSSRPath(t *testing.T) {
+	tests := []struct {
+		path, pattern string
+		want          bool
+	}{
+		{"/admin/users", "admin/*", true},
+		{"/admin/users", "/admin/*", true},
+		{"/users", "admin/*", false},
+		{"/", "/", true},
+		{"/exact", "exact", true},
+	}
+	for _, tt := range tests {
+		if got := matchSSRPath(tt.path, tt.pattern); got != tt.want {
+			t.Fatalf("matchSSRPath(%q, %q)=%v, want %v", tt.path, tt.pattern, got, tt.want)
+		}
+	}
+}
+
+func TestMiddlewareWithoutSsr(t *testing.T) {
+	e := echo.New()
+	dispatched := false
+	gateway := gatewayFunc(func(ctx *RenderContext) (*SsrResponse, error) {
+		dispatched = true
+		return &SsrResponse{Body: "<div>ssr</div>"}, nil
+	})
+	r := NewHTMLRenderer()
+	r.SsrGateway = gateway
+	r.Templates = mustParseRendererTemplate(t, r, `{{ define "app.html" }}{{ .inertia }}{{ end }}`)
+
+	e.Use(MiddlewareWithConfig(MiddlewareConfig{
+		VersionFunc: func(*echo.Context) string { return "v3" },
+		WithoutSsr:  []string{"admin/*"},
+		Renderer:    r,
+	}))
+	e.GET("/admin/users", func(c *echo.Context) error {
+		if SsrEnabled(c) {
+			t.Fatal("SsrEnabled should be false for WithoutSsr match")
+		}
+		return Render(c, "Home", nil)
+	})
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin/users", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	if dispatched {
+		t.Fatal("SsrGateway.Dispatch must not run when Inertia.SsrEnabled is false")
+	}
+	if !strings.Contains(rec.Body.String(), `type="application/json"`) {
+		t.Fatalf("expected CSR bootstrap, got %s", rec.Body.String())
+	}
+}
+
+func TestInertiaSsrEnabled(t *testing.T) {
+	e := echo.New()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/admin/users", nil), httptest.NewRecorder())
+	i := &Inertia{echoContext: c}
+	if !i.SsrEnabled() {
+		t.Fatal("default should allow SSR")
+	}
+	i.DisableSsr()
+	if i.SsrEnabled() {
+		t.Fatal("DisableSsr")
+	}
+	i.ssrDisabled = false
+	i.WithoutSsr("admin/*")
+	if i.SsrEnabled() {
+		t.Fatal("WithoutSsr path match")
+	}
+	i.withoutSsr = nil
+	i.DisableSsrWhen(func(*echo.Context) bool { return true })
+	if i.SsrEnabled() {
+		t.Fatal("DisableSsrWhen")
+	}
+}
+
+type gatewayFunc func(*RenderContext) (*SsrResponse, error)
+
+func (f gatewayFunc) Dispatch(ctx *RenderContext) (*SsrResponse, error) { return f(ctx) }
+
+func mustParseRendererTemplate(t *testing.T, r *HTMLRenderer, body string) *template.Template {
+	t.Helper()
+	tmpl, err := template.New("").Funcs(r.FuncMap()).Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tmpl
 }

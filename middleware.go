@@ -1,8 +1,11 @@
 package inertia
 
 import (
+	"fmt"
 	"net/http"
 	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -13,36 +16,57 @@ const (
 	key = "__inertia__"
 )
 
-type MiddlewareConfig struct {
-	Skipper middleware.Skipper
-	// The root template that's loaded on the first page visit.
-	// see https://inertiajs.com/server-side-setup#root-template
-	RootView string
-	// Determines the current asset version.
-	// see https://inertiajs.com/asset-versioning
-	VersionFunc func() string
-	// Defines the props that are shared by default.
-	// see https://inertiajs.com/shared-data
-	Share SharedDataFunc
-	// Renderer is a renderer that is used for rendering the root view.
-	Renderer Renderer
-	// ClearHistoryCookieKey is a key for the cookie that is used to clear the history state.
-	ClearHistoryCookieKey string
-	// IsSsrDisabled is a flag that determines whether server-side rendering is disabled.
-	// If this is true, server-side rendering is disabled even if the renderer supports and is configured for it.
-	IsSsrDisabled bool
-}
-
 type SharedDataFunc func(c *echo.Context) (map[string]any, error)
 
+type MiddlewareConfig struct {
+	// Skipper is a function to skip middleware. Returning true skips processing the middleware.
+	Skipper middleware.Skipper
+	// The root template that's loaded on the first page visit.
+	// Unlike inertia-laravel's rootView(Request), this stays a static string: in practice
+	// a fixed template name is enough. Override per request with SetRootView if needed.
+	RootView string
+	// Determines the current asset version.
+	// Corresponding specification: https://inertiajs.com/docs/v3/advanced/asset-versioning
+	VersionFunc VersionFunc
+	// URLResolver resolves the Page object URL.
+	URLResolver URLResolverFunc
+	// Defines the props that are shared by default.
+	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data
+	Share SharedDataFunc
+	// Defines once props shared on every request. Map values should be
+	// func() (any, error) or *OnceProp (same contract as Laravel's shareOnce).
+	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data#sharing-once-props
+	ShareOnce SharedDataFunc
+	// Renderer is a renderer that is used for rendering the root view.
+	Renderer Renderer
+	// StateStore is inertia-echo's own design for cross-request state, not an
+	// official Inertia protocol feature. Echo has no built-in session, but
+	// Inertia features such as flash, clear history, and preserve fragment need
+	// state that survives to a later request (inertia-laravel uses the Laravel
+	// session). This package therefore owns a small stateful bag and API scoped
+	// to Inertia, rather than depending on or replacing an application session.
+	// Nil uses CookieStateStore. Not a secure session — see StateStore docs.
+	StateStore StateStore
+	// RescueReporter receives errors from deferred props with Rescue enabled.
+	RescueReporter RescueReporter
+	// Now supplies request-time timestamps for once-prop expiration metadata.
+	Now func() time.Time
+	// WithoutSsr excludes matching paths from SSR for each request.
+	// Mirrors inertia-laravel Middleware::$withoutSsr (patterns: * wildcards like Request::is).
+	// Design difference: Laravel applies this to the (container) Gateway via except().
+	// Here SsrGateway is an application-wide shared instance, not request-scoped, so the
+	// paths are copied onto the request-scoped Inertia instead (see Inertia.SsrEnabled).
+	WithoutSsr []string
+}
+
 var DefaultMiddlewareConfig = MiddlewareConfig{
-	Skipper:               middleware.DefaultSkipper,
-	RootView:              "app.html",
-	VersionFunc:           defaultVersionFunc(),
-	Share:                 nil,
-	Renderer:              nil,
-	ClearHistoryCookieKey: "inertia.clear_history",
-	IsSsrDisabled:         false,
+	Skipper:     middleware.DefaultSkipper,
+	RootView:    "app.html",
+	VersionFunc: defaultVersionFunc(),
+	URLResolver: defaultURLResolver(),
+	Share:       nil,
+	Renderer:    nil,
+	StateStore:  NewCookieStateStore(),
 }
 
 func defaultVersionFunc() VersionFunc {
@@ -58,14 +82,19 @@ func defaultVersionFunc() VersionFunc {
 		}
 	}
 
-	return func() string {
+	return func(*echo.Context) string {
 		return v
+	}
+}
+
+func defaultURLResolver() URLResolverFunc {
+	return func(c *echo.Context) string {
+		return c.Request().URL.String()
 	}
 }
 
 // MiddlewareWithConfig returns an echo middleware that adds the Inertia instance to the context.
 func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
-	// Defaults
 	if config.Skipper == nil {
 		config.Skipper = DefaultMiddlewareConfig.Skipper
 	}
@@ -75,103 +104,153 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	if config.VersionFunc == nil {
 		config.VersionFunc = DefaultMiddlewareConfig.VersionFunc
 	}
-	if config.ClearHistoryCookieKey == "" {
-		config.ClearHistoryCookieKey = DefaultMiddlewareConfig.ClearHistoryCookieKey
+	if config.URLResolver == nil {
+		config.URLResolver = DefaultMiddlewareConfig.URLResolver
+	}
+	if config.StateStore == nil {
+		config.StateStore = DefaultMiddlewareConfig.StateStore
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) (err error) {
+		return func(c *echo.Context) error {
 			if config.Skipper(c) {
 				return next(c)
 			}
 
-			var sharedProps map[string]any
-			if config.Share != nil {
-				ret, err := config.Share(c)
-				if err != nil {
-					return err
-				}
-				sharedProps = ret
-			} else {
-				sharedProps = map[string]any{}
+			// Create the request-scoped Inertia instance.
+			req := c.Request()
+			state, err := config.StateStore.Load(c)
+			if err != nil {
+				return err
 			}
-
-			// Create an Inertia instance.
+			if state == nil {
+				state = map[string]string{}
+			}
 			i := &Inertia{
-				echoContext:           c,
-				rootView:              config.RootView,
-				sharedProps:           sharedProps,
-				version:               config.VersionFunc,
-				renderer:              config.Renderer,
-				clearHistoryCookieKey: config.ClearHistoryCookieKey,
-				isSsrDisabled:         config.IsSsrDisabled,
+				echoContext:      c,
+				rootView:         config.RootView,
+				sharedProps:      map[string]any{},
+				version:          config.VersionFunc,
+				urlResolver:      config.URLResolver,
+				renderer:         config.Renderer,
+				stateStore:       config.StateStore,
+				state:            state,
+				flash:            map[string]any{},
+				rescueReporter:   config.RescueReporter,
+				now:              config.Now,
+				withoutSsr:       slices.Clone(config.WithoutSsr),
+				partialComponent: req.Header.Get(HeaderXInertiaPartialComponent),
+				onlyProps:        splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ","),
+				exceptProps:      splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ","),
+				resetProps:       splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ","),
 			}
 			c.Set(key, i)
 
-			req := c.Request()
-
-			i.partialComponent = req.Header.Get(HeaderXInertiaPartialComponent)
-			i.onlyProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialData), ",")
-			i.exceptProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ",")
-			i.resetProps = splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ",")
-
-			if req.Header.Get(HeaderXInertia) == "" {
-				// Not inertial request
-				if err = next(c); err != nil {
-					return
+			// Asset versioning runs before Share and next (unlike inertia-laravel,
+			// which replaces the response after $next). Location does not use
+			// shared props or the handler result, so resolve version first.
+			// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#asset-versioning
+			version := i.Version()
+			if checkVersion(req, version) {
+				addVaryHeader(c.Response().Header(), HeaderXInertia)
+				if err := i.persistState(); err != nil {
+					return err
 				}
-				i.sendClearHistoryCookieIfNeeded()
-
-				return
+				c.Response().Header().Set(HeaderXInertiaVersion, version)
+				return i.Location(req.URL.String())
 			}
 
-			// In the event that the assets change, initiate a
-			// client-side location visit to force an update.
-			// see https://inertiajs.com/the-protocol#asset-versioning
-			if checkVersion(req, i.Version()) {
-				err = i.Location(req.URL.String())
-				return
+			if config.Share != nil {
+				shared, err := config.Share(c)
+				if err != nil {
+					return err
+				}
+				if shared != nil {
+					i.Share(shared)
+				}
+			}
+			if config.ShareOnce != nil {
+				onceShared, err := config.ShareOnce(c)
+				if err != nil {
+					return err
+				}
+				for propKey, value := range onceShared {
+					switch v := value.(type) {
+					case *OnceProp:
+						i.Share(map[string]any{propKey: v})
+					case func() (any, error):
+						i.ShareOnce(propKey, v)
+					default:
+						return fmt.Errorf("inertia-echo: ShareOnce %q: want func() (any, error) or *OnceProp, got %T", propKey, value)
+					}
+				}
 			}
 
-			// Wrap the http response writer.
-			// The response status code might change after the handler executes.
+			// Wrap the writer so post-next rewrites (302→303, fragment→409) can
+			// adjust redirect responses before they are flushed.
 			originalWriter := c.Response()
 			w := NewResponseWriterWrapper(originalWriter)
 			c.SetResponse(w)
-			// Flush the buffered header before restoring the original writer. These are
-			// separate defers so the writer is restored even if flushing panics.
 			defer c.SetResponse(originalWriter)
-			defer w.FlushHeader()
 
-			if err = next(c); err != nil {
-				return
+			if err := next(c); err != nil {
+				// Propagate to the calling middleware or Echo's HTTPErrorHandler.
+				// This package intentionally does not provide an inertia-laravel's style
+				// error-handling framework. Echo and Go favor explicit application logic.
+				// Typically, you should handle errors in your application's echo.HTTPErrorHandler,
+				// and if you want to render an Inertia error page, you can do so there.
+				return err
 			}
-			i.sendClearHistoryCookieIfNeeded()
 
-			changeRedirectCode(req, w)
-			return
+			addVaryHeader(w.Header(), HeaderXInertia)
+
+			if req.Header.Get(HeaderXInertia) != "" {
+				// 302 → 303 for PUT/PATCH/DELETE so the follow-up is GET.
+				// Spec: https://inertiajs.com/docs/v3/the-basics/redirects
+				if w.StatusCode() == http.StatusFound && inArray(req.Method, []string{http.MethodPut, http.MethodPatch, http.MethodDelete}) {
+					w.replaceBufferedStatusCode(http.StatusFound, http.StatusSeeOther)
+				}
+				if w.isRedirectResponse() && redirectHasFragment(w) && !isPrefetchRequest(req) {
+					onRedirectWithFragment(w)
+				}
+			}
+
+			// Commit the request-scoped state bag to StateStore.
+			if err := i.persistState(); err != nil {
+				return err
+			}
+			return w.flushBufferedResponse()
 		}
 	}
 }
 
-// checkVersion checks the assets version change.
+// checkVersion reports a GET Inertia asset version mismatch.
 func checkVersion(req *http.Request, version string) bool {
-	if req.Header.Get(HeaderXInertia) != "" &&
-		req.Method == "GET" &&
-		req.Header.Get(HeaderXInertiaVersion) != version {
-		return true
-	}
-	return false
+	return req.Header.Get(HeaderXInertia) != "" &&
+		req.Method == http.MethodGet &&
+		req.Header.Get(HeaderXInertiaVersion) != version
 }
 
-// changeRedirectCode changes the status code during redirects, ensuring they are made as
-// GET requests, preventing "MethodNotAllowedHttpException" errors.
-// see https://inertiajs.com/redirects
-func changeRedirectCode(req *http.Request, w *ResponseWriterWrapper) {
-	if req.Header.Get(HeaderXInertia) != "" &&
-		inArray(req.Method, []string{http.MethodPut, http.MethodPatch, http.MethodDelete}) {
-		w.replaceBufferedStatusCode(http.StatusFound, http.StatusSeeOther)
-	}
+// isPrefetchRequest mirrors Laravel Illuminate\Http\Request::prefetch.
+func isPrefetchRequest(req *http.Request) bool {
+	return strings.EqualFold(req.Header.Get("Purpose"), "prefetch") ||
+		strings.EqualFold(req.Header.Get("Sec-Purpose"), "prefetch") ||
+		strings.EqualFold(req.Header.Get("X-Moz"), "prefetch")
+}
+
+// redirectHasFragment mirrors inertia-laravel Middleware::redirectHasFragment.
+func redirectHasFragment(w *ResponseWriterWrapper) bool {
+	return strings.Contains(w.Header().Get(echo.HeaderLocation), "#")
+}
+
+// onRedirectWithFragment mirrors inertia-laravel Middleware::onRedirectWithFragment.
+func onRedirectWithFragment(w *ResponseWriterWrapper) {
+	location := w.Header().Get(echo.HeaderLocation)
+	w.replaceBufferedResponse(http.StatusConflict, nil)
+	w.Header().Del(echo.HeaderLocation)
+	w.Header().Del(echo.HeaderContentLength)
+	w.Header().Del(echo.HeaderContentType)
+	w.Header().Set(HeaderXInertiaRedirect, location)
 }
 
 func Get(c *echo.Context) (*Inertia, error) {
@@ -209,7 +288,7 @@ func EncryptHistoryMiddlewareWithConfig(config EncryptHistoryMiddlewareConfig) e
 			config.Skipper = middleware.DefaultSkipper
 		}
 
-		return func(c *echo.Context) (err error) {
+		return func(c *echo.Context) error {
 			if config.Skipper(c) {
 				return next(c)
 			}

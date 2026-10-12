@@ -1,60 +1,101 @@
 package inertia
 
 import (
-	"reflect"
+	"net/http"
+	"slices"
 	"testing"
 )
+
+func TestAddVaryHeader(t *testing.T) {
+	tests := []struct {
+		name    string
+		initial []string
+		value   string
+		want    []string
+	}{
+		{
+			name:  "empty header",
+			value: HeaderXInertia,
+			want:  []string{HeaderXInertia},
+		},
+		{
+			name:    "appends to existing tokens",
+			initial: []string{"Accept-Encoding"},
+			value:   HeaderXInertia,
+			want:    []string{"Accept-Encoding", HeaderXInertia},
+		},
+		{
+			name:    "does not duplicate exact match",
+			initial: []string{HeaderXInertia},
+			value:   HeaderXInertia,
+			want:    []string{HeaderXInertia},
+		},
+		{
+			name:    "does not duplicate case-insensitive match",
+			initial: []string{"x-inertia"},
+			value:   HeaderXInertia,
+			want:    []string{"x-inertia"},
+		},
+		{
+			name:    "match inside comma-separated Vary value",
+			initial: []string{"Cookie, X-Inertia, Accept-Encoding"},
+			value:   HeaderXInertia,
+			want:    []string{"Cookie, X-Inertia, Accept-Encoding"},
+		},
+		{
+			name:    "wildcard prevents adding",
+			initial: []string{"*"},
+			value:   HeaderXInertia,
+			want:    []string{"*"},
+		},
+		{
+			name:    "multiple Vary header values",
+			initial: []string{"Cookie", "Accept-Encoding"},
+			value:   HeaderXInertia,
+			want:    []string{"Cookie", "Accept-Encoding", HeaderXInertia},
+		},
+		{
+			name:    "already present across multiple Vary values",
+			initial: []string{"Cookie", "X-Inertia"},
+			value:   HeaderXInertia,
+			want:    []string{"Cookie", "X-Inertia"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := make(http.Header)
+			for _, v := range tt.initial {
+				header.Add("Vary", v)
+			}
+			addVaryHeader(header, tt.value)
+			got := header.Values("Vary")
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("Vary=%v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestInArray(t *testing.T) {
 	tests := []struct {
 		name     string
 		needle   string
 		haystack []string
-		expected bool
+		want     bool
 	}{
-		{
-			name:     "found in array",
-			needle:   "apple",
-			haystack: []string{"orange", "apple", "banana"},
-			expected: true,
-		},
-		{
-			name:     "not found in array",
-			needle:   "grape",
-			haystack: []string{"orange", "apple", "banana"},
-			expected: false,
-		},
-		{
-			name:     "empty array",
-			needle:   "apple",
-			haystack: []string{},
-			expected: false,
-		},
-		{
-			name:     "nil array",
-			needle:   "apple",
-			haystack: nil,
-			expected: false,
-		},
-		{
-			name:     "empty needle",
-			needle:   "",
-			haystack: []string{"orange", "", "banana"},
-			expected: true,
-		},
-		{
-			name:     "empty needle not in array",
-			needle:   "",
-			haystack: []string{"orange", "apple", "banana"},
-			expected: false,
-		},
+		{name: "found", needle: "apple", haystack: []string{"orange", "apple", "banana"}, want: true},
+		{name: "not found", needle: "grape", haystack: []string{"orange", "apple", "banana"}, want: false},
+		{name: "empty haystack", needle: "apple", haystack: []string{}, want: false},
+		{name: "nil haystack", needle: "apple", haystack: nil, want: false},
+		{name: "empty needle found", needle: "", haystack: []string{"orange", "", "banana"}, want: true},
+		{name: "empty needle missing", needle: "", haystack: []string{"orange", "apple"}, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := inArray(tt.needle, tt.haystack)
-			if result != tt.expected {
-				t.Errorf("inArray(%q, %v) = %v, expected %v", tt.needle, tt.haystack, result, tt.expected)
+			if got := inArray(tt.needle, tt.haystack); got != tt.want {
+				t.Fatalf("inArray(%q, %v) = %v, want %v", tt.needle, tt.haystack, got, tt.want)
 			}
 		})
 	}
@@ -62,120 +103,28 @@ func TestInArray(t *testing.T) {
 
 func TestSplitAndRemoveEmpty(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     string
-		separator string
-		expected  []string
+		name string
+		s    string
+		sep  string
+		want []string
 	}{
-		{
-			name:      "normal split",
-			input:     "apple,orange,banana",
-			separator: ",",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "empty string",
-			input:     "",
-			separator: ",",
-			expected:  nil,
-		},
-		{
-			name:      "single element",
-			input:     "apple",
-			separator: ",",
-			expected:  []string{"apple"},
-		},
-		{
-			name:      "empty elements",
-			input:     "apple,,orange,,banana",
-			separator: ",",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "leading empty elements",
-			input:     ",,apple,orange,banana",
-			separator: ",",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "trailing empty elements",
-			input:     "apple,orange,banana,,",
-			separator: ",",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "only separators",
-			input:     ",,,",
-			separator: ",",
-			expected:  nil,
-		},
-		{
-			name:      "different separator",
-			input:     "apple|orange|banana",
-			separator: "|",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "space separator",
-			input:     "apple orange banana",
-			separator: " ",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "space separator with extra spaces",
-			input:     "apple  orange  banana",
-			separator: " ",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "multi-character separator",
-			input:     "apple::orange::banana",
-			separator: "::",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "multi-character separator with empty",
-			input:     "apple::::orange::banana",
-			separator: "::",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "no separator found",
-			input:     "apple",
-			separator: ",",
-			expected:  []string{"apple"},
-		},
-		{
-			name:      "whitespace elements",
-			input:     " apple , orange , banana ",
-			separator: ",",
-			expected:  []string{"apple", "orange", "banana"},
-		},
-		{
-			name:      "single separator at start",
-			input:     ",apple",
-			separator: ",",
-			expected:  []string{"apple"},
-		},
-		{
-			name:      "single separator at end",
-			input:     "apple,",
-			separator: ",",
-			expected:  []string{"apple"},
-		},
-		{
-			name:      "just separator",
-			input:     ",",
-			separator: ",",
-			expected:  nil,
-		},
+		{name: "normal", s: "apple,orange,banana", sep: ",", want: []string{"apple", "orange", "banana"}},
+		{name: "empty input", s: "", sep: ",", want: nil},
+		{name: "single token", s: "apple", sep: ",", want: []string{"apple"}},
+		{name: "skips empty segments", s: "apple,,orange,,banana", sep: ",", want: []string{"apple", "orange", "banana"}},
+		{name: "trims whitespace", s: " apple , orange , banana ", sep: ",", want: []string{"apple", "orange", "banana"}},
+		{name: "only separators", s: ",,,", sep: ",", want: nil},
+		{name: "leading and trailing separators", s: ",apple,banana,", sep: ",", want: []string{"apple", "banana"}},
+		{name: "custom separator", s: "apple|orange|banana", sep: "|", want: []string{"apple", "orange", "banana"}},
+		{name: "multi-char separator", s: "apple::orange::::banana", sep: "::", want: []string{"apple", "orange", "banana"}},
+		{name: "space separator collapses extras", s: "apple  orange  banana", sep: " ", want: []string{"apple", "orange", "banana"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := splitAndRemoveEmpty(tt.input, tt.separator)
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("splitAndRemoveEmpty(%q, %q) = %v, expected %v", tt.input, tt.separator, result, tt.expected)
+			got := splitAndRemoveEmpty(tt.s, tt.sep)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("splitAndRemoveEmpty(%q, %q) = %#v, want %#v", tt.s, tt.sep, got, tt.want)
 			}
 		})
 	}

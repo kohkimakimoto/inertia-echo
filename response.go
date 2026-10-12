@@ -9,10 +9,9 @@ import (
 	"net/http"
 )
 
-// ResponseWriterWrapper is a wrapper of http.ResponseWriter for buffering a response status code.
-// Inertia.js adapter needs to change the response status code in a middleware.
-// For example, if a request has X-Inertia, the adapter change the response code to 303 from 302.
-// see https://inertiajs.com/redirects
+// ResponseWriterWrapper is a wrapper of http.ResponseWriter for buffering a response
+// so middleware can rewrite redirect status/headers after the handler returns.
+// Only redirects and Inertia 409 responses are buffered; other responses flush through.
 type ResponseWriterWrapper struct {
 	http.ResponseWriter
 	buffered    bool
@@ -30,7 +29,7 @@ func NewResponseWriterWrapper(w http.ResponseWriter) *ResponseWriterWrapper {
 	}
 }
 
-// WriteHeader buffers redirect responses and forwards other status codes.
+// WriteHeader buffers the status when required; otherwise forwards immediately.
 // As required by net/http, only the first call takes effect.
 func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
 	if w.wroteHeader {
@@ -39,9 +38,8 @@ func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
 	w.wroteHeader = true
 	w.statusCode = statusCode
 
-	if statusCode == 302 || statusCode == 303 {
-		// buffering only 302 or 303 status. it is current Inertia.js protocol specification.
-		// see also https://inertiajs.com/redirects
+	if isRedirectStatus(statusCode) || (statusCode == http.StatusConflict &&
+		(w.Header().Get(HeaderXInertiaLocation) != "" || w.Header().Get(HeaderXInertiaRedirect) != "")) {
 		w.buffered = true
 		return
 	}
@@ -62,9 +60,38 @@ func (w *ResponseWriterWrapper) Write(p []byte) (int, error) {
 	return w.ResponseWriter.Write(p)
 }
 
+// StatusCode returns the status that will be flushed (buffered or already written).
+func (w *ResponseWriterWrapper) StatusCode() int {
+	return w.statusCode
+}
+
 func (w *ResponseWriterWrapper) replaceBufferedStatusCode(from, to int) {
 	if w.buffered && w.statusCode == from {
 		w.statusCode = to
+	}
+}
+
+func (w *ResponseWriterWrapper) replaceBufferedResponse(statusCode int, body []byte) {
+	if !w.buffered {
+		return
+	}
+	w.statusCode = statusCode
+	w.body.Reset()
+	if len(body) > 0 {
+		_, _ = w.body.Write(body)
+	}
+}
+
+func (w *ResponseWriterWrapper) isRedirectResponse() bool {
+	return w.wroteHeader && isRedirectStatus(w.statusCode)
+}
+
+func isRedirectStatus(statusCode int) bool {
+	switch statusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		return true
+	default:
+		return false
 	}
 }
 

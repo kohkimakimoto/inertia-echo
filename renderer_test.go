@@ -1,0 +1,193 @@
+package inertia
+
+import (
+	"encoding/json"
+	"errors"
+	"html"
+	"html/template"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"testing/fstest"
+
+	"github.com/labstack/echo/v5"
+)
+
+func TestHTMLRendererRenderInertiaV3Bootstrap(t *testing.T) {
+	r := NewHTMLRenderer()
+	page := &Page{
+		Component: "Index",
+		Props: map[string]any{
+			"unsafe":  "</script><script>alert(\"x\")</script>&\u2028\u2029",
+			"unicode": "日本語",
+		},
+		URL:     "/?q=<&quote=\"",
+		Version: "v3",
+	}
+
+	markup, err := r.renderInertia(page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(markup)
+	if !strings.HasPrefix(got, `<script type="application/json" data-page="app">`) {
+		t.Fatalf("unexpected v3 bootstrap markup: %s", got)
+	}
+	if !strings.HasSuffix(got, `</script><div id="app"></div>`) {
+		t.Fatalf("unexpected root element: %s", got)
+	}
+	if strings.Contains(got, `<div id="app" data-page=`) {
+		t.Fatalf("legacy data-page attribute must not be emitted: %s", got)
+	}
+	if strings.Count(got, "</script>") != 1 {
+		t.Fatalf("page JSON escaped the script element: %s", got)
+	}
+
+	start := strings.Index(got, ">") + 1
+	end := strings.Index(got, "</script>")
+	var decoded Page
+	if err := json.Unmarshal([]byte(got[start:end]), &decoded); err != nil {
+		t.Fatalf("script text is not JSON: %v", err)
+	}
+	if decoded.Props["unsafe"] != page.Props["unsafe"] || decoded.Props["unicode"] != "日本語" {
+		t.Fatalf("page JSON did not round-trip: %#v", decoded.Props)
+	}
+}
+
+func TestHTMLRendererEscapesContainerID(t *testing.T) {
+	r := NewHTMLRenderer()
+	r.ContainerId = `app"><script>alert(1)</script>`
+	markup, err := r.renderInertia(&Page{Props: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(markup)
+	if strings.Contains(got, `<script>alert(1)</script>`) {
+		t.Fatalf("container ID was not attribute escaped: %s", got)
+	}
+	escaped := html.EscapeString(r.ContainerId)
+	if strings.Count(got, escaped) != 2 {
+		t.Fatalf("container ID must be shared by script and root div: %s", got)
+	}
+}
+
+type rendererGatewayFunc func(*RenderContext) (*SsrResponse, error)
+
+func (f rendererGatewayFunc) Dispatch(ctx *RenderContext) (*SsrResponse, error) { return f(ctx) }
+
+func newRendererTestInertia(t *testing.T) *Inertia {
+	t.Helper()
+	e := echo.New()
+	c := e.NewContext(httptest.NewRequest("GET", "/", nil), httptest.NewRecorder())
+	return &Inertia{echoContext: c}
+}
+
+func TestHTMLRendererSSRDispatch(t *testing.T) {
+	tests := []struct {
+		name    string
+		gateway SsrGateway
+		wantErr bool
+		wantCSR bool
+		wantSSR bool
+	}{
+		{name: "nil skip uses CSR", gateway: rendererGatewayFunc(func(*RenderContext) (*SsrResponse, error) { return nil, nil }), wantCSR: true},
+		{name: "strict error", gateway: rendererGatewayFunc(func(*RenderContext) (*SsrResponse, error) { return nil, errors.New("ssr failed") }), wantErr: true},
+		{name: "ssr body", gateway: rendererGatewayFunc(func(*RenderContext) (*SsrResponse, error) {
+			return &SsrResponse{Head: []string{"<title>x</title>"}, Body: "<div>ssr</div>"}, nil
+		}), wantSSR: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			i := newRendererTestInertia(t)
+			r := NewHTMLRenderer()
+			r.SsrGateway = tt.gateway
+			r.Templates = template.Must(template.New("").Funcs(r.FuncMap()).Parse(`{{ define "app.html" }}{{ .inertia }}{{ end }}`))
+			var out strings.Builder
+			err := r.Render(&RenderContext{Inertia: i, Page: &Page{Props: map[string]any{}}, ViewName: "app.html", Writer: &out})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantCSR && !strings.Contains(out.String(), `type="application/json"`) {
+				t.Fatalf("expected CSR bootstrap, got %s", out.String())
+			}
+			if tt.wantSSR && !strings.Contains(out.String(), "<div>ssr</div>") {
+				t.Fatalf("expected SSR body, got %s", out.String())
+			}
+		})
+	}
+}
+
+func TestHTMLRendererParseHelpers(t *testing.T) {
+	const body = `{{ define "app.html" }}{{ vite "resources/js/app.tsx" }}{{ end }}`
+
+	t.Run("ParseFiles", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "app.html")
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		r := NewHTMLRenderer()
+		r.Debug = true
+		tpl, err := r.ParseFiles(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Templates != tpl {
+			t.Fatal("ParseFiles did not set Templates")
+		}
+		if tpl.Lookup("app.html") == nil {
+			t.Fatal("expected app.html template")
+		}
+	})
+
+	t.Run("MustParseGlob", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "app.html")
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		r := NewHTMLRenderer()
+		r.Debug = true
+		tpl := r.MustParseGlob(filepath.Join(dir, "*.html"))
+		if r.Templates != tpl {
+			t.Fatal("MustParseGlob did not set Templates")
+		}
+		if tpl.Lookup("app.html") == nil {
+			t.Fatal("expected app.html template")
+		}
+	})
+
+	t.Run("ParseFS", func(t *testing.T) {
+		fsys := fstest.MapFS{
+			"views/app.html": &fstest.MapFile{Data: []byte(body)},
+		}
+		r := NewHTMLRenderer()
+		r.Debug = true
+		tpl, err := r.ParseFS(fsys, "views/*.html")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Templates != tpl {
+			t.Fatal("ParseFS did not set Templates")
+		}
+		if tpl.Lookup("app.html") == nil {
+			t.Fatal("expected app.html template")
+		}
+	})
+
+	t.Run("ParseGlob error leaves Templates unset", func(t *testing.T) {
+		r := NewHTMLRenderer()
+		_, err := r.ParseGlob(filepath.Join(t.TempDir(), "missing-*.html"))
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if r.Templates != nil {
+			t.Fatal("Templates should remain nil on error")
+		}
+	})
+}
