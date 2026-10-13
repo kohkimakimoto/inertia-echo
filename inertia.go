@@ -527,6 +527,22 @@ func SetURLResolver(c *echo.Context, resolver URLResolverFunc) {
 	MustGet(c).SetURLResolver(resolver)
 }
 
+func ClearHistory(c *echo.Context) {
+	MustGet(c).ClearHistory()
+}
+
+func PreserveFragment(c *echo.Context) {
+	MustGet(c).PreserveFragment()
+}
+
+func EncryptHistory(c *echo.Context, encrypt bool) {
+	MustGet(c).EncryptHistory(encrypt)
+}
+
+func Flash(c *echo.Context, data map[string]any) {
+	MustGet(c).Flash(data)
+}
+
 func WithoutSsr(c *echo.Context, paths ...string) {
 	MustGet(c).WithoutSsr(paths...)
 }
@@ -545,22 +561,6 @@ func SsrEnabled(c *echo.Context) bool {
 
 func Location(c *echo.Context, url string) error {
 	return MustGet(c).Location(url)
-}
-
-func EncryptHistory(c *echo.Context, encrypt bool) {
-	MustGet(c).EncryptHistory(encrypt)
-}
-
-func ClearHistory(c *echo.Context) {
-	MustGet(c).ClearHistory()
-}
-
-func PreserveFragment(c *echo.Context) {
-	MustGet(c).PreserveFragment()
-}
-
-func Flash(c *echo.Context, data map[string]any) {
-	MustGet(c).Flash(data)
 }
 
 func Render(c *echo.Context, status int, component string, props map[string]any) error {
