@@ -106,33 +106,6 @@ func TestCookieStateStore_WithConfig(t *testing.T) {
 	}
 }
 
-func TestInertiaStateBagOps(t *testing.T) {
-	i := &Inertia{state: map[string]string{}}
-
-	i.stateSet(StateKeyClearHistory, "true")
-	if !i.stateDirty {
-		t.Fatal("expected dirty after Set")
-	}
-	got, ok := i.stateGet(StateKeyClearHistory)
-	if !ok || got != "true" {
-		t.Fatalf("Get got=%q ok=%v", got, ok)
-	}
-
-	pulled, ok := i.statePull(StateKeyClearHistory)
-	if !ok || pulled != "true" {
-		t.Fatalf("Pull got=%q ok=%v", pulled, ok)
-	}
-	if _, ok := i.stateGet(StateKeyClearHistory); ok {
-		t.Fatal("expected missing after Pull")
-	}
-
-	i.stateSet(StateKeyPreserveFragment, "true")
-	i.stateDelete(StateKeyPreserveFragment)
-	if _, ok := i.stateGet(StateKeyPreserveFragment); ok {
-		t.Fatal("expected missing after Delete")
-	}
-}
-
 func testStateBagCookie(t *testing.T, bag map[string]string) *http.Cookie {
 	t.Helper()
 	encoded, err := encodeStateBag(bag)

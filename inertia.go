@@ -166,6 +166,18 @@ func (i *Inertia) EncryptHistory(encrypt bool) {
 	i.encryptHistory = encrypt
 }
 
+// Flash adds data to the top-level Page flash object for the current render.
+// For POST-redirect-GET, unconsumed flash is persisted via StateStore (default:
+// unsigned cookie). Treat loaded flash like untrusted request input.
+func (i *Inertia) Flash(data map[string]any) {
+	if i.flash == nil {
+		i.flash = map[string]any{}
+	}
+	for key, value := range data {
+		i.flash[key] = value
+	}
+}
+
 // pullClearHistory pulls the clear-history flag from state or the current field.
 // Laravel uses session for this; Echo has no built-in session, so the default
 // StateStore uses an unsigned cookie (see StateStore security notes).
@@ -231,74 +243,6 @@ func (i *Inertia) saveBooleanFlag(key string, value bool) {
 	i.stateSet(key, "true")
 }
 
-// persistState writes unconsumed one-shot values (clear history, preserve
-// fragment, flash) into the in-memory bag, then Save via StateStore when dirty.
-func (i *Inertia) persistState() error {
-	i.saveBooleanFlag(StateKeyClearHistory, i.clearHistory)
-	i.saveBooleanFlag(StateKeyPreserveFragment, i.preserveFragment)
-	if err := i.persistFlash(); err != nil {
-		return err
-	}
-	if !i.stateDirty {
-		return nil
-	}
-	if i.stateStore == nil {
-		return nil
-	}
-	if i.state == nil {
-		i.state = map[string]string{}
-	}
-	return i.stateStore.Save(i.echoContext, i.state)
-}
-
-// WithoutSsr excludes matching paths from SSR for this request.
-// Mirrors inertia-laravel Inertia::withoutSsr / Middleware::$withoutSsr.
-func (i *Inertia) WithoutSsr(paths ...string) {
-	i.withoutSsr = append(i.withoutSsr, paths...)
-}
-
-// DisableSsr disables SSR for this request.
-// Mirrors inertia-laravel Inertia::disableSsr(true).
-func (i *Inertia) DisableSsr() {
-	i.ssrDisabled = true
-}
-
-// DisableSsrWhen disables SSR for this request when fn returns true at dispatch time.
-// Mirrors inertia-laravel Inertia::disableSsr(Closure).
-func (i *Inertia) DisableSsrWhen(fn func(c *echo.Context) bool) {
-	i.ssrDisableWhen = fn
-}
-
-// SsrEnabled reports whether this request may attempt SSR from Inertia's point of view.
-// Evaluates DisableSsr / DisableSsrWhen / WithoutSsr. SsrHTTPGateway may still skip when
-// Enabled is false or no SSR bundle exists. Custom Renderers should call this instead of
-// reading Inertia internals.
-func (i *Inertia) SsrEnabled() bool {
-	if i.ssrDisabled {
-		return false
-	}
-	if i.ssrDisableWhen != nil && i.ssrDisableWhen(i.echoContext) {
-		return false
-	}
-	path := ""
-	if i.echoContext != nil && i.echoContext.Request() != nil {
-		path = i.echoContext.Request().URL.Path
-	}
-	return !matchSSRPaths(path, i.withoutSsr)
-}
-
-// Flash adds data to the top-level Page flash object for the current render.
-// For POST-redirect-GET, unconsumed flash is persisted via StateStore (default:
-// unsigned cookie). Treat loaded flash like untrusted request input.
-func (i *Inertia) Flash(data map[string]any) {
-	if i.flash == nil {
-		i.flash = map[string]any{}
-	}
-	for key, value := range data {
-		i.flash[key] = value
-	}
-}
-
 func (i *Inertia) resolveFlash() (map[string]any, error) {
 	if !i.flashLoaded {
 		local := i.flash
@@ -340,6 +284,26 @@ func (i *Inertia) persistFlash() error {
 	return nil
 }
 
+// persistState writes unconsumed one-shot values (clear history, preserve
+// fragment, flash) into the in-memory bag, then Save via StateStore when dirty.
+func (i *Inertia) persistState() error {
+	i.saveBooleanFlag(StateKeyClearHistory, i.clearHistory)
+	i.saveBooleanFlag(StateKeyPreserveFragment, i.preserveFragment)
+	if err := i.persistFlash(); err != nil {
+		return err
+	}
+	if !i.stateDirty {
+		return nil
+	}
+	if i.stateStore == nil {
+		return nil
+	}
+	if i.state == nil {
+		i.state = map[string]string{}
+	}
+	return i.stateStore.Save(i.echoContext, i.state)
+}
+
 func encodeFlashState(data map[string]any) (string, error) {
 	b, err := json.Marshal(data)
 	if err != nil {
@@ -358,6 +322,42 @@ func decodeFlashState(raw string) (map[string]any, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// WithoutSsr excludes matching paths from SSR for this request.
+// Mirrors inertia-laravel Inertia::withoutSsr / Middleware::$withoutSsr.
+func (i *Inertia) WithoutSsr(paths ...string) {
+	i.withoutSsr = append(i.withoutSsr, paths...)
+}
+
+// DisableSsr disables SSR for this request.
+// Mirrors inertia-laravel Inertia::disableSsr(true).
+func (i *Inertia) DisableSsr() {
+	i.ssrDisabled = true
+}
+
+// DisableSsrWhen disables SSR for this request when fn returns true at dispatch time.
+// Mirrors inertia-laravel Inertia::disableSsr(Closure).
+func (i *Inertia) DisableSsrWhen(fn func(c *echo.Context) bool) {
+	i.ssrDisableWhen = fn
+}
+
+// SsrEnabled reports whether this request may attempt SSR from Inertia's point of view.
+// Evaluates DisableSsr / DisableSsrWhen / WithoutSsr. SsrHTTPGateway may still skip when
+// Enabled is false or no SSR bundle exists. Custom Renderers should call this instead of
+// reading Inertia internals.
+func (i *Inertia) SsrEnabled() bool {
+	if i.ssrDisabled {
+		return false
+	}
+	if i.ssrDisableWhen != nil && i.ssrDisableWhen(i.echoContext) {
+		return false
+	}
+	path := ""
+	if i.echoContext != nil && i.echoContext.Request() != nil {
+		path = i.echoContext.Request().URL.Path
+	}
+	return !matchSSRPaths(path, i.withoutSsr)
 }
 
 // Location generates 409 response for external redirects
