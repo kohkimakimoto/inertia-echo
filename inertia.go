@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -32,7 +31,6 @@ type Inertia struct {
 	echoContext      *echo.Context
 	rootView         string
 	sharedProps      map[string]any
-	sharedPropsMutex sync.RWMutex
 	version          VersionFunc
 	urlResolver      URLResolverFunc
 	renderer         Renderer
@@ -76,9 +74,6 @@ func (i *Inertia) RootView() string {
 }
 
 func (i *Inertia) Share(props map[string]any) {
-	i.sharedPropsMutex.Lock()
-	defer i.sharedPropsMutex.Unlock()
-
 	if i.sharedProps == nil {
 		i.sharedProps = map[string]any{}
 	}
@@ -96,9 +91,6 @@ func (i *Inertia) ShareOnce(key string, callback func() (any, error)) *OnceProp 
 }
 
 func (i *Inertia) Shared() map[string]any {
-	i.sharedPropsMutex.RLock()
-	defer i.sharedPropsMutex.RUnlock()
-
 	props := make(map[string]any, len(i.sharedProps))
 	for key, value := range i.sharedProps {
 		props[key] = value
@@ -107,9 +99,6 @@ func (i *Inertia) Shared() map[string]any {
 }
 
 func (i *Inertia) FlushShared() {
-	i.sharedPropsMutex.Lock()
-	defer i.sharedPropsMutex.Unlock()
-
 	i.sharedProps = map[string]any{}
 }
 
@@ -161,14 +150,20 @@ func (i *Inertia) resolveURL() string {
 	return i.urlResolver(i.echoContext)
 }
 
-func (i *Inertia) EncryptHistory(encrypt bool) {
-	i.encryptHistory = encrypt
-}
-
 // ClearHistory clears the history.
 // see https://inertiajs.com/docs/v3/security/history-encryption
 func (i *Inertia) ClearHistory() {
 	i.clearHistory = true
+}
+
+// PreserveFragment asks the client to carry the source URL fragment through
+// the next rendered page. The flag survives across requests via StateStore.
+func (i *Inertia) PreserveFragment() {
+	i.preserveFragment = true
+}
+
+func (i *Inertia) EncryptHistory(encrypt bool) {
+	i.encryptHistory = encrypt
 }
 
 // pullClearHistory pulls the clear-history flag from state or the current field.
@@ -176,12 +171,6 @@ func (i *Inertia) ClearHistory() {
 // StateStore uses an unsigned cookie (see StateStore security notes).
 func (i *Inertia) pullClearHistory() bool {
 	return i.pullBooleanFlag(StateKeyClearHistory, &i.clearHistory)
-}
-
-// PreserveFragment asks the client to carry the source URL fragment through
-// the next rendered page. The flag survives across requests via StateStore.
-func (i *Inertia) PreserveFragment() {
-	i.preserveFragment = true
 }
 
 func (i *Inertia) pullPreserveFragment() bool {
