@@ -425,6 +425,7 @@ See [`CookieStateStoreConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inert
 ### Responses
 
 :book: Related official docs: [Responses](https://inertiajs.com/docs/v3/the-basics/responses)
+
 ```go
 func ShowEventHandler(c *echo.Context) error {
 	event := // retrieve an event...
@@ -440,6 +441,7 @@ For root-template-only data, see [Root template data](#root-template-data).
 ### Redirects
 
 :book: Related official docs: [Redirects](https://inertiajs.com/docs/v3/the-basics/redirects)
+
 Use Echo's standard redirect:
 
 ```go
@@ -477,6 +479,7 @@ This is separate from [`PreserveFragment`](#preserving-url-fragments), which ask
 ### Routing
 
 :book: Related official docs: [Routing](https://inertiajs.com/docs/v3/the-basics/routing)
+
 #### Shorthand routes
 
 ```go
@@ -512,11 +515,10 @@ func ShowEventsHandler(c *echo.Context) error {
 
 ## Data Props
 
-:book: Related official docs: [Data props](https://inertiajs.com/docs/v3/data-props/shared-data)
-
 ### Shared data
 
 :book: Related official docs: [Shared data](https://inertiajs.com/docs/v3/data-props/shared-data)
+
 #### Sharing data using middleware
 
 ```go
@@ -554,6 +556,7 @@ inertia.Share(c, map[string]any{
 ### Flash data
 
 :book: Related official docs: [Flash data](https://inertiajs.com/docs/v3/data-props/flash-data)
+
 `Flash` adds one-time data to the top-level Page `flash` object:
 
 ```go
@@ -568,6 +571,7 @@ Across redirects, flash is persisted via [`StateStore`](#statestore) until the n
 ### Partial reloads
 
 :book: Related official docs: [Partial reloads](https://inertiajs.com/docs/v3/data-props/partial-reloads)
+
 ```go
 inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	// ALWAYS included on standard visits
@@ -599,6 +603,7 @@ inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 ### Deferred props
 
 :book: Related official docs: [Deferred props](https://inertiajs.com/docs/v3/data-props/deferred-props)
+
 ```go
 inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"users": users,
@@ -672,6 +677,7 @@ inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 ### Merging props
 
 :book: Related official docs: [Merging props](https://inertiajs.com/docs/v3/data-props/merging-props)
+
 #### Shallow merge
 
 ```go
@@ -708,6 +714,7 @@ inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 ### Once props
 
 :book: Related official docs: [Once props](https://inertiajs.com/docs/v3/data-props/once-props)
+
 Once props let the client reuse a previously loaded value. The server remains stateless; the client reports loaded keys in later requests.
 
 ```go
@@ -754,6 +761,7 @@ Authentication and authorization are application concerns (same as with any Echo
 ### CSRF protection
 
 :book: Related official docs: [CSRF protection](https://inertiajs.com/docs/v3/security/csrf-protection)
+
 Inertia Echo ships CSRF middleware configured for Inertia.js.
 It sets an `XSRF-TOKEN` cookie and verifies the `X-XSRF-TOKEN` header.
 
@@ -764,6 +772,7 @@ e.Use(inertia.CSRF())
 ### History encryption
 
 :book: Related official docs: [History encryption](https://inertiajs.com/docs/v3/security/history-encryption)
+
 #### Encrypt middleware
 
 ```go
@@ -795,6 +804,7 @@ If the response is a redirect (or otherwise does not consume the flag on a Page 
 ### Asset versioning
 
 :book: Related official docs: [Asset versioning](https://inertiajs.com/docs/v3/advanced/asset-versioning)
+
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 	VersionFunc: func(c *echo.Context) string { return version },
@@ -812,6 +822,7 @@ inertia.SetVersion(c, func(c *echo.Context) string { return version })
 ### Page URL
 
 :book: Related official docs: [The Page object](https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object)
+
 By default the Page `url` is resolved with `req.URL.String()` (path and query). Customize it when the request URL differs from the URL you want the client to see (for example behind a path prefix):
 
 ```go
@@ -833,6 +844,7 @@ inertia.SetURLResolver(c, func(c *echo.Context) string {
 ### Error handling
 
 :book: Related official docs: [Error handling](https://inertiajs.com/docs/v3/advanced/error-handling)
+
 This package does not add its own error-handling framework.
 Echo already has `HTTPErrorHandler`, and Inertia request state is available on
 `echo.Context` after the middleware runs. Prefer those primitives.
