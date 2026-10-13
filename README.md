@@ -57,13 +57,18 @@ Table of Contents
 
 ## Getting started
 
-A minimal app from scratch. Full copies of each step live under [`examples/`](./examples).
+This section walks through a minimal app from scratch.
+Full copies of each step live under [`examples/`](./examples).
 
 ### Installation
+
+Install Inertia Echo:
 
 ```sh
 go get github.com/kohkimakimoto/inertia-echo/v5
 ```
+
+Install Echo as well:
 
 ```sh
 go get github.com/labstack/echo/v5
@@ -71,8 +76,11 @@ go get github.com/labstack/echo/v5
 
 ### Root template
 
-Create `resources/views/app.html`.
-`{{ vite ... }}` emits your JS/CSS tags; `{{ .inertia }}` / `{{ .inertiaHead }}` emit the Inertia page bootstrap (details in [Renderer](#renderer)):
+Next, set up the root template loaded on the first page visit.
+It should include your CSS/JS assets, plus the `.inertia` and `.inertiaHead` variables.
+`{{ vite ... }}` emits the asset tags; `{{ .inertia }}` / `{{ .inertiaHead }}` emit the Inertia page bootstrap (details in [Renderer](#renderer)).
+
+Create `resources/views/app.html`:
 
 ```html
 <!DOCTYPE html>
@@ -91,7 +99,7 @@ Create `resources/views/app.html`.
 
 ### Write Go code
 
-Create `main.go`:
+Next, implement the Echo application. Create `main.go`:
 
 ```go
 package main
@@ -137,10 +145,17 @@ func main() {
 
 ### Setup frontend
 
-This tutorial uses Vite and React.
+Next, set up the frontend. This tutorial uses Vite and React.
+
+If you do not have a `package.json` yet:
 
 ```sh
 npm init -y
+```
+
+Install the required packages:
+
+```sh
 npm install @inertiajs/react react react-dom vite @vitejs/plugin-react
 ```
 
@@ -176,7 +191,7 @@ createInertiaApp({
 })
 ```
 
-Create `resources/js/pages/Index.jsx` ([page components](https://inertiajs.com/docs/v3/the-basics/pages)):
+Create a [page component](https://inertiajs.com/docs/v3/the-basics/pages) at `resources/js/pages/Index.jsx`:
 
 ```jsx
 import React from 'react';
@@ -190,11 +205,15 @@ export default function Index({ message }) {
 }
 ```
 
+Build the frontend assets:
+
 ```sh
 npx vite build
 ```
 
 ### Run the application
+
+Run the application:
 
 ```sh
 go run .
@@ -206,7 +225,7 @@ Complete code: [`examples/getting-started-step1`](./examples/getting-started-ste
 
 ### Run in Dev mode
 
-For Vite hot reload, use a `BuildMode` flag and start Vite from Go with [go-subprocess](https://github.com/kohkimakimoto/go-subprocess):
+For Vite hot reload, introduce a `BuildMode` variable overwritten at build time via `-ldflags`, and start Vite from Go with [go-subprocess](https://github.com/kohkimakimoto/go-subprocess):
 
 ```sh
 go get github.com/kohkimakimoto/go-subprocess
@@ -297,7 +316,10 @@ func main() {
 }
 ```
 
-Add `{{ vite_react_refresh }}` for React Fast Refresh ([Vite docs](https://vitejs.dev/guide/backend-integration.html)):
+This starts the Vite server only when `BuildMode` is `"debug"`.
+A shared cancelable context ties the Echo server and Vite process together so both stop on interrupt.
+
+Also add `{{ vite_react_refresh }}` to the root template for React Fast Refresh ([Vite docs](https://vitejs.dev/guide/backend-integration.html)):
 
 ```html
 <!DOCTYPE html>
@@ -315,13 +337,13 @@ Add `{{ vite_react_refresh }}` for React Fast Refresh ([Vite docs](https://vitej
 </html>
 ```
 
-Debug (hot reload):
+Run in debug mode (Vite hot reload):
 
 ```sh
 go run .
 ```
 
-Production:
+Run in production mode (serves assets from `npx vite build`):
 
 ```sh
 npx vite build
@@ -332,14 +354,20 @@ Complete code: [`examples/getting-started-step2`](./examples/getting-started-ste
 
 ### Embed assets into a single binary
 
-Embed templates and built assets into one binary for production.
+For production, you can embed the root template and built frontend assets into the Go binary.
+Inertia Echo accepts `fs.FS` for templates and the Vite manifest (`MustParseFS`, `MustParseViteManifestFS`, and Echo's `StaticFS`), so the same application code can serve files from disk in development and from the embedded filesystem in production.
+
 See [`examples/getting-started-step3`](./examples/getting-started-step3) and [Vite and embedding](#vite-and-embedding).
+
+Build the frontend assets, then compile with production `BuildMode`:
 
 ```sh
 npx vite build
 go build -ldflags="-X main.BuildMode=production" -o app
 ./app
 ```
+
+Open `http://localhost:8080`. The server no longer depends on `resources/` on disk; the views and public assets are inside the binary.
 
 ### Next steps
 
