@@ -3,7 +3,6 @@ package inertia
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -68,30 +67,6 @@ var DefaultMiddlewareConfig = MiddlewareConfig{
 	Share:       nil,
 	Renderer:    nil,
 	StateStore:  NewCookieStateStore(),
-}
-
-func defaultVersionFunc() VersionFunc {
-	var v string
-
-	if v = os.Getenv("INERTIA_VERSION"); v == "" {
-		// `GAE_VERSION` is for Google App Engine.
-		// see https://cloud.google.com/appengine/docs/standard/go/runtime#environment_variables
-		if v = os.Getenv("GAE_VERSION"); v == "" {
-			// The fallback version value that imitates the default GAE version format.
-			// It assumes to be used for development.
-			v = time.Now().Format("20060102t150405")
-		}
-	}
-
-	return func(*echo.Context) string {
-		return v
-	}
-}
-
-func defaultURLResolver() URLResolverFunc {
-	return func(c *echo.Context) string {
-		return c.Request().URL.String()
-	}
 }
 
 // MiddlewareWithConfig returns an echo middleware that adds the Inertia instance to the context.

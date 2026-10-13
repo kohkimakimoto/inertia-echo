@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -64,6 +65,100 @@ func (i *Inertia) SetRenderer(r Renderer) {
 
 func (i *Inertia) Renderer() Renderer {
 	return i.renderer
+}
+
+func (i *Inertia) SetRootView(name string) {
+	i.rootView = name
+}
+
+func (i *Inertia) RootView() string {
+	return i.rootView
+}
+
+func (i *Inertia) Share(props map[string]any) {
+	i.sharedPropsMutex.Lock()
+	defer i.sharedPropsMutex.Unlock()
+
+	if i.sharedProps == nil {
+		i.sharedProps = map[string]any{}
+	}
+	for k, v := range props {
+		i.sharedProps[k] = v
+	}
+}
+
+// ShareOnce shares a callback-backed prop that the client can retain across
+// visits under the supplied top-level prop name.
+func (i *Inertia) ShareOnce(key string, callback func() (any, error)) *OnceProp {
+	prop := Once(callback)
+	i.Share(map[string]any{key: prop})
+	return prop
+}
+
+func (i *Inertia) Shared() map[string]any {
+	i.sharedPropsMutex.RLock()
+	defer i.sharedPropsMutex.RUnlock()
+
+	props := make(map[string]any, len(i.sharedProps))
+	for key, value := range i.sharedProps {
+		props[key] = value
+	}
+	return props
+}
+
+func (i *Inertia) FlushShared() {
+	i.sharedPropsMutex.Lock()
+	defer i.sharedPropsMutex.Unlock()
+
+	i.sharedProps = map[string]any{}
+}
+
+// VersionFunc resolves the asset version.
+type VersionFunc func(c *echo.Context) string
+
+func defaultVersionFunc() VersionFunc {
+	var v string
+
+	if v = os.Getenv("INERTIA_VERSION"); v == "" {
+		// `GAE_VERSION` is for Google App Engine.
+		// see https://cloud.google.com/appengine/docs/standard/go/runtime#environment_variables
+		if v = os.Getenv("GAE_VERSION"); v == "" {
+			// The fallback version value that imitates the default GAE version format.
+			// It assumes to be used for development.
+			v = time.Now().Format("20060102t150405")
+		}
+	}
+
+	return func(*echo.Context) string {
+		return v
+	}
+}
+
+func (i *Inertia) SetVersion(version VersionFunc) {
+	i.version = version
+}
+
+func (i *Inertia) Version() string {
+	return i.version(i.echoContext)
+}
+
+// URLResolverFunc resolves the Page object URL.
+// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object
+// Mirrors inertia-laravel's resolveUrlUsing / Middleware::urlResolver.
+type URLResolverFunc func(c *echo.Context) string
+
+func defaultURLResolver() URLResolverFunc {
+	return func(c *echo.Context) string {
+		return c.Request().URL.String()
+	}
+}
+
+func (i *Inertia) SetURLResolver(resolver URLResolverFunc) {
+	i.urlResolver = resolver
+}
+
+func (i *Inertia) resolveURL() string {
+	return i.urlResolver(i.echoContext)
 }
 
 func (i *Inertia) EncryptHistory(encrypt bool) {
@@ -203,45 +298,6 @@ func (i *Inertia) SsrEnabled() bool {
 	return !matchSSRPaths(path, i.withoutSsr)
 }
 
-func (i *Inertia) SetRootView(name string) {
-	i.rootView = name
-}
-
-func (i *Inertia) RootView() string {
-	return i.rootView
-}
-
-func (i *Inertia) Share(props map[string]any) {
-	i.sharedPropsMutex.Lock()
-	defer i.sharedPropsMutex.Unlock()
-
-	if i.sharedProps == nil {
-		i.sharedProps = map[string]any{}
-	}
-	for k, v := range props {
-		i.sharedProps[k] = v
-	}
-}
-
-// ShareOnce shares a callback-backed prop that the client can retain across
-// visits under the supplied top-level prop name.
-func (i *Inertia) ShareOnce(key string, callback func() (any, error)) *OnceProp {
-	prop := Once(callback)
-	i.Share(map[string]any{key: prop})
-	return prop
-}
-
-func (i *Inertia) Shared() map[string]any {
-	i.sharedPropsMutex.RLock()
-	defer i.sharedPropsMutex.RUnlock()
-
-	props := make(map[string]any, len(i.sharedProps))
-	for key, value := range i.sharedProps {
-		props[key] = value
-	}
-	return props
-}
-
 // Flash adds data to the top-level Page flash object for the current render.
 // For POST-redirect-GET, unconsumed flash is persisted via StateStore (default:
 // unsigned cookie). Treat loaded flash like untrusted request input.
@@ -313,37 +369,6 @@ func decodeFlashState(raw string) (map[string]any, error) {
 		return nil, err
 	}
 	return data, nil
-}
-
-func (i *Inertia) FlushShared() {
-	i.sharedPropsMutex.Lock()
-	defer i.sharedPropsMutex.Unlock()
-
-	i.sharedProps = map[string]any{}
-}
-
-// VersionFunc resolves the asset version.
-type VersionFunc func(c *echo.Context) string
-
-func (i *Inertia) SetVersion(version VersionFunc) {
-	i.version = version
-}
-
-func (i *Inertia) Version() string {
-	return i.version(i.echoContext)
-}
-
-// URLResolverFunc resolves the Page object URL.
-// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object
-// Mirrors inertia-laravel's resolveUrlUsing / Middleware::urlResolver.
-type URLResolverFunc func(c *echo.Context) string
-
-func (i *Inertia) SetURLResolver(resolver URLResolverFunc) {
-	i.urlResolver = resolver
-}
-
-func (i *Inertia) resolveURL() string {
-	return i.urlResolver(i.echoContext)
 }
 
 // Location generates 409 response for external redirects
