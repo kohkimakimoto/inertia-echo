@@ -3,7 +3,6 @@ package inertia
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -15,8 +14,6 @@ import (
 const (
 	key = "__inertia__"
 )
-
-type SharedDataFunc func(c *echo.Context) (map[string]any, error)
 
 type MiddlewareConfig struct {
 	// Skipper is a function to skip middleware. Returning true skips processing the middleware.
@@ -32,11 +29,11 @@ type MiddlewareConfig struct {
 	URLResolver URLResolverFunc
 	// Defines the props that are shared by default.
 	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data
-	Share SharedDataFunc
+	Share func(c *echo.Context) (map[string]any, error)
 	// Defines once props shared on every request. Map values should be
 	// func() (any, error) or *OnceProp (same contract as Laravel's shareOnce).
 	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data#sharing-once-props
-	ShareOnce SharedDataFunc
+	ShareOnce func(c *echo.Context) (map[string]any, error)
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer Renderer
 	// StateStore is inertia-echo's own design for cross-request state, not an
@@ -50,6 +47,7 @@ type MiddlewareConfig struct {
 	// RescueReporter receives errors from deferred props with Rescue enabled.
 	RescueReporter RescueReporter
 	// Now supplies request-time timestamps for once-prop expiration metadata.
+	// Nil defaults to time.Now.
 	Now func() time.Time
 	// WithoutSsr excludes matching paths from SSR for each request.
 	// Mirrors inertia-laravel Middleware::$withoutSsr (patterns: * wildcards like Request::is).
@@ -69,30 +67,6 @@ var DefaultMiddlewareConfig = MiddlewareConfig{
 	StateStore:  NewCookieStateStore(),
 }
 
-func defaultVersionFunc() VersionFunc {
-	var v string
-
-	if v = os.Getenv("INERTIA_VERSION"); v == "" {
-		// `GAE_VERSION` is for Google App Engine.
-		// see https://cloud.google.com/appengine/docs/standard/go/runtime#environment_variables
-		if v = os.Getenv("GAE_VERSION"); v == "" {
-			// The fallback version value that imitates the default GAE version format.
-			// It assumes to be used for development.
-			v = time.Now().Format("20060102t150405")
-		}
-	}
-
-	return func(*echo.Context) string {
-		return v
-	}
-}
-
-func defaultURLResolver() URLResolverFunc {
-	return func(c *echo.Context) string {
-		return c.Request().URL.String()
-	}
-}
-
 // MiddlewareWithConfig returns an echo middleware that adds the Inertia instance to the context.
 func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	if config.Skipper == nil {
@@ -110,6 +84,9 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 	if config.StateStore == nil {
 		config.StateStore = DefaultMiddlewareConfig.StateStore
 	}
+	if config.Now == nil {
+		config.Now = time.Now
+	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
@@ -119,13 +96,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 
 			// Create the request-scoped Inertia instance.
 			req := c.Request()
-			state, err := config.StateStore.Load(c)
-			if err != nil {
-				return err
-			}
-			if state == nil {
-				state = map[string]string{}
-			}
 			i := &Inertia{
 				echoContext:      c,
 				rootView:         config.RootView,
@@ -134,7 +104,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				urlResolver:      config.URLResolver,
 				renderer:         config.Renderer,
 				stateStore:       config.StateStore,
-				state:            state,
 				flash:            map[string]any{},
 				rescueReporter:   config.RescueReporter,
 				now:              config.Now,
@@ -144,6 +113,18 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				exceptProps:      splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ","),
 				resetProps:       splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ","),
 			}
+
+			// Load state (usually from a cookie) into the request-scoped Inertia instance.
+			state, err := config.StateStore.Load(c)
+			if err != nil {
+				return err
+			}
+			if state == nil {
+				state = map[string]string{}
+			}
+			i.state = state
+
+			// Set the Inertia instance into the echo.Context for access in handlers and other middleware.
 			c.Set(key, i)
 
 			// Asset versioning runs before Share and next (unlike inertia-laravel,

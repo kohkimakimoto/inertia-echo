@@ -450,7 +450,7 @@ func TestMiddleware_ComposesWithGzipMiddleware(t *testing.T) {
 	}
 }
 
-func TestFlashAndRenderWithStatus(t *testing.T) {
+func TestFlashAndRender(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/missing", nil)
 	encoded, err := encodeFlashState(map[string]any{"message": "stored", "old": true})
@@ -469,7 +469,7 @@ func TestFlashAndRenderWithStatus(t *testing.T) {
 		Renderer: renderer,
 	})(func(c *echo.Context) error {
 		Flash(c, map[string]any{"message": "local"})
-		return RenderWithStatus(c, http.StatusNotFound, "ErrorPage", nil)
+		return Render(c, http.StatusNotFound, "ErrorPage", nil)
 	})
 	if err := h(c); err != nil {
 		t.Fatal(err)
@@ -526,7 +526,7 @@ func TestFlashSurvivesRedirectViaStateStore(t *testing.T) {
 		VersionFunc: func(*echo.Context) string { return "v3" },
 		Renderer:    testNewMockRenderer(t, func(*RenderContext) error { return nil }),
 	})(func(c *echo.Context) error {
-		return Render(c, "Next", nil)
+		return Render(c, http.StatusOK, "Next", nil)
 	})
 	if err := getH(getC); err != nil {
 		t.Fatal(err)
@@ -574,7 +574,7 @@ func TestMiddlewareShareOnce(t *testing.T) {
 		}),
 	}))
 	e.GET("/", func(c *echo.Context) error {
-		return Render(c, "Home", nil)
+		return Render(c, http.StatusOK, "Home", nil)
 	})
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))

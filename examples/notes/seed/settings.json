@@ -1,0 +1,10 @@
+{
+  "u1": {
+    "theme": "system",
+    "page_size": 10
+  },
+  "u2": {
+    "theme": "light",
+    "page_size": 10
+  }
+}

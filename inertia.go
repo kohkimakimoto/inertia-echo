@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"sync"
+	"os"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -31,7 +31,6 @@ type Inertia struct {
 	echoContext      *echo.Context
 	rootView         string
 	sharedProps      map[string]any
-	sharedPropsMutex sync.RWMutex
 	version          VersionFunc
 	urlResolver      URLResolverFunc
 	renderer         Renderer
@@ -66,8 +65,89 @@ func (i *Inertia) Renderer() Renderer {
 	return i.renderer
 }
 
-func (i *Inertia) EncryptHistory(encrypt bool) {
-	i.encryptHistory = encrypt
+func (i *Inertia) SetRootView(name string) {
+	i.rootView = name
+}
+
+func (i *Inertia) RootView() string {
+	return i.rootView
+}
+
+func (i *Inertia) Share(props map[string]any) {
+	if i.sharedProps == nil {
+		i.sharedProps = map[string]any{}
+	}
+	for k, v := range props {
+		i.sharedProps[k] = v
+	}
+}
+
+// ShareOnce shares a callback-backed prop that the client can retain across
+// visits under the supplied top-level prop name.
+func (i *Inertia) ShareOnce(key string, callback func() (any, error)) *OnceProp {
+	prop := Once(callback)
+	i.Share(map[string]any{key: prop})
+	return prop
+}
+
+func (i *Inertia) Shared() map[string]any {
+	props := make(map[string]any, len(i.sharedProps))
+	for key, value := range i.sharedProps {
+		props[key] = value
+	}
+	return props
+}
+
+func (i *Inertia) FlushShared() {
+	i.sharedProps = map[string]any{}
+}
+
+// VersionFunc resolves the asset version.
+type VersionFunc func(c *echo.Context) string
+
+func defaultVersionFunc() VersionFunc {
+	var v string
+
+	if v = os.Getenv("INERTIA_VERSION"); v == "" {
+		// `GAE_VERSION` is for Google App Engine.
+		// see https://cloud.google.com/appengine/docs/standard/go/runtime#environment_variables
+		if v = os.Getenv("GAE_VERSION"); v == "" {
+			// The fallback version value that imitates the default GAE version format.
+			// It assumes to be used for development.
+			v = time.Now().Format("20060102t150405")
+		}
+	}
+
+	return func(*echo.Context) string {
+		return v
+	}
+}
+
+func (i *Inertia) SetVersion(version VersionFunc) {
+	i.version = version
+}
+
+func (i *Inertia) Version() string {
+	return i.version(i.echoContext)
+}
+
+// URLResolverFunc resolves the Page object URL.
+// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object
+// Mirrors inertia-laravel's resolveUrlUsing / Middleware::urlResolver.
+type URLResolverFunc func(c *echo.Context) string
+
+func defaultURLResolver() URLResolverFunc {
+	return func(c *echo.Context) string {
+		return c.Request().URL.String()
+	}
+}
+
+func (i *Inertia) SetURLResolver(resolver URLResolverFunc) {
+	i.urlResolver = resolver
+}
+
+func (i *Inertia) resolveURL() string {
+	return i.urlResolver(i.echoContext)
 }
 
 // ClearHistory clears the history.
@@ -76,17 +156,33 @@ func (i *Inertia) ClearHistory() {
 	i.clearHistory = true
 }
 
+// PreserveFragment asks the client to carry the source URL fragment through
+// the next rendered page. The flag survives across requests via StateStore.
+func (i *Inertia) PreserveFragment() {
+	i.preserveFragment = true
+}
+
+func (i *Inertia) EncryptHistory(encrypt bool) {
+	i.encryptHistory = encrypt
+}
+
+// Flash adds data to the top-level Page flash object for the current render.
+// For POST-redirect-GET, unconsumed flash is persisted via StateStore (default:
+// unsigned cookie). Treat loaded flash like untrusted request input.
+func (i *Inertia) Flash(data map[string]any) {
+	if i.flash == nil {
+		i.flash = map[string]any{}
+	}
+	for key, value := range data {
+		i.flash[key] = value
+	}
+}
+
 // pullClearHistory pulls the clear-history flag from state or the current field.
 // Laravel uses session for this; Echo has no built-in session, so the default
 // StateStore uses an unsigned cookie (see StateStore security notes).
 func (i *Inertia) pullClearHistory() bool {
 	return i.pullBooleanFlag(StateKeyClearHistory, &i.clearHistory)
-}
-
-// PreserveFragment asks the client to carry the source URL fragment through
-// the next rendered page. The flag survives across requests via StateStore.
-func (i *Inertia) PreserveFragment() {
-	i.preserveFragment = true
 }
 
 func (i *Inertia) pullPreserveFragment() bool {
@@ -147,113 +243,6 @@ func (i *Inertia) saveBooleanFlag(key string, value bool) {
 	i.stateSet(key, "true")
 }
 
-// persistState writes unconsumed one-shot values (clear history, preserve
-// fragment, flash) into the in-memory bag, then Save via StateStore when dirty.
-func (i *Inertia) persistState() error {
-	i.saveBooleanFlag(StateKeyClearHistory, i.clearHistory)
-	i.saveBooleanFlag(StateKeyPreserveFragment, i.preserveFragment)
-	if err := i.persistFlash(); err != nil {
-		return err
-	}
-	if !i.stateDirty {
-		return nil
-	}
-	if i.stateStore == nil {
-		return nil
-	}
-	if i.state == nil {
-		i.state = map[string]string{}
-	}
-	return i.stateStore.Save(i.echoContext, i.state)
-}
-
-// WithoutSsr excludes matching paths from SSR for this request.
-// Mirrors inertia-laravel Inertia::withoutSsr / Middleware::$withoutSsr.
-func (i *Inertia) WithoutSsr(paths ...string) {
-	i.withoutSsr = append(i.withoutSsr, paths...)
-}
-
-// DisableSsr disables SSR for this request.
-// Mirrors inertia-laravel Inertia::disableSsr(true).
-func (i *Inertia) DisableSsr() {
-	i.ssrDisabled = true
-}
-
-// DisableSsrWhen disables SSR for this request when fn returns true at dispatch time.
-// Mirrors inertia-laravel Inertia::disableSsr(Closure).
-func (i *Inertia) DisableSsrWhen(fn func(c *echo.Context) bool) {
-	i.ssrDisableWhen = fn
-}
-
-// SsrEnabled reports whether this request may attempt SSR from Inertia's point of view.
-// Evaluates DisableSsr / DisableSsrWhen / WithoutSsr. SsrHTTPGateway may still skip when
-// Enabled is false or no SSR bundle exists. Custom Renderers should call this instead of
-// reading Inertia internals.
-func (i *Inertia) SsrEnabled() bool {
-	if i.ssrDisabled {
-		return false
-	}
-	if i.ssrDisableWhen != nil && i.ssrDisableWhen(i.echoContext) {
-		return false
-	}
-	path := ""
-	if i.echoContext != nil && i.echoContext.Request() != nil {
-		path = i.echoContext.Request().URL.Path
-	}
-	return !matchSSRPaths(path, i.withoutSsr)
-}
-
-func (i *Inertia) SetRootView(name string) {
-	i.rootView = name
-}
-
-func (i *Inertia) RootView() string {
-	return i.rootView
-}
-
-func (i *Inertia) Share(props map[string]any) {
-	i.sharedPropsMutex.Lock()
-	defer i.sharedPropsMutex.Unlock()
-
-	if i.sharedProps == nil {
-		i.sharedProps = map[string]any{}
-	}
-	for k, v := range props {
-		i.sharedProps[k] = v
-	}
-}
-
-// ShareOnce shares a callback-backed prop that the client can retain across
-// visits under the supplied top-level prop name.
-func (i *Inertia) ShareOnce(key string, callback func() (any, error)) *OnceProp {
-	prop := Once(callback)
-	i.Share(map[string]any{key: prop})
-	return prop
-}
-
-func (i *Inertia) Shared() map[string]any {
-	i.sharedPropsMutex.RLock()
-	defer i.sharedPropsMutex.RUnlock()
-
-	props := make(map[string]any, len(i.sharedProps))
-	for key, value := range i.sharedProps {
-		props[key] = value
-	}
-	return props
-}
-
-// Flash adds data to the top-level Page flash object for the current render.
-// For POST-redirect-GET, unconsumed flash is persisted via StateStore (default:
-// unsigned cookie). Treat loaded flash like untrusted request input.
-func (i *Inertia) Flash(data map[string]any) {
-	if i.flash == nil {
-		i.flash = map[string]any{}
-	}
-	for key, value := range data {
-		i.flash[key] = value
-	}
-}
-
 func (i *Inertia) resolveFlash() (map[string]any, error) {
 	if !i.flashLoaded {
 		local := i.flash
@@ -295,6 +284,26 @@ func (i *Inertia) persistFlash() error {
 	return nil
 }
 
+// persistState writes unconsumed one-shot values (clear history, preserve
+// fragment, flash) into the in-memory bag, then Save via StateStore when dirty.
+func (i *Inertia) persistState() error {
+	i.saveBooleanFlag(StateKeyClearHistory, i.clearHistory)
+	i.saveBooleanFlag(StateKeyPreserveFragment, i.preserveFragment)
+	if err := i.persistFlash(); err != nil {
+		return err
+	}
+	if !i.stateDirty {
+		return nil
+	}
+	if i.stateStore == nil {
+		return nil
+	}
+	if i.state == nil {
+		i.state = map[string]string{}
+	}
+	return i.stateStore.Save(i.echoContext, i.state)
+}
+
 func encodeFlashState(data map[string]any) (string, error) {
 	b, err := json.Marshal(data)
 	if err != nil {
@@ -315,35 +324,40 @@ func decodeFlashState(raw string) (map[string]any, error) {
 	return data, nil
 }
 
-func (i *Inertia) FlushShared() {
-	i.sharedPropsMutex.Lock()
-	defer i.sharedPropsMutex.Unlock()
-
-	i.sharedProps = map[string]any{}
+// WithoutSsr excludes matching paths from SSR for this request.
+// Mirrors inertia-laravel Inertia::withoutSsr / Middleware::$withoutSsr.
+func (i *Inertia) WithoutSsr(paths ...string) {
+	i.withoutSsr = append(i.withoutSsr, paths...)
 }
 
-// VersionFunc resolves the asset version.
-type VersionFunc func(c *echo.Context) string
-
-func (i *Inertia) SetVersion(version VersionFunc) {
-	i.version = version
+// DisableSsr disables SSR for this request.
+// Mirrors inertia-laravel Inertia::disableSsr(true).
+func (i *Inertia) DisableSsr() {
+	i.ssrDisabled = true
 }
 
-func (i *Inertia) Version() string {
-	return i.version(i.echoContext)
+// DisableSsrWhen disables SSR for this request when fn returns true at dispatch time.
+// Mirrors inertia-laravel Inertia::disableSsr(Closure).
+func (i *Inertia) DisableSsrWhen(fn func(c *echo.Context) bool) {
+	i.ssrDisableWhen = fn
 }
 
-// URLResolverFunc resolves the Page object URL.
-// Corresponding specification: https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object
-// Mirrors inertia-laravel's resolveUrlUsing / Middleware::urlResolver.
-type URLResolverFunc func(c *echo.Context) string
-
-func (i *Inertia) SetURLResolver(resolver URLResolverFunc) {
-	i.urlResolver = resolver
-}
-
-func (i *Inertia) resolveURL() string {
-	return i.urlResolver(i.echoContext)
+// SsrEnabled reports whether this request may attempt SSR from Inertia's point of view.
+// Evaluates DisableSsr / DisableSsrWhen / WithoutSsr. SsrHTTPGateway may still skip when
+// Enabled is false or no SSR bundle exists. Custom Renderers should call this instead of
+// reading Inertia internals.
+func (i *Inertia) SsrEnabled() bool {
+	if i.ssrDisabled {
+		return false
+	}
+	if i.ssrDisableWhen != nil && i.ssrDisableWhen(i.echoContext) {
+		return false
+	}
+	path := ""
+	if i.echoContext != nil && i.echoContext.Request() != nil {
+		path = i.echoContext.Request().URL.Path
+	}
+	return !matchSSRPaths(path, i.withoutSsr)
 }
 
 // Location generates 409 response for external redirects
@@ -394,23 +408,12 @@ type RenderContext struct {
 	Writer   io.Writer
 }
 
-func (i *Inertia) Render(component string, props map[string]any) error {
-	return i.render(http.StatusOK, component, props, nil)
-}
-
-func (i *Inertia) RenderWithViewData(component string, props map[string]any, viewData map[string]any) error {
-	return i.render(http.StatusOK, component, props, viewData)
-}
-
-// RenderWithStatus renders an Inertia page with a non-200 HTTP status.
-// This package does not provide an inertia-laravel-style error-handling
-// framework; Echo and Go favor explicit application logic. For centralized
-// error pages, use your application's echo.HTTPErrorHandler with Get.
-func (i *Inertia) RenderWithStatus(status int, component string, props map[string]any) error {
+// Render renders an Inertia page.
+func (i *Inertia) Render(status int, component string, props map[string]any) error {
 	return i.render(status, component, props, nil)
 }
 
-func (i *Inertia) RenderWithStatusAndViewData(status int, component string, props map[string]any, viewData map[string]any) error {
+func (i *Inertia) RenderWithViewData(status int, component string, props map[string]any, viewData map[string]any) error {
 	return i.render(status, component, props, viewData)
 }
 
@@ -524,6 +527,22 @@ func SetURLResolver(c *echo.Context, resolver URLResolverFunc) {
 	MustGet(c).SetURLResolver(resolver)
 }
 
+func ClearHistory(c *echo.Context) {
+	MustGet(c).ClearHistory()
+}
+
+func PreserveFragment(c *echo.Context) {
+	MustGet(c).PreserveFragment()
+}
+
+func EncryptHistory(c *echo.Context, encrypt bool) {
+	MustGet(c).EncryptHistory(encrypt)
+}
+
+func Flash(c *echo.Context, data map[string]any) {
+	MustGet(c).Flash(data)
+}
+
 func WithoutSsr(c *echo.Context, paths ...string) {
 	MustGet(c).WithoutSsr(paths...)
 }
@@ -544,34 +563,10 @@ func Location(c *echo.Context, url string) error {
 	return MustGet(c).Location(url)
 }
 
-func EncryptHistory(c *echo.Context, encrypt bool) {
-	MustGet(c).EncryptHistory(encrypt)
+func Render(c *echo.Context, status int, component string, props map[string]any) error {
+	return MustGet(c).Render(status, component, props)
 }
 
-func ClearHistory(c *echo.Context) {
-	MustGet(c).ClearHistory()
-}
-
-func PreserveFragment(c *echo.Context) {
-	MustGet(c).PreserveFragment()
-}
-
-func Flash(c *echo.Context, data map[string]any) {
-	MustGet(c).Flash(data)
-}
-
-func Render(c *echo.Context, component string, props map[string]any) error {
-	return MustGet(c).Render(component, props)
-}
-
-func RenderWithViewData(c *echo.Context, component string, props map[string]any, viewData map[string]any) error {
-	return MustGet(c).RenderWithViewData(component, props, viewData)
-}
-
-func RenderWithStatus(c *echo.Context, status int, component string, props map[string]any) error {
-	return MustGet(c).RenderWithStatus(status, component, props)
-}
-
-func RenderWithStatusAndViewData(c *echo.Context, status int, component string, props map[string]any, viewData map[string]any) error {
-	return MustGet(c).RenderWithStatusAndViewData(status, component, props, viewData)
+func RenderWithViewData(c *echo.Context, status int, component string, props map[string]any, viewData map[string]any) error {
+	return MustGet(c).RenderWithViewData(status, component, props, viewData)
 }

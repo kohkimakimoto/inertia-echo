@@ -886,6 +886,9 @@ func newTestPropsResolver(
 	}
 	e := echo.New()
 	c := e.NewContext(req, httptest.NewRecorder())
+	if now == nil {
+		now = time.Now
+	}
 	i := &Inertia{
 		echoContext:      c,
 		partialComponent: req.Header.Get(HeaderXInertiaPartialComponent),

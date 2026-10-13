@@ -1,0 +1,425 @@
+[
+  {
+    "id": "n1",
+    "user_id": "u1",
+    "title": "Welcome to notes",
+    "body": "This is your personal notebook.\n\n## Section\nUse the body anchor to try fragment preservation.",
+    "tags": [
+      "intro",
+      "demo"
+    ],
+    "pinned": true,
+    "created_at": "2026-01-01T00:00:00Z",
+    "updated_at": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "n2",
+    "user_id": "u1",
+    "title": "Weekend reading list",
+    "body": "Explore a new book, revisit a favorite essay, and make time to read.",
+    "tags": [
+      "reading",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-02T00:00:00Z",
+    "updated_at": "2026-01-02T00:00:00Z"
+  },
+  {
+    "id": "n3",
+    "user_id": "u1",
+    "title": "Project ideas",
+    "body": "Small tools, thoughtful interfaces, and useful experiments.",
+    "tags": [
+      "work",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-03T00:00:00Z",
+    "updated_at": "2026-01-03T00:00:00Z"
+  },
+  {
+    "id": "n4",
+    "user_id": "u1",
+    "title": "Walks around the city",
+    "body": "Take a different route and notice the details.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-04T00:00:00Z",
+    "updated_at": "2026-01-04T00:00:00Z"
+  },
+  {
+    "id": "n5",
+    "user_id": "u1",
+    "title": "Kitchen experiments",
+    "body": "Try a seasonal recipe and keep notes on what worked.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-05T00:00:00Z",
+    "updated_at": "2026-01-05T00:00:00Z"
+  },
+  {
+    "id": "n6",
+    "user_id": "u1",
+    "title": "Inertia feature notes",
+    "body": "Deferred props, scroll pagination, cached settings, and merged updates.",
+    "tags": [
+      "demo"
+    ],
+    "pinned": true,
+    "created_at": "2026-01-06T00:00:00Z",
+    "updated_at": "2026-01-06T00:00:00Z"
+  },
+  {
+    "id": "n7",
+    "user_id": "u1",
+    "title": "Welcome to notes — 2",
+    "body": "This is your personal notebook.\n\n## Section\nUse the body anchor to try fragment preservation.",
+    "tags": [
+      "intro",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-07T00:00:00Z",
+    "updated_at": "2026-01-07T00:00:00Z"
+  },
+  {
+    "id": "n8",
+    "user_id": "u1",
+    "title": "Weekend reading list — 2",
+    "body": "Explore a new book, revisit a favorite essay, and make time to read.",
+    "tags": [
+      "reading",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-08T00:00:00Z",
+    "updated_at": "2026-01-08T00:00:00Z"
+  },
+  {
+    "id": "n9",
+    "user_id": "u1",
+    "title": "Project ideas — 2",
+    "body": "Small tools, thoughtful interfaces, and useful experiments.",
+    "tags": [
+      "work",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-09T00:00:00Z",
+    "updated_at": "2026-01-09T00:00:00Z"
+  },
+  {
+    "id": "n10",
+    "user_id": "u1",
+    "title": "Walks around the city — 2",
+    "body": "Take a different route and notice the details.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-10T00:00:00Z",
+    "updated_at": "2026-01-10T00:00:00Z"
+  },
+  {
+    "id": "n11",
+    "user_id": "u1",
+    "title": "Kitchen experiments — 2",
+    "body": "Try a seasonal recipe and keep notes on what worked.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-11T00:00:00Z",
+    "updated_at": "2026-01-11T00:00:00Z"
+  },
+  {
+    "id": "n12",
+    "user_id": "u1",
+    "title": "Inertia feature notes — 2",
+    "body": "Deferred props, scroll pagination, cached settings, and merged updates.",
+    "tags": [
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-12T00:00:00Z",
+    "updated_at": "2026-01-12T00:00:00Z"
+  },
+  {
+    "id": "n13",
+    "user_id": "u1",
+    "title": "Welcome to notes — 3",
+    "body": "This is your personal notebook.\n\n## Section\nUse the body anchor to try fragment preservation.",
+    "tags": [
+      "intro",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-13T00:00:00Z",
+    "updated_at": "2026-01-13T00:00:00Z"
+  },
+  {
+    "id": "n14",
+    "user_id": "u1",
+    "title": "Weekend reading list — 3",
+    "body": "Explore a new book, revisit a favorite essay, and make time to read.",
+    "tags": [
+      "reading",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-14T00:00:00Z",
+    "updated_at": "2026-01-14T00:00:00Z"
+  },
+  {
+    "id": "n15",
+    "user_id": "u1",
+    "title": "Project ideas — 3",
+    "body": "Small tools, thoughtful interfaces, and useful experiments.",
+    "tags": [
+      "work",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-15T00:00:00Z",
+    "updated_at": "2026-01-15T00:00:00Z"
+  },
+  {
+    "id": "n16",
+    "user_id": "u1",
+    "title": "Walks around the city — 3",
+    "body": "Take a different route and notice the details.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-16T00:00:00Z",
+    "updated_at": "2026-01-16T00:00:00Z"
+  },
+  {
+    "id": "n17",
+    "user_id": "u1",
+    "title": "Kitchen experiments — 3",
+    "body": "Try a seasonal recipe and keep notes on what worked.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-17T00:00:00Z",
+    "updated_at": "2026-01-17T00:00:00Z"
+  },
+  {
+    "id": "n18",
+    "user_id": "u1",
+    "title": "Inertia feature notes — 3",
+    "body": "Deferred props, scroll pagination, cached settings, and merged updates.",
+    "tags": [
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-18T00:00:00Z",
+    "updated_at": "2026-01-18T00:00:00Z"
+  },
+  {
+    "id": "n19",
+    "user_id": "u1",
+    "title": "Welcome to notes — 4",
+    "body": "This is your personal notebook.\n\n## Section\nUse the body anchor to try fragment preservation.",
+    "tags": [
+      "intro",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-19T00:00:00Z",
+    "updated_at": "2026-01-19T00:00:00Z"
+  },
+  {
+    "id": "n20",
+    "user_id": "u1",
+    "title": "Weekend reading list — 4",
+    "body": "Explore a new book, revisit a favorite essay, and make time to read.",
+    "tags": [
+      "reading",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-20T00:00:00Z",
+    "updated_at": "2026-01-20T00:00:00Z"
+  },
+  {
+    "id": "n21",
+    "user_id": "u1",
+    "title": "Project ideas — 4",
+    "body": "Small tools, thoughtful interfaces, and useful experiments.",
+    "tags": [
+      "work",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-21T00:00:00Z",
+    "updated_at": "2026-01-21T00:00:00Z"
+  },
+  {
+    "id": "n22",
+    "user_id": "u1",
+    "title": "Walks around the city — 4",
+    "body": "Take a different route and notice the details.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-22T00:00:00Z",
+    "updated_at": "2026-01-22T00:00:00Z"
+  },
+  {
+    "id": "n23",
+    "user_id": "u1",
+    "title": "Kitchen experiments — 4",
+    "body": "Try a seasonal recipe and keep notes on what worked.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-23T00:00:00Z",
+    "updated_at": "2026-01-23T00:00:00Z"
+  },
+  {
+    "id": "n24",
+    "user_id": "u1",
+    "title": "Inertia feature notes — 4",
+    "body": "Deferred props, scroll pagination, cached settings, and merged updates.",
+    "tags": [
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-24T00:00:00Z",
+    "updated_at": "2026-01-24T00:00:00Z"
+  },
+  {
+    "id": "n25",
+    "user_id": "u1",
+    "title": "Welcome to notes — 5",
+    "body": "This is your personal notebook.\n\n## Section\nUse the body anchor to try fragment preservation.",
+    "tags": [
+      "intro",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-25T00:00:00Z",
+    "updated_at": "2026-01-25T00:00:00Z"
+  },
+  {
+    "id": "n26",
+    "user_id": "u1",
+    "title": "Weekend reading list — 5",
+    "body": "Explore a new book, revisit a favorite essay, and make time to read.",
+    "tags": [
+      "reading",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-26T00:00:00Z",
+    "updated_at": "2026-01-26T00:00:00Z"
+  },
+  {
+    "id": "n27",
+    "user_id": "u1",
+    "title": "Project ideas — 5",
+    "body": "Small tools, thoughtful interfaces, and useful experiments.",
+    "tags": [
+      "work",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-27T00:00:00Z",
+    "updated_at": "2026-01-27T00:00:00Z"
+  },
+  {
+    "id": "n28",
+    "user_id": "u1",
+    "title": "Walks around the city — 5",
+    "body": "Take a different route and notice the details.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-28T00:00:00Z",
+    "updated_at": "2026-01-28T00:00:00Z"
+  },
+  {
+    "id": "n29",
+    "user_id": "u1",
+    "title": "Kitchen experiments — 5",
+    "body": "Try a seasonal recipe and keep notes on what worked.",
+    "tags": [
+      "personal",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-29T00:00:00Z",
+    "updated_at": "2026-01-29T00:00:00Z"
+  },
+  {
+    "id": "n30",
+    "user_id": "u1",
+    "title": "Inertia feature notes — 5",
+    "body": "Deferred props, scroll pagination, cached settings, and merged updates.",
+    "tags": [
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-30T00:00:00Z",
+    "updated_at": "2026-01-30T00:00:00Z"
+  },
+  {
+    "id": "n31",
+    "user_id": "u1",
+    "title": "Welcome to notes — 6",
+    "body": "This is your personal notebook.\n\n## Section\nUse the body anchor to try fragment preservation.",
+    "tags": [
+      "intro",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-01-31T00:00:00Z",
+    "updated_at": "2026-01-31T00:00:00Z"
+  },
+  {
+    "id": "n32",
+    "user_id": "u1",
+    "title": "Weekend reading list — 6",
+    "body": "Explore a new book, revisit a favorite essay, and make time to read.",
+    "tags": [
+      "reading",
+      "demo"
+    ],
+    "pinned": false,
+    "created_at": "2026-02-01T00:00:00Z",
+    "updated_at": "2026-02-01T00:00:00Z"
+  },
+  {
+    "id": "alice-1",
+    "user_id": "u2",
+    "title": "Alice's private notebook",
+    "body": "This note belongs to Alice. Each account has its own notes and settings.",
+    "tags": [
+      "personal"
+    ],
+    "pinned": true,
+    "created_at": "2026-01-01T00:00:00Z",
+    "updated_at": "2026-01-02T00:00:00Z"
+  }
+]

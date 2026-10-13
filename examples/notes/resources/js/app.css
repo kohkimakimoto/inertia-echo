@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+@layer base {
+  body {
+    @apply m-0 bg-stone-50 text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply outline-offset-4;
+  }
+  button {
+    @apply cursor-pointer disabled:cursor-wait disabled:opacity-50;
+  }
+  input:not([type="checkbox"]),
+  textarea,
+  select {
+    @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm dark:border-stone-600 dark:bg-stone-900;
+  }
+  label {
+    @apply mb-2 block text-sm font-medium;
+  }
+}
+@layer components {
+  .panel {
+    @apply rounded-xl border border-stone-200 bg-white p-6 dark:border-stone-800 dark:bg-stone-900;
+  }
+  .button {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900;
+  }
+  .secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-medium transition hover:bg-stone-100 dark:border-stone-600 dark:hover:bg-stone-800;
+  }
+  .muted {
+    @apply text-sm text-stone-500 dark:text-stone-400;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-widest text-stone-500;
+  }
+  .page-title {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+  .error {
+    @apply mt-2 text-sm text-red-600;
+  }
+}
