@@ -343,14 +343,19 @@ go build -ldflags="-X main.BuildMode=production" -o app
 
 ### Next steps
 
+Documents:
+
 - [Architecture](#architecture) — Middleware, Renderer, and StateStore
-- [The Basics](#the-basics) onward — Inertia features in Go
+- [The Basics](#the-basics) — Inertia features in Inertia Echo
+
+Other examples:
+
 - [`examples/notes`](./examples/notes) — authenticated sample app
 - [`examples/ssr`](./examples/ssr) — SSR setup
 
 ## Architecture
 
-Like [inertia-laravel](https://github.com/inertiajs/inertia-laravel), **middleware is the core**: it prepares each request for the Inertia protocol and lets handlers call `inertia.Render`, `inertia.Share`, and related helpers.
+Like [inertia-laravel](https://github.com/inertiajs/inertia-laravel), **middleware is the core of the server-side inertia adapter**: it prepares each request for the Inertia protocol and lets handlers call `inertia.Render`, `inertia.Share`, and related helpers.
 
 Laravel already provides a view layer and a session. Echo does not, so inertia-echo fills those gaps with two extra pieces wired into the same middleware:
 
@@ -374,17 +379,17 @@ After this middleware runs, use package helpers (`inertia.Render`, `inertia.Shar
 
 ### Renderer
 
-:book: Related: [Server-Side Setup](https://inertiajs.com/docs/v3/installation/server-side-setup)
-
 [`Renderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#Renderer) turns a first visit into HTML (root template + Inertia bootstrap, or SSR output).
 The built-in [`HTMLRenderer`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#HTMLRenderer) uses `html/template` and Vite helpers (`{{ vite }}`, `{{ .inertia }}`, `{{ .inertiaHead }}`).
 
 ```go
+// Create a Renderer
 r := inertia.NewHTMLRenderer()
 r.ViteBasePath = "/build"
 r.ViteManifest = inertia.MustParseViteManifestFile("resources/public/build/manifest.json")
 r.MustParseGlob("resources/views/*.html")
 
+// Set the Renderer in the middleware config
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 	Renderer: r,
 }))
@@ -417,13 +422,9 @@ See [`CookieStateStoreConfig`](https://pkg.go.dev/github.com/kohkimakimoto/inert
 
 ## The Basics
 
-Server-side counterparts to [Inertia's the-basics](https://inertiajs.com/docs/v3/the-basics/pages).
-Pages, links, forms, and similar client topics are covered in the official docs.
-
 ### Responses
 
-:book: [Responses](https://inertiajs.com/docs/v3/the-basics/responses)
-
+:book: Related official docs: [Responses](https://inertiajs.com/docs/v3/the-basics/responses)
 ```go
 func ShowEventHandler(c *echo.Context) error {
 	event := // retrieve an event...
@@ -438,8 +439,7 @@ For root-template-only data, see [Root template data](#root-template-data).
 
 ### Redirects
 
-:book: [Redirects](https://inertiajs.com/docs/v3/the-basics/redirects)
-
+:book: Related official docs: [Redirects](https://inertiajs.com/docs/v3/the-basics/redirects)
 Use Echo's standard redirect:
 
 ```go
@@ -476,8 +476,7 @@ This is separate from [`PreserveFragment`](#preserving-url-fragments), which ask
 
 ### Routing
 
-:book: [Routing](https://inertiajs.com/docs/v3/the-basics/routing)
-
+:book: Related official docs: [Routing](https://inertiajs.com/docs/v3/the-basics/routing)
 #### Shorthand routes
 
 ```go
@@ -486,7 +485,7 @@ e.GET("/about", inertia.Handler("About"))
 
 ### Root template data
 
-:book: Related: [Title & Meta](https://inertiajs.com/docs/v3/the-basics/title-and-meta)
+:book: Related official docs: [Title & Meta](https://inertiajs.com/docs/v3/the-basics/title-and-meta)
 
 Props are available on the root template:
 
@@ -513,12 +512,11 @@ func ShowEventsHandler(c *echo.Context) error {
 
 ## Data Props
 
-:book: Category: [Data props](https://inertiajs.com/docs/v3/data-props/shared-data)
+:book: Related official docs: [Data props](https://inertiajs.com/docs/v3/data-props/shared-data)
 
 ### Shared data
 
-:book: [Shared data](https://inertiajs.com/docs/v3/data-props/shared-data)
-
+:book: Related official docs: [Shared data](https://inertiajs.com/docs/v3/data-props/shared-data)
 #### Sharing data using middleware
 
 ```go
@@ -555,8 +553,7 @@ inertia.Share(c, map[string]any{
 
 ### Flash data
 
-:book: [Flash data](https://inertiajs.com/docs/v3/data-props/flash-data)
-
+:book: Related official docs: [Flash data](https://inertiajs.com/docs/v3/data-props/flash-data)
 `Flash` adds one-time data to the top-level Page `flash` object:
 
 ```go
@@ -570,8 +567,7 @@ Across redirects, flash is persisted via [`StateStore`](#statestore) until the n
 
 ### Partial reloads
 
-:book: [Partial reloads](https://inertiajs.com/docs/v3/data-props/partial-reloads)
-
+:book: Related official docs: [Partial reloads](https://inertiajs.com/docs/v3/data-props/partial-reloads)
 ```go
 inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	// ALWAYS included on standard visits
@@ -602,8 +598,7 @@ inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 
 ### Deferred props
 
-:book: [Deferred props](https://inertiajs.com/docs/v3/data-props/deferred-props)
-
+:book: Related official docs: [Deferred props](https://inertiajs.com/docs/v3/data-props/deferred-props)
 ```go
 inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"users": users,
@@ -676,8 +671,7 @@ inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 
 ### Merging props
 
-:book: [Merging props](https://inertiajs.com/docs/v3/data-props/merging-props)
-
+:book: Related official docs: [Merging props](https://inertiajs.com/docs/v3/data-props/merging-props)
 #### Shallow merge
 
 ```go
@@ -713,8 +707,7 @@ inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 
 ### Once props
 
-:book: [Once props](https://inertiajs.com/docs/v3/data-props/once-props)
-
+:book: Related official docs: [Once props](https://inertiajs.com/docs/v3/data-props/once-props)
 Once props let the client reuse a previously loaded value. The server remains stateless; the client reports loaded keys in later requests.
 
 ```go
@@ -729,8 +722,7 @@ Use `Fresh(true)` to resolve the value even when the client already has it, `Unt
 
 ### Infinite scroll
 
-:book: [Infinite Scroll](https://inertiajs.com/docs/v3/data-props/infinite-scroll)
-
+:book: Related official docs: [Infinite Scroll](https://inertiajs.com/docs/v3/data-props/infinite-scroll)
 `Scroll` receives the page value and pagination metadata together, so loading the data does not need to run twice. Page identifiers may be numbers, cursor strings, or `nil`.
 
 ```go
@@ -755,14 +747,13 @@ The default data path is `data`. Use `WithDataPath` to change it and `Defer` to 
 
 ## Security
 
-:book: Category: [Security](https://inertiajs.com/docs/v3/security/authentication)
+:book: Related official docs: [Security](https://inertiajs.com/docs/v3/security/authentication)
 
 Authentication and authorization are application concerns (same as with any Echo app). This section covers adapter helpers that map to Inertia's security docs.
 
 ### CSRF protection
 
-:book: [CSRF protection](https://inertiajs.com/docs/v3/security/csrf-protection)
-
+:book: Related official docs: [CSRF protection](https://inertiajs.com/docs/v3/security/csrf-protection)
 Inertia Echo ships CSRF middleware configured for Inertia.js.
 It sets an `XSRF-TOKEN` cookie and verifies the `X-XSRF-TOKEN` header.
 
@@ -772,8 +763,7 @@ e.Use(inertia.CSRF())
 
 ### History encryption
 
-:book: [History encryption](https://inertiajs.com/docs/v3/security/history-encryption)
-
+:book: Related official docs: [History encryption](https://inertiajs.com/docs/v3/security/history-encryption)
 #### Encrypt middleware
 
 ```go
@@ -804,8 +794,7 @@ If the response is a redirect (or otherwise does not consume the flag on a Page 
 
 ### Asset versioning
 
-:book: [Asset versioning](https://inertiajs.com/docs/v3/advanced/asset-versioning)
-
+:book: Related official docs: [Asset versioning](https://inertiajs.com/docs/v3/advanced/asset-versioning)
 ```go
 e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 	VersionFunc: func(c *echo.Context) string { return version },
@@ -822,8 +811,7 @@ inertia.SetVersion(c, func(c *echo.Context) string { return version })
 
 ### Page URL
 
-:book: [The Page object](https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object)
-
+:book: Related official docs: [The Page object](https://inertiajs.com/docs/v3/core-concepts/the-protocol#the-page-object)
 By default the Page `url` is resolved with `req.URL.String()` (path and query). Customize it when the request URL differs from the URL you want the client to see (for example behind a path prefix):
 
 ```go
@@ -844,8 +832,7 @@ inertia.SetURLResolver(c, func(c *echo.Context) string {
 
 ### Error handling
 
-:book: [Error handling](https://inertiajs.com/docs/v3/advanced/error-handling)
-
+:book: Related official docs: [Error handling](https://inertiajs.com/docs/v3/advanced/error-handling)
 This package does not add its own error-handling framework.
 Echo already has `HTTPErrorHandler`, and Inertia request state is available on
 `echo.Context` after the middleware runs. Prefer those primitives.
@@ -901,8 +888,7 @@ If the redirect **destination** already includes `#…`, see [Redirects with URL
 
 ### Server-side Rendering (SSR)
 
-:book: [Server-side Rendering (SSR)](https://inertiajs.com/docs/v3/advanced/server-side-rendering)
-
+:book: Related official docs: [Server-side Rendering (SSR)](https://inertiajs.com/docs/v3/advanced/server-side-rendering)
 SSR is pluggable through [`SsrGateway`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#SsrGateway) interface. [`SsrHTTPGateway`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#SsrHTTPGateway) is the built-in HTTP client for a remote SSR server.
 
 ```go
