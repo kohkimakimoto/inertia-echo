@@ -61,13 +61,13 @@ func main() {
 	e.StaticFS("/", resources.Public())
 
 	e.GET("/", func(c *echo.Context) error {
-		return inertia.Render(c, "Index", map[string]any{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
 			"title":   "SSR example powered by inertia-echo",
 			"message": "SSR example",
 		})
 	})
 	e.GET("/about", func(c *echo.Context) error {
-		return inertia.Render(c, "About", map[string]any{
+		return inertia.Render(c, http.StatusOK, "About", map[string]any{
 			"title": "About inertia-echo",
 		})
 	})

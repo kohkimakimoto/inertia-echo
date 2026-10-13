@@ -2,6 +2,7 @@ package main
 
 import (
 	"log/slog"
+	"net/http"
 
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/labstack/echo/v5"
@@ -27,7 +28,7 @@ func main() {
 	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
-		return inertia.Render(c, "Index", map[string]any{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})

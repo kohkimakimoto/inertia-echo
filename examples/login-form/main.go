@@ -64,14 +64,14 @@ func main() {
 		authEmail := s.GetString("auth_email")
 		slog.Debug("authEmail", "email", authEmail)
 
-		return inertia.Render(c, "Index", map[string]any{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
 			"message": "You are logged in!",
 			"email":   authEmail,
 		})
 	}, AuthMiddleware)
 
 	e.GET("/about", func(c *echo.Context) error {
-		return inertia.Render(c, "About", map[string]any{
+		return inertia.Render(c, http.StatusOK, "About", map[string]any{
 			"title": "About inertia-echo",
 		})
 	}, AuthMiddleware)
@@ -83,7 +83,7 @@ func main() {
 			inertia.ClearHistory(c)
 			return c.Redirect(http.StatusFound, "/")
 		}
-		return inertia.Render(c, "Login", map[string]any{})
+		return inertia.Render(c, http.StatusOK, "Login", map[string]any{})
 	})
 
 	type Form struct {
@@ -99,7 +99,7 @@ func main() {
 
 		if form.Email != "kohki.makimoto@gmail.com" {
 			// display the login page again if the email is not correct
-			return inertia.Render(c, "Login", map[string]any{
+			return inertia.Render(c, http.StatusOK, "Login", map[string]any{
 				"errors": map[string]string{
 					"email": "Invalid email address",
 				},

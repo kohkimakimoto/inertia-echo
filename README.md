@@ -111,6 +111,7 @@ package main
 
 import (
 	"log/slog"
+	"net/http"
 
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/labstack/echo/v5"
@@ -136,7 +137,7 @@ func main() {
 	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
-		return inertia.Render(c, "Index", map[string]any{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})
@@ -287,7 +288,7 @@ func main() {
 	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
-		return inertia.Render(c, "Index", map[string]any{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})
@@ -444,7 +445,7 @@ The `Render` function accepts a `map[string]any` as its final argument, which co
 ```go
 func ShowEventHandler(c *echo.Context) error {
 	event := // retrieve a event...
-	return inertia.Render(c, "Event/Show", map[string]any{
+	return inertia.Render(c, http.StatusOK, "Event/Show", map[string]any{
 		"event": event,
 	})
 }
@@ -464,7 +465,7 @@ In this case, you can use the `RenderWithViewData` function.
 ```go
 func ShowEventsHandler(c *echo.Context) error {
 	event := // retrieve a event...
-	return inertia.RenderWithViewData(c, "Event/Show", map[string]any{
+	return inertia.RenderWithViewData(c, http.StatusOK, "Event/Show", map[string]any{
 		"event": event,
 	}, map[string]any{
 		"meta": "Meta data...",
@@ -575,7 +576,7 @@ inertia.Share(c, map[string]any{
 :book: The related official document: [Partial reloads](https://inertiajs.com/docs/v3/data-props/partial-reloads)
 
 ```go
-inertia.Render(c, "Users/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	// ALWAYS included on standard visits
 	// OPTIONALLY included on partial reloads
 	// ALWAYS evaluated
@@ -607,7 +608,7 @@ inertia.Render(c, "Users/Index", map[string]any{
 :book: The related official document: [Deferred props](https://inertiajs.com/docs/v3/data-props/deferred-props)
 
 ```go
-inertia.Render(c, "Users/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"users": users,
 	"roles": roles,
 	"permissions": inertia.Defer(func() (any, error) {
@@ -623,7 +624,7 @@ inertia.Render(c, "Users/Index", map[string]any{
 #### Grouping requests
 
 ```go
-inertia.Render(c, "Users/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"users": users,
 	"roles": roles,
 	"permissions": inertia.Defer(func() (any, error) {
@@ -669,7 +670,7 @@ e.Use(inertia.MiddlewareWithConfig(inertia.MiddlewareConfig{
 	},
 }))
 
-inertia.Render(c, "Users/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"permissions": inertia.Defer(func() (any, error) {
 		return loadPermissions()
 	}).Rescue(),
@@ -681,7 +682,7 @@ inertia.Render(c, "Users/Index", map[string]any{
 Once props let the client reuse a previously loaded value. The server remains stateless; the client reports loaded keys in later requests.
 
 ```go
-inertia.Render(c, "Dashboard", map[string]any{
+inertia.Render(c, http.StatusOK, "Dashboard", map[string]any{
 	"settings": inertia.Once(func() (any, error) {
 		return loadSettings()
 	}).As("dashboard-settings").For(10 * time.Minute),
@@ -699,7 +700,7 @@ Use `Fresh(true)` to resolve the value even when the client already has it, `Unt
 #### Shallow merge
 
 ```go
-inertia.Render(c, "Tags/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Tags/Index", map[string]any{
 	"tags": inertia.Merge(tags),
 })
 ```
@@ -707,7 +708,7 @@ inertia.Render(c, "Tags/Index", map[string]any{
 #### Deep merge
 
 ```go
-inertia.Render(c, "Users/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"tags": inertia.DeepMerge(users),
 })
 ```
@@ -715,7 +716,7 @@ inertia.Render(c, "Users/Index", map[string]any{
 You may chain the matchOn method to determine how existing items should be matched and updated.
 
 ```go
-inertia.Render(c, "Users/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"tags": inertia.DeepMerge(users).MatchOn("data.id"),
 })
 ```
@@ -723,7 +724,7 @@ inertia.Render(c, "Users/Index", map[string]any{
 Use `Append` or `Prepend` to select the client-side merge direction at the root or at nested paths:
 
 ```go
-inertia.Render(c, "Users/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"users": inertia.Merge(users).Append("data").MatchOn("data.id"),
 	"activity": inertia.Merge(activity).Prepend(),
 })
@@ -734,7 +735,7 @@ inertia.Render(c, "Users/Index", map[string]any{
 `Scroll` receives the page value and pagination metadata together, so loading the data does not need to run twice. Page identifiers may be numbers, cursor strings, or `nil`.
 
 ```go
-inertia.Render(c, "Users/Index", map[string]any{
+inertia.Render(c, http.StatusOK, "Users/Index", map[string]any{
 	"users": inertia.Scroll(func() (inertia.ScrollResult, error) {
 		users, err := loadUsers()
 		if err != nil {
@@ -819,10 +820,10 @@ This package does not provide an inertia-laravel-style error-handling framework
 after the middleware runs. Prefer those primitives over a library-specific
 abstraction.
 
-**In a handler**, render an error page with `RenderWithStatus`:
+**In a handler**, render an error page with a non-200 status via `Render`:
 
 ```go
-return inertia.RenderWithStatus(c, http.StatusNotFound, "ErrorPage", map[string]any{
+return inertia.Render(c, http.StatusNotFound, "ErrorPage", map[string]any{
 	"status": http.StatusNotFound,
 })
 ```
@@ -842,7 +843,7 @@ e.HTTPErrorHandler = func(c *echo.Context, err error) {
 	if i, e := inertia.Get(c); e == nil {
 		switch status {
 		case http.StatusForbidden, http.StatusNotFound, http.StatusInternalServerError, http.StatusServiceUnavailable:
-			if renderErr := i.RenderWithStatus(status, "ErrorPage", map[string]any{
+			if renderErr := i.Render(status, "ErrorPage", map[string]any{
 				"status": status,
 			}); renderErr == nil {
 				return
@@ -1080,7 +1081,7 @@ func main() {
 	e.GET("/*", echo.WrapHandler(http.StripPrefix("/", assetHandler)))
 
 	e.GET("/", func(c *echo.Context) error {
-		return inertia.Render(c, "Index", map[string]any{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})

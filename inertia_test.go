@@ -64,7 +64,7 @@ func TestRenderPreservesVaryHeader(t *testing.T) {
 				for _, value := range tt.initialVary {
 					c.Response().Header().Add(echo.HeaderVary, value)
 				}
-				return Render(c, "Home", map[string]any{})
+				return Render(c, http.StatusOK, "Home", map[string]any{})
 			})
 
 			if err := h(c); err != nil {
@@ -114,7 +114,7 @@ func TestRenderPageURLDefaultAndResolver(t *testing.T) {
 				}),
 			}))
 			e.GET("/users", func(c *echo.Context) error {
-				return Render(c, "Users", nil)
+				return Render(c, http.StatusOK, "Users", nil)
 			})
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
@@ -140,7 +140,7 @@ func TestSetURLResolver(t *testing.T) {
 	}))
 	e.GET("/", func(c *echo.Context) error {
 		SetURLResolver(c, func(*echo.Context) string { return "/custom" })
-		return Render(c, "Home", nil)
+		return Render(c, http.StatusOK, "Home", nil)
 	})
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))

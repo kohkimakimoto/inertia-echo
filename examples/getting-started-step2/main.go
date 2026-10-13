@@ -45,7 +45,7 @@ func main() {
 	e.Static("/", "resources/public")
 
 	e.GET("/", func(c *echo.Context) error {
-		return inertia.Render(c, "Index", map[string]any{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
 			"message": "Hello, World!",
 		})
 	})

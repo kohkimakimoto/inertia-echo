@@ -543,7 +543,7 @@ func TestMiddlewareWithoutSsr(t *testing.T) {
 		if SsrEnabled(c) {
 			t.Fatal("SsrEnabled should be false for WithoutSsr match")
 		}
-		return Render(c, "Home", nil)
+		return Render(c, http.StatusOK, "Home", nil)
 	})
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin/users", nil))

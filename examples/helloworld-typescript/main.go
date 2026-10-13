@@ -57,14 +57,14 @@ func main() {
 	e.StaticFS("/", resources.Public())
 
 	e.GET("/", func(c *echo.Context) error {
-		return inertia.Render(c, "Index", map[string]any{
+		return inertia.Render(c, http.StatusOK, "Index", map[string]any{
 			"title":   "Hello, World! powered by inertia-echo",
 			"message": "Hello, World!",
 		})
 	})
 
 	e.GET("/about", func(c *echo.Context) error {
-		return inertia.Render(c, "About", map[string]any{
+		return inertia.Render(c, http.StatusOK, "About", map[string]any{
 			"title": "About inertia-echo",
 			"deferredMessage": inertia.Defer(func() (any, error) {
 				return "Hello, World! from deferred props", nil

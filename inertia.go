@@ -394,23 +394,12 @@ type RenderContext struct {
 	Writer   io.Writer
 }
 
-func (i *Inertia) Render(component string, props map[string]any) error {
-	return i.render(http.StatusOK, component, props, nil)
-}
-
-func (i *Inertia) RenderWithViewData(component string, props map[string]any, viewData map[string]any) error {
-	return i.render(http.StatusOK, component, props, viewData)
-}
-
-// RenderWithStatus renders an Inertia page with a non-200 HTTP status.
-// This package does not provide an inertia-laravel-style error-handling
-// framework; Echo and Go favor explicit application logic. For centralized
-// error pages, use your application's echo.HTTPErrorHandler with Get.
-func (i *Inertia) RenderWithStatus(status int, component string, props map[string]any) error {
+// Render renders an Inertia page.
+func (i *Inertia) Render(status int, component string, props map[string]any) error {
 	return i.render(status, component, props, nil)
 }
 
-func (i *Inertia) RenderWithStatusAndViewData(status int, component string, props map[string]any, viewData map[string]any) error {
+func (i *Inertia) RenderWithViewData(status int, component string, props map[string]any, viewData map[string]any) error {
 	return i.render(status, component, props, viewData)
 }
 
@@ -560,18 +549,10 @@ func Flash(c *echo.Context, data map[string]any) {
 	MustGet(c).Flash(data)
 }
 
-func Render(c *echo.Context, component string, props map[string]any) error {
-	return MustGet(c).Render(component, props)
+func Render(c *echo.Context, status int, component string, props map[string]any) error {
+	return MustGet(c).Render(status, component, props)
 }
 
-func RenderWithViewData(c *echo.Context, component string, props map[string]any, viewData map[string]any) error {
-	return MustGet(c).RenderWithViewData(component, props, viewData)
-}
-
-func RenderWithStatus(c *echo.Context, status int, component string, props map[string]any) error {
-	return MustGet(c).RenderWithStatus(status, component, props)
-}
-
-func RenderWithStatusAndViewData(c *echo.Context, status int, component string, props map[string]any, viewData map[string]any) error {
-	return MustGet(c).RenderWithStatusAndViewData(status, component, props, viewData)
+func RenderWithViewData(c *echo.Context, status int, component string, props map[string]any, viewData map[string]any) error {
+	return MustGet(c).RenderWithViewData(status, component, props, viewData)
 }
