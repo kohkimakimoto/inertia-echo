@@ -1,4 +1,4 @@
-module github.com/kohkimakimoto/inertia-echo/examples/login-form
+module github.com/kohkimakimoto/inertia-echo/examples/notes
 
 go 1.25.0
 

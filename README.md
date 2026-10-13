@@ -384,6 +384,9 @@ Run the resulting binary:
 
 Open `http://localhost:8080`. The server no longer depends on `resources/` on disk; the views and public assets are inside the binary.
 
+For a complete authenticated application with JSON persistence, React, Tailwind CSS,
+and Inertia feature demonstrations, see [Notes](./examples/notes).
+
 ## Usage
 
 ### Renderer
