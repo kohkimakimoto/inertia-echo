@@ -15,8 +15,6 @@ const (
 	key = "__inertia__"
 )
 
-type SharedDataFunc func(c *echo.Context) (map[string]any, error)
-
 type MiddlewareConfig struct {
 	// Skipper is a function to skip middleware. Returning true skips processing the middleware.
 	Skipper middleware.Skipper
@@ -31,11 +29,11 @@ type MiddlewareConfig struct {
 	URLResolver URLResolverFunc
 	// Defines the props that are shared by default.
 	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data
-	Share SharedDataFunc
+	Share func(c *echo.Context) (map[string]any, error)
 	// Defines once props shared on every request. Map values should be
 	// func() (any, error) or *OnceProp (same contract as Laravel's shareOnce).
 	// Corresponding specification: https://inertiajs.com/docs/v3/data-props/shared-data#sharing-once-props
-	ShareOnce SharedDataFunc
+	ShareOnce func(c *echo.Context) (map[string]any, error)
 	// Renderer is a renderer that is used for rendering the root view.
 	Renderer Renderer
 	// StateStore is inertia-echo's own design for cross-request state, not an
