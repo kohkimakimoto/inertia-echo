@@ -123,13 +123,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 
 			// Create the request-scoped Inertia instance.
 			req := c.Request()
-			state, err := config.StateStore.Load(c)
-			if err != nil {
-				return err
-			}
-			if state == nil {
-				state = map[string]string{}
-			}
 			i := &Inertia{
 				echoContext:      c,
 				rootView:         config.RootView,
@@ -138,7 +131,6 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				urlResolver:      config.URLResolver,
 				renderer:         config.Renderer,
 				stateStore:       config.StateStore,
-				state:            state,
 				flash:            map[string]any{},
 				rescueReporter:   config.RescueReporter,
 				now:              config.Now,
@@ -148,6 +140,18 @@ func MiddlewareWithConfig(config MiddlewareConfig) echo.MiddlewareFunc {
 				exceptProps:      splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaPartialExcept), ","),
 				resetProps:       splitAndRemoveEmpty(req.Header.Get(HeaderXInertiaReset), ","),
 			}
+
+			// Load state (usually from a cookie) into the request-scoped Inertia instance.
+			state, err := config.StateStore.Load(c)
+			if err != nil {
+				return err
+			}
+			if state == nil {
+				state = map[string]string{}
+			}
+			i.state = state
+
+			// Set the Inertia instance into the echo.Context for access in handlers and other middleware.
 			c.Set(key, i)
 
 			// Asset versioning runs before Share and next (unlike inertia-laravel,
