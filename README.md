@@ -13,9 +13,6 @@ This README assumes you already know [how Inertia works](https://inertiajs.com/d
 > [!NOTE]
 > Inertia Echo v5.1.0+ supports Echo v5 and Inertia.js v3. v5.0.0 is the final release for Inertia.js v2.
 
-This README follows the same categories as the [Inertia.js v3 docs](https://inertiajs.com/docs/v3/getting-started/index) where the topic is server-side.
-Client-only topics (links, forms, layouts, prefetching, and so on) stay in the official docs — use this guide for how to express those features from Go with inertia-echo.
-
 Table of Contents
 
 - [Getting started](#getting-started)
