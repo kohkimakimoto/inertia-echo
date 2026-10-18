@@ -4,11 +4,4 @@ Thumbs.db
 .vscode/
 node_modules/
 
-# dev
-/.dev
-
-# doenv, direnv
-.env
-.envrc
-
 !.gitkeep
