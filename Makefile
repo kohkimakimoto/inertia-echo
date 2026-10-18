@@ -2,12 +2,6 @@
 
 SHELL := bash
 
-# Load .env file if it exists.
-ifneq (,$(wildcard ./.env))
-  include .env
-  export
-endif
-
 .PHONY: help
 help: ## Show help
 	@echo "Usage: make [target]"
@@ -20,8 +14,8 @@ help: ## Show help
 # Development environment
 # --------------------------------------------------------------------------------------
 .PHONY: clean
-clean: ## Clean up development environment
-	@rm -rf .dev
+clean: ## Clean up generated development artifacts
+	@rm -rf dev/test
 
 
 # --------------------------------------------------------------------------------------
@@ -45,10 +39,10 @@ test-verbose: ## Run tests with verbose outputting
 
 .PHONY: test-cover
 test-cover: ## Run tests with coverage report
-	@mkdir -p $(CURDIR)/.dev/test
-	@go test -race -coverpkg=./... -coverprofile=$(CURDIR)/.dev/test/coverage.out ./...
-	@go tool go-better-html-coverage -profile $(CURDIR)/.dev/test/coverage.out -o $(CURDIR)/.dev/test/coverage.html -n
+	@mkdir -p $(CURDIR)/dev/test
+	@go test -race -coverpkg=./... -coverprofile=$(CURDIR)/dev/test/coverage.out ./...
+	@go tool go-better-html-coverage -profile $(CURDIR)/dev/test/coverage.out -o $(CURDIR)/dev/test/coverage.html -n
 
 .PHONY: test-cover-open
 test-cover-open: ## Open coverage report in browser
-	@open $(CURDIR)/.dev/test/coverage.html
+	@open $(CURDIR)/dev/test/coverage.html
