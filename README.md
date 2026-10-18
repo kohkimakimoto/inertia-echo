@@ -10,8 +10,13 @@ This is the [Inertia.js](https://inertiajs.com) server-side adapter for [Echo](h
 The official server-side adapter is [inertia-laravel](https://github.com/inertiajs/inertia-laravel); this package brings the same protocol to Echo.
 This README assumes you already know [how Inertia works](https://inertiajs.com/docs/v3/core-concepts/how-it-works) and are familiar with Echo.
 
-> [!NOTE]
-> Inertia Echo v5.1.0+ supports Echo v5 and Inertia.js v3. v5.0.0 is the final release for Inertia.js v2.
+Inertia Echo aligns its major version with the supported Echo major version.
+
+| Inertia Echo | Echo | Inertia.js | Status |
+| --- | --- | --- | --- |
+| v5.1.0+ | v5 | v3 | Current |
+| v5.0.0 | v5 | v2 | Final |
+| v4.0.1 | v4 | v2 | Final |
 
 Table of Contents
 
@@ -51,7 +56,6 @@ Table of Contents
   - [Preserving URL fragments](#preserving-url-fragments)
   - [Server-side Rendering (SSR)](#server-side-rendering-ssr)
   - [Vite and embedding](#vite-and-embedding)
-- [Compatibility](#compatibility)
 - [Author](#author)
 - [License](#license)
 
@@ -995,16 +999,6 @@ func main() {
 	}
 }
 ```
-
-## Compatibility
-
-Inertia Echo aligns its major version with the supported Echo major version.
-
-| Inertia Echo | Echo | Inertia.js | Status |
-| --- | --- | --- | --- |
-| v5.1.0+ | v5 | v3 | Current |
-| v5.0.0 | v5 | v2 | Final |
-| v4.0.1 | v4 | v2 | Final |
 
 ## Author
 
