@@ -1,6 +1,6 @@
 module github.com/kohkimakimoto/inertia-echo/examples/notes
 
-go 1.25.6
+go 1.26.0
 
 replace github.com/kohkimakimoto/inertia-echo/v5 => ../..
 

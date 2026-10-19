@@ -5,7 +5,7 @@ Vite, and Tailwind CSS v4. Data is stored in JSON files; no database or SSR is u
 
 ## Run
 
-Requires Go 1.25+, Node.js 20.19+ (or 22.12+), and npm.
+Requires Go 1.26+, Node.js 20.19+ (or 22.12+), and npm.
 
 ```sh
 cd examples/notes

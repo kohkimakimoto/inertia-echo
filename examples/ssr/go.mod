@@ -1,6 +1,6 @@
 module github.com/kohkimakimoto/inertia-echo/examples/ssr
 
-go 1.25.6
+go 1.26.0
 
 replace github.com/kohkimakimoto/inertia-echo/v5 => ../..
 
