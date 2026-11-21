@@ -27,8 +27,8 @@ make run
 
 - `resources/js/ssr.tsx` — thin entry: `renderPage(page) -> { head, body }`
 - `vite.ssr.config.ts` — builds a browser-style IIFE into `ssrbundle/ssr.js`
-- `polyfill.js` — minimal host stubs (`MessageChannel`, `FormData`, …)
-- `gateway.go` — `inertia.SsrGateway` backed by one slowjs VM
+- `polyfill.js` — JS host stubs (`MessageChannel`, `FormData`, `TextEncoder`, …)
+- `gateway.go` — `inertia.SsrGateway` + `slowjs/{url,intl,temporal}.Register` (no `slowjs/tifa`)
 
 Rebuild the SSR bundle after changing pages:
 

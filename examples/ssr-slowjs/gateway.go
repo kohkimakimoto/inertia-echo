@@ -9,7 +9,9 @@ import (
 
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/liustack/slowjs"
-	"github.com/liustack/slowjs/tifa"
+	"github.com/liustack/slowjs/intl"
+	"github.com/liustack/slowjs/temporal"
+	"github.com/liustack/slowjs/url"
 )
 
 //go:embed polyfill.js
@@ -45,11 +47,21 @@ func NewSlowjsSsrGateway(bundlePath string) (*SlowjsSsrGateway, error) {
 		vm.Close()
 		return nil, fmt.Errorf("slowjs ssr: set timeout: %w", err)
 	}
-	// React-oriented host APIs (Intl/URL/Temporal + render hot paths).
-	if err := tifa.Register(vm); err != nil {
+	// Go-implemented Web APIs (same building blocks tifa.Register uses, without
+	// tifa's React acceleration hooks). Order matches slowjs/tifa.Register.
+	if err := url.Register(vm); err != nil {
 		vm.Close()
-		return nil, fmt.Errorf("slowjs ssr: tifa.Register: %w", err)
+		return nil, fmt.Errorf("slowjs ssr: url.Register: %w", err)
 	}
+	if err := intl.Register(vm); err != nil {
+		vm.Close()
+		return nil, fmt.Errorf("slowjs ssr: intl.Register: %w", err)
+	}
+	if err := temporal.Register(vm); err != nil {
+		vm.Close()
+		return nil, fmt.Errorf("slowjs ssr: temporal.Register: %w", err)
+	}
+	// JS stubs for APIs that React/Inertia touch but slowjs packages do not provide.
 	if _, err := vm.Eval(polyfillJS, slowjs.EvalGlobal); err != nil {
 		vm.Close()
 		return nil, fmt.Errorf("slowjs ssr: eval polyfill: %w", err)
