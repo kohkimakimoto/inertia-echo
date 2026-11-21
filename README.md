@@ -383,7 +383,8 @@ Documents:
 Other examples:
 
 - [`examples/notes`](./examples/notes) — authenticated sample app
-- [`examples/ssr`](./examples/ssr) — SSR setup
+- [`examples/ssr`](./examples/ssr) — SSR setup (Node SSR server)
+- [`examples/ssr-slowjs`](./examples/ssr-slowjs) — PoC: in-process SSR via [slowjs](https://github.com/liustack/slowjs) (no Node SSR server)
 
 ## Architecture
 
