@@ -34,7 +34,7 @@ func main() {
 		resources.UseDir(filepath.Join(root, "resources"))
 	}
 
-	bundlePath := filepath.Join(root, "ssrbundle", "ssr.js")
+	bundlePath := filepath.Join(root, ".build", "ssr", "ssr.js")
 	gateway, err := NewSlowjsSsrGateway(bundlePath)
 	if err != nil {
 		slog.Error("failed to start slowjs SSR gateway", "error", err)

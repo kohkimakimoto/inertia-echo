@@ -26,7 +26,7 @@ make run
 ## Layout
 
 - `resources/js/ssr.tsx` — thin entry: `renderPage(page) -> { head, body }`
-- `vite.ssr.config.ts` — builds a browser-style IIFE into `ssrbundle/ssr.js`
+- `vite.config.ts` — client build + `vite build --mode ssr` → `.build/ssr/ssr.js`
 - `polyfill.js` — JS host stubs (`MessageChannel`, `FormData`, `TextEncoder`, …)
 - `gateway.go` — `inertia.SsrGateway` + `slowjs/{url,intl,temporal}.Register` (no `slowjs/tifa`)
 

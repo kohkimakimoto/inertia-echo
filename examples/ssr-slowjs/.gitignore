@@ -1,4 +1,4 @@
 /app
+/.build
 /node_modules
 /resources/public/build
-/ssrbundle/ssr.js

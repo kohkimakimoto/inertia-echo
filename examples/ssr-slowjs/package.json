@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "vite --clearScreen=false",
     "build": "tsc --noEmit && vite build && npm run build:ssr",
-    "build:ssr": "vite build --config vite.ssr.config.ts",
-    "clean": "rm -rf resources/public/build && rm -rf ssrbundle/ssr.js && rm -rf app"
+    "build:ssr": "vite build --mode ssr",
+    "clean": "rm -rf resources/public/build && rm -rf .build && rm -rf app"
   },
   "license": "ISC",
   "description": "PoC: Inertia SSR inside the Go process via liustack/slowjs",
