@@ -1,11 +1,10 @@
-import inertia from '@inertiajs/vite'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Client (browser) build only. SSR for slowjs uses vite.ssr.config.ts.
+// Client build only. Same shape as examples/helloworld-typescript:
+// no @inertiajs/vite — official Node SSR is not used here (slowjs handles SSR).
 export default defineConfig({
-  // ssr: false — this example uses slowjs in-process, not Vite/Node SSR.
-  plugins: [inertia({ ssr: false }), react()],
+  plugins: [react()],
   publicDir: false,
   build: {
     manifest: 'manifest.json',
