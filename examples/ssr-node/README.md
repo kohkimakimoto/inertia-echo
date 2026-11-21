@@ -1,6 +1,13 @@
 # SSR with Node
 
-Official-style Inertia SSR: a Node SSR server, reached from Go via [`SsrHTTPGateway`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#SsrHTTPGateway).
+Official-style Inertia SSR: a Node SSR server, reached from Go via [`ssr/nodejs`](../../ssr/nodejs).
+
+```go
+import ssrnodejs "github.com/kohkimakimoto/inertia-echo/v5/ssr/nodejs"
+
+gateway := ssrnodejs.NewGateway()
+renderer.SsrGateway = gateway
+```
 
 For in-process SSR without Node, see [`examples/ssr-slowjs`](../ssr-slowjs).
 

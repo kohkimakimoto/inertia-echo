@@ -1,37 +1,35 @@
-# SSR with slowjs (PoC)
+# SSR with slowjs
 
-Inertia SSR inside the Go process via [liustack/slowjs](https://github.com/liustack/slowjs). No Node SSR HTTP server.
+Inertia SSR inside the Go process via [`ssr/slowjs`](../../ssr/slowjs) ([liustack/slowjs](https://github.com/liustack/slowjs)). No Node SSR HTTP server.
+
+```go
+import ssrslowjs "github.com/kohkimakimoto/inertia-echo/v5/ssr/slowjs"
+
+gateway, err := ssrslowjs.New(".build/ssr/ssr.js") // PoolSize defaults to GOMAXPROCS
+// gateway, err := ssrslowjs.New(path, ssrslowjs.Config{PoolSize: 1})
+renderer.SsrGateway = gateway
+defer gateway.Close()
+```
+
+See [`ssr/slowjs/README.md`](../../ssr/slowjs/README.md) for the VM pool and Vite IIFE setup.
 
 ## How it differs from `examples/ssr-node`
 
 | | `examples/ssr-node` | `examples/ssr-slowjs` |
 |---|---|---|
 | SSR runtime | Node (`@inertiajs/react` + Vite SSR) | slowjs (Pure Go, in-process) |
-| Transport | HTTP to SSR server (`SsrHTTPGateway`) | `SsrGateway` → `renderPage(page)` |
-| Entry | Vite `--ssr` + Inertia SSR server | thin `resources/js/ssr.tsx` IIFE |
+| Go package | `ssr/nodejs` | `ssr/slowjs` |
+| Transport | HTTP to SSR server | `renderPage(page)` in-process |
+| Entry | Vite `--ssr` | thin `resources/js/ssr.tsx` IIFE (`vite build --mode ssr`) |
 
 ## Run
 
 ```sh
-make dev    # Vite for client assets; slowjs for SSR
+make dev
 # open http://localhost:8080
 ```
 
-Production-style binary:
-
 ```sh
-make run
-```
-
-## Layout
-
-- `resources/js/ssr.tsx` — thin entry: `renderPage(page) -> { head, body }`
-- `vite.config.ts` — client build + `vite build --mode ssr` → `.build/ssr/ssr.js`
-- `polyfill.js` — JS host stubs (`MessageChannel`, `FormData`, `TextEncoder`, …)
-- `gateway.go` — `inertia.SsrGateway` + `slowjs/{url,intl,temporal}.Register` (no `slowjs/tifa`)
-
-Rebuild the SSR bundle after changing pages:
-
-```sh
-make ssr-bundle
+make run          # production-style binary
+make ssr-bundle   # rebuild SSR IIFE after page changes
 ```

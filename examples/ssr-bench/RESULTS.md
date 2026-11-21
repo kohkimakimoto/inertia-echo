@@ -1,6 +1,6 @@
 # Results
 
-Isolated processes, Index page, 50 warmup + 1000 timed renders.
+Uses core packages `ssr/slowjs` and `ssr/nodejs`.
 
 ## Author's machine
 
@@ -10,19 +10,32 @@ Isolated processes, Index page, 50 warmup + 1000 timed renders.
 | OS | macOS 26.6.2 (Build 25G83), Darwin 25.6.0 |
 | CPU | Apple M1 Max (arm64), 10 cores |
 | Memory | 32 GiB |
-| Go | go1.27.3 (`darwin/arm64`) |
+| Go | go1.27.3 (`darwin/arm64`), GOMAXPROCS=10 |
 | Node | v25.9.0 |
 
-## Numbers
+## Latency (sequential)
 
-| Engine | init | Go HeapInuse | Go MaxRSS | Node RSS | footprint≈ | avg | p50 | p95 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **slowjs** | 93ms | 1.7 MiB | **28.2 MiB** | — | **28.2 MiB** | **84µs** | 76µs | 87µs |
-| node | 778ms | 1.6 MiB | 18.9 MiB | 107.8 MiB | 126.7 MiB | 276µs | 316µs | 418µs |
+`make bench-long` — PoolSize=1, 50 warmup + 1000 timed renders, single-threaded Dispatch.
 
-- slowjs avg render ≈ **3.3× faster** than Node HTTP SSR (localhost).
-- Memory footprint ≈ **4.5× smaller** for slowjs (one process vs Go harness + Node).
-- Architectures differ on purpose: thin in-process IIFE vs official Vite `--ssr` Node server.
+| Engine | pool | init | footprint≈ | avg | p50 | p95 |
+|---|---:|---:|---:|---:|---:|---:|
+| **slowjs** | 1 | 93ms | **27.9 MiB** | **82µs** | 75µs | 81µs |
+| node | — | 827ms | 126.3 MiB | 277µs | 308µs | 417µs |
+
+- slowjs avg ≈ **3.4×** faster than Node HTTP SSR.
+- Memory footprint ≈ **4.5×** smaller (one process vs Go harness + Node).
+
+## Throughput (concurrent)
+
+`make bench-throughput` — 10 workers (=GOMAXPROCS), slowjs PoolSize=10, 50 warmup + 5000 timed renders.
+
+| Engine | pool | workers | footprint≈ | wall | rps | avg (under load) | p50 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **slowjs** | 10 | 10 | **93.3 MiB** | 62ms | **~80k** | 124µs | 84µs |
+| node | — | 10 | 128.8 MiB | 455ms | ~11k | 908µs | 617µs |
+
+- slowjs ≈ **7.3×** higher RPS at the same worker count.
+- Pool of 10 VMs raises slowjs RSS (~93 MiB) vs single-VM latency run (~28 MiB); still under Node’s combined footprint.
 
 ## Recommendation
 

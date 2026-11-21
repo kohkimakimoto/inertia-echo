@@ -1,8 +1,9 @@
 /**
- * Thin Inertia SSR entry for in-process runtimes (slowjs).
+ * Thin Inertia SSR entry for ssr/slowjs (in-process).
  *
- * Unlike the Node path (@inertiajs/react/server createServer), this file
+ * Unlike the Node path (vite build --ssr + Inertia SSR server), this file
  * only exposes renderPage(page) -> { head, body }. No HTTP server.
+ * See ssr/slowjs/README.md for the Vite IIFE build shape.
  */
 import { createElement, type ComponentType } from 'react'
 import { renderToString } from 'react-dom/server'

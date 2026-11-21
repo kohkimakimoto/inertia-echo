@@ -11,6 +11,7 @@ import (
 	"time"
 
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
+	ssrnodejs "github.com/kohkimakimoto/inertia-echo/v5/ssr/nodejs"
 )
 
 type nodeEngine struct {
@@ -18,7 +19,7 @@ type nodeEngine struct {
 	ssrDir  string
 	url     string
 	cmd     *exec.Cmd
-	gateway *inertia.SsrHTTPGateway
+	gateway *ssrnodejs.Gateway
 }
 
 func newNodeEngine(root string) *nodeEngine {
@@ -72,11 +73,9 @@ func (e *nodeEngine) Open() error {
 	}
 	e.cmd = cmd
 
-	e.gateway = &inertia.SsrHTTPGateway{
-		Enabled:    true,
-		URL:        e.url,
-		HttpClient: &http.Client{Timeout: 10 * time.Second},
-	}
+	e.gateway = ssrnodejs.NewGateway()
+	e.gateway.URL = e.url
+	e.gateway.HttpClient = &http.Client{Timeout: 10 * time.Second}
 
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {

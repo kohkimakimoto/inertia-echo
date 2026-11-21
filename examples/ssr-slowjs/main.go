@@ -13,6 +13,7 @@ import (
 	"github.com/kohkimakimoto/go-subprocess"
 	"github.com/kohkimakimoto/inertia-echo/examples/ssr-slowjs/resources"
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
+	ssrslowjs "github.com/kohkimakimoto/inertia-echo/v5/ssr/slowjs"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
@@ -35,7 +36,8 @@ func main() {
 	}
 
 	bundlePath := filepath.Join(root, ".build", "ssr", "ssr.js")
-	gateway, err := NewSlowjsSsrGateway(bundlePath)
+	// PoolSize defaults to GOMAXPROCS (see ssr/slowjs.Config). Use PoolSize: 1 for serial SSR.
+	gateway, err := ssrslowjs.New(bundlePath)
 	if err != nil {
 		slog.Error("failed to start slowjs SSR gateway", "error", err)
 		return
@@ -92,7 +94,7 @@ func main() {
 		child = p
 	}
 
-	slog.Info("listening", "addr", ":8080", "ssr", "slowjs", "bundle", bundlePath)
+	slog.Info("listening", "addr", ":8080", "ssr", "slowjs", "pool", gateway.PoolSize(), "bundle", bundlePath)
 	if err := (echo.StartConfig{Address: ":8080"}).Start(ctx, e); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
 	}

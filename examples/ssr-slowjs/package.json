@@ -9,7 +9,7 @@
     "clean": "rm -rf resources/public/build && rm -rf .build && rm -rf app"
   },
   "license": "ISC",
-  "description": "PoC: Inertia SSR inside the Go process via liustack/slowjs",
+  "description": "Inertia SSR inside the Go process via inertia-echo/v5/ssr/slowjs",
   "devDependencies": {
     "@inertiajs/react": "3.7.0",
     "@types/react": "^19.1.8",

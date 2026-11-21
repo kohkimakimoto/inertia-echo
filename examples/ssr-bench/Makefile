@@ -15,9 +15,17 @@ bundle: ## Build the slowjs SSR IIFE
 	@$(MAKE) -C ../ssr-slowjs ssr-bundle
 
 .PHONY: bench
-bench: bundle ## Run comparison (default -n 200)
-	@go run . -n 200 -warmup 20
+bench: bundle ## Latency (sequential, -n 200, slowjs -pool 1)
+	@go run . -mode latency -n 200 -warmup 20 -pool 1
 
 .PHONY: bench-long
-bench-long: bundle ## Longer run (-n 1000)
-	@go run . -n 1000 -warmup 50
+bench-long: bundle ## Latency longer (-n 1000, slowjs -pool 1)
+	@go run . -mode latency -n 1000 -warmup 50 -pool 1
+
+.PHONY: bench-throughput
+bench-throughput: bundle ## Throughput (concurrent workers=GOMAXPROCS, slowjs pool=GOMAXPROCS)
+	@go run . -mode throughput -n 5000 -warmup 50 -pool 0 -workers 0
+
+.PHONY: bench-all
+bench-all: bundle ## Latency + throughput (-n 1000 latency / same n throughput)
+	@go run . -mode both -n 1000 -warmup 50
