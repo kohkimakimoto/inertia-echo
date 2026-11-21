@@ -1,4 +1,4 @@
-module github.com/kohkimakimoto/inertia-echo/examples/ssr
+module github.com/kohkimakimoto/inertia-echo/examples/ssr-node
 
 go 1.26.0
 

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// One config, two builds — same idea as examples/ssr's isSsrBuild branch.
+// One config, two builds — same idea as examples/ssr-node's isSsrBuild branch.
 // Official Node SSR uses `vite build --ssr` (isSsrBuild). This PoC cannot:
 // slowjs needs a client-environment IIFE of ssr.tsx, not Vite's Node SSR graph.
 // So the switch is `--mode ssr` instead of `--ssr`.

@@ -11,7 +11,7 @@ import (
 	"syscall"
 
 	"github.com/kohkimakimoto/go-subprocess"
-	"github.com/kohkimakimoto/inertia-echo/examples/ssr/resources"
+	"github.com/kohkimakimoto/inertia-echo/examples/ssr-node/resources"
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"

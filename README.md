@@ -383,8 +383,9 @@ Documents:
 Other examples:
 
 - [`examples/notes`](./examples/notes) — authenticated sample app
-- [`examples/ssr`](./examples/ssr) — SSR setup (Node SSR server)
+- [`examples/ssr-node`](./examples/ssr-node) — SSR setup (Node SSR server)
 - [`examples/ssr-slowjs`](./examples/ssr-slowjs) — PoC: in-process SSR via [slowjs](https://github.com/liustack/slowjs) (no Node SSR server)
+- [`examples/ssr-bench`](./examples/ssr-bench) — compare `ssr-slowjs` vs `ssr-node` latency/memory
 
 ## Architecture
 
@@ -941,7 +942,7 @@ SSR is pluggable through [`SsrGateway`](https://pkg.go.dev/github.com/kohkimakim
 renderer.SsrGateway = inertia.NewSsrHTTPGateway()
 ```
 
-See [`examples/ssr`](./examples/ssr) for details.
+See [`examples/ssr-node`](./examples/ssr-node) for details.
 
 ### Vite and embedding
 

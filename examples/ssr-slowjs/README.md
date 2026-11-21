@@ -2,13 +2,13 @@
 
 Inertia SSR inside the Go process via [liustack/slowjs](https://github.com/liustack/slowjs). No Node SSR HTTP server.
 
-## How it differs from `examples/ssr`
+## How it differs from `examples/ssr-node`
 
-| | `examples/ssr` | `examples/ssr-slowjs` |
+| | `examples/ssr-node` | `examples/ssr-slowjs` |
 |---|---|---|
-| SSR runtime | Node (`@inertiajs/react/server`) | slowjs (Pure Go, in-process) |
-| Transport | HTTP to SSR server | `SsrGateway` → `renderPage(page)` |
-| Entry | Vite SSR + `createServer` | thin `resources/js/ssr.tsx` IIFE |
+| SSR runtime | Node (`@inertiajs/react` + Vite SSR) | slowjs (Pure Go, in-process) |
+| Transport | HTTP to SSR server (`SsrHTTPGateway`) | `SsrGateway` → `renderPage(page)` |
+| Entry | Vite `--ssr` + Inertia SSR server | thin `resources/js/ssr.tsx` IIFE |
 
 ## Run
 
