@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => {
     build: {
       manifest: isSsr ? false : 'manifest.json',
       outDir: isSsr ? '.build/ssr' : 'resources/public/build',
+      // slowjs Eval needs one self-contained IIFE (React+Inertia inlined).
+      // Code-splitting is not an option, so raise the default 500 kB warn limit.
+      chunkSizeWarningLimit: isSsr ? 2000 : undefined,
       rollupOptions: isSsr
         ? {
             input: 'resources/js/ssr.tsx',
