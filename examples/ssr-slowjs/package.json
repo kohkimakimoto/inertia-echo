@@ -1,27 +1,23 @@
 {
-  "name": "ssr",
+  "name": "ssr-slowjs",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --clearScreen=false",
-    "build": "tsc --noEmit && vite build",
-    "build:ssr": "vite build --ssr",
-    "clean": "rm -rf resources/public/build && rm -rf .build && rm -rf app",
-    "start-ssr": "npm run build:ssr && node .build/ssr/app.js"
+    "build": "tsc --noEmit && vite build && npm run build:ssr",
+    "build:ssr": "vite build --mode ssr",
+    "clean": "rm -rf resources/public/build && rm -rf .build && rm -rf app"
   },
-  "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Inertia SSR inside the Go process via inertia-echo/v5/ssr/slowjs",
   "devDependencies": {
     "@inertiajs/react": "3.7.0",
-    "@inertiajs/vite": "3.7.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.35.1",
     "vite": "^7.0.6"
   }
 }

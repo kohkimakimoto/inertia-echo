@@ -383,7 +383,9 @@ Documents:
 Other examples:
 
 - [`examples/notes`](./examples/notes) — authenticated sample app
-- [`examples/ssr`](./examples/ssr) — SSR setup
+- [`examples/ssr-node`](./examples/ssr-node) — SSR via [`ssr/nodejs`](./ssr/nodejs) (Node SSR server)
+- [`examples/ssr-slowjs`](./examples/ssr-slowjs) — SSR via [`ssr/slowjs`](./ssr/slowjs) (in-process [slowjs](https://github.com/liustack/slowjs))
+- [`examples/ssr-bench`](./examples/ssr-bench) — compare `ssr-slowjs` vs `ssr-node` latency/memory
 
 ## Architecture
 
@@ -933,14 +935,40 @@ If the redirect **destination** already includes `#…`, see [Redirects with URL
 ### Server-side Rendering (SSR)
 
 :book: Related official docs: [Server-side Rendering (SSR)](https://inertiajs.com/docs/v3/advanced/server-side-rendering)
-SSR is pluggable through [`SsrGateway`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#SsrGateway) interface. [`SsrHTTPGateway`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#SsrHTTPGateway) is the built-in HTTP client for a remote SSR server.
+
+SSR is pluggable through the [`SsrGateway`](https://pkg.go.dev/github.com/kohkimakimoto/inertia-echo/v5#SsrGateway) interface. Built-in gateways live under [`ssr/`](./ssr):
+
+| Package | Role |
+|---|---|
+| [`ssr/nodejs`](./ssr/nodejs) | HTTP client for a remote Node SSR server |
+| [`ssr/slowjs`](./ssr/slowjs) | In-process SSR via [liustack/slowjs](https://github.com/liustack/slowjs) |
+
+#### Node SSR (HTTP)
 
 ```go
-// Assign an SsrHTTPGateway to the renderer to enable SSR.
-renderer.SsrGateway = inertia.NewSsrHTTPGateway()
+import ssrnodejs "github.com/kohkimakimoto/inertia-echo/v5/ssr/nodejs"
+
+renderer.SsrGateway = ssrnodejs.NewGateway()
 ```
 
-See [`examples/ssr`](./examples/ssr) for details.
+See [`examples/ssr-node`](./examples/ssr-node).
+
+#### In-process SSR with slowjs
+
+```go
+import ssrslowjs "github.com/kohkimakimoto/inertia-echo/v5/ssr/slowjs"
+
+gateway, err := ssrslowjs.New(".build/ssr/ssr.js")
+if err != nil {
+	return err
+}
+defer gateway.Close()
+renderer.SsrGateway = gateway
+```
+
+The JS side is a thin `renderPage(page) -> { head, body }` IIFE (`vite build --mode ssr`), not the official `vite build --ssr` Node server. Details: [`ssr/slowjs/README.md`](./ssr/slowjs/README.md). Working app: [`examples/ssr-slowjs`](./examples/ssr-slowjs).
+
+Unused gateway packages are not linked into your binary; import only what you use.
 
 ### Vite and embedding
 

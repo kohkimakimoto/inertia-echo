@@ -11,8 +11,9 @@ import (
 	"syscall"
 
 	"github.com/kohkimakimoto/go-subprocess"
-	"github.com/kohkimakimoto/inertia-echo/examples/ssr/resources"
+	"github.com/kohkimakimoto/inertia-echo/examples/ssr-node/resources"
 	inertia "github.com/kohkimakimoto/inertia-echo/v5"
+	ssrnodejs "github.com/kohkimakimoto/inertia-echo/v5/ssr/nodejs"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
@@ -46,7 +47,7 @@ func main() {
 		r.ViteManifest = inertia.MustParseViteManifestFS(resources.Public(), "build/manifest.json")
 	}
 	r.MustParseFS(resources.Views(), "*.html")
-	gateway := inertia.NewSsrHTTPGateway()
+	gateway := ssrnodejs.NewGateway()
 	if isDebug {
 		gateway.UseHot = true
 		gateway.HotURL = r.ViteDevServerURL
